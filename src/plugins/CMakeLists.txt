@@ -22,6 +22,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${KRKR2CORE_PATH}/msg
     ${KRKR2CORE_PATH}/msg/win32
     ${KRKR2CORE_PATH}/utils
+    ${KRKR2CORE_PATH}/utils/encoding
     ${KRKR2CORE_PATH}/utils/win32
     ${KRKR2CORE_PATH}/base
     ${KRKR2CORE_PATH}/base/win32

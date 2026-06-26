@@ -6,18 +6,21 @@ static bool PreferenceGetValueBool(const std::string &name, bool defval) {
 }
 static void PreferenceSetValueBool(const std::string &name, bool v) {
 	GetConfigManager()->SetValueInt(name, v);
+	GetConfigManager()->SaveToFile();
 }
 static std::string PreferenceGetValueString(const std::string &name, const std::string& defval) {
 	return GetConfigManager()->GetValue<std::string>(name, defval);
 }
 static void PreferenceSetValueString(const std::string &name, const std::string& v) {
 	GetConfigManager()->SetValue(name, v);
+	GetConfigManager()->SaveToFile();
 }
 static float PreferenceGetValueFloat(const std::string &name, float defval) {
 	return GetConfigManager()->GetValue<float>(name, defval);
 }
 static void PreferenceSetValueFloat(const std::string &name, float v) {
 	GetConfigManager()->SetValueFloat(name, v);
+	GetConfigManager()->SaveToFile();
 }
 
 namespace {

@@ -15,7 +15,7 @@ Roadmap :
   - [ ] [windowEx](https://github.com/wamsoft/windowEx)
   - [ ] [layerEx](https://github.com/wamsoft/layerEx)
   - [ ] [layerExDraw](https://github.com/wamsoft/layerExDraw) (gdiPlus)
-  - [ ] [scriptsEx](https://github.com/wamsoft/scriptsEx)
+  - [x] [scriptsEx](https://github.com/wamsoft/scriptsEx) (ported; windowEx/layerExDraw stubs on Android)
 - platform
   - android
     - [x] SDK level above 21 (android 5.1, Lolipop)

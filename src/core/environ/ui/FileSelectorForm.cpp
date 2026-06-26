@@ -347,11 +347,14 @@ void TVPBaseFileSelectorForm::onTitleClicked(cocos2d::Ref *owner) {
 //		cell2->setContentSize(cell->getContentSize());
 //      cell2->addChild(item);
 		item->setContentSize(cell->getContentSize());
+		item->setAnchorPoint(Vec2::ZERO);
+		item->setPosition(Vec2::ZERO);
 		item->setCallbackName(path);
 		item->setTitleText(path);
 		item->addClickEventListener(func);
-		// ## fixme, button click position error
-		cells.emplace_back(item);
+		cell->setAnchorPoint(Vec2::ZERO);
+		cell->addChild(item);
+		cells.emplace_back(cell);
 		buttons.emplace_back(item);
 	}
 	_listform = TVPListForm::create(cells);

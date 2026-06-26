@@ -83,6 +83,7 @@ void TVPMessageBoxForm::init(const std::string &caption, const std::string &text
 		btns.emplace_back(btn);
 		_btnList->addChild(btn);
 		btn->setTag(i);
+		btn->setSwallowTouches(true);
 	}
 	float gap = _btnList->getContentSize().width - totalWidth;
 	if (gap < 0) {

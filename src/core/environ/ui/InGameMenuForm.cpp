@@ -66,7 +66,8 @@ cocos2d::ui::Widget * TVPInGameMenuForm::createMenuItem(int idx, tTJSNI_MenuItem
 	if (!item->GetChildren().empty()) {
 		ret = CreatePreferenceItem<tPreferenceItemSubDir>(idx, size, caption);
 		ret->addClickEventListener([=](Ref*){
-			TVPMainScene::GetInstance()->pushUIForm(create(caption, item));
+			TVPMainScene::GetInstance()->pushUIForm(
+				TVPInGameMenuForm::create(caption, item), TVPMainScene::eEnterAniOverFromRight);
 		});
 	} else if (item->GetGroup() > 0 || item->GetRadio()) {
 		auto getter = [=]()->bool{ return item->GetChecked(); };

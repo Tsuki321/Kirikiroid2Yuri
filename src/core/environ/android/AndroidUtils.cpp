@@ -753,36 +753,18 @@ static bool TVPWriteDataToFileJava(const std::string &filename, const void* data
 
 bool TVPWriteDataToFile(const ttstr &filepath, const void *data, unsigned int size) {
 	std::string filename = filepath.AsStdString();
-	cocos2d::FileUtils *fileutil = cocos2d::FileUtils::getInstance();
-	while (fileutil->isFileExist(filename)) {
-		// for number filename suffix issue
-		time_t t = time(nullptr);
-		std::vector<char> buffer;
-		buffer.resize(filename.size() + 32);
-		sprintf(&buffer.front(), "%s.%d.bak", filename.c_str(), (int)t);
-		std::string tempname = &buffer.front();
-		if (rename(filename.c_str(), tempname.c_str()) == 0) {
-			// file api is OK
-			FILE *fp = fopen(filename.c_str(), "wb");
-			if (fp) {
-				bool ret = fwrite(data, 1, size, fp) == size;
-				fclose(fp);
-				remove(tempname.c_str());
-				return ret;
-			}
-		}
-		bool ret = TVPWriteDataToFileJava(filename, data, size);
-		if (fileutil->isFileExist(tempname.c_str())) {
-			TVPDeleteFile(tempname);
-		}
-		return ret;
+	const char *parent = strrchr(filename.c_str(), '/');
+	if (parent && parent != filename.c_str()) {
+		std::string dir(filename.c_str(), parent - filename.c_str());
+		TVPCreateFolders(ttstr(dir));
 	}
 	FILE *fp = fopen(filename.c_str(), "wb");
 	if (fp) {
-		// file api is OK
-		int writed = fwrite(data, 1, size, fp);
+		size_t writed = fwrite(data, 1, size, fp);
 		fclose(fp);
-		return writed == size;
+		if (writed == size) {
+			return true;
+		}
 	}
 	return TVPWriteDataToFileJava(filename, data, size);
 }
