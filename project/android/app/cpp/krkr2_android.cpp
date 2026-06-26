@@ -11,12 +11,20 @@
 *******************************************************************************/
 #include <string.h>
 #include <string>
+#include <vector>
 #include <condition_variable>
 #include <mutex>
 #include "breakpad/client/linux/handler/exception_handler.h"
 #include "breakpad/client/linux/handler/minidump_descriptor.h"
 
 //std::string Android_GetDumpStoragePath();
+
+// Stashed Android launch arguments, populated by nativeSetStartupArgs (called
+// from KR2Activity.onCreate via intent extras) and consumed later by
+// TVPCheckStartupArg on the cocos thread. Plain data, safe to write from JNI
+// before the engine is fully up.
+std::string g_AndroidStartupPath;
+std::vector<std::string> g_AndroidStartupArgs;
 
 static bool __DumpCallback(const google_breakpad::MinidumpDescriptor& descriptor,
 	void* context, bool succeeded)
@@ -274,5 +282,45 @@ extern "C" {
 		Android_PushEvents([]() {
 			::Application->OnLowMemory();
 		});
+	}
+
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeSetSafTreeUri(JNIEnv* env, jclass cls, jstring uri) {
+		const char* pszUri = env->GetStringUTFChars(uri, NULL);
+		if (pszUri) {
+			std::string uriStr(pszUri);
+			env->ReleaseStringUTFChars(uri, pszUri);
+			// GlobalConfigManager::AllConfig has no locking; hop to the cocos
+			// thread to avoid racing concurrent config reads/writes (e.g. from a
+			// live preference form behind the SAF picker).
+			Android_PushEvents([uriStr]() {
+				GlobalConfigManager::GetInstance()->SetValue("saf_tree_uri", uriStr);
+				GlobalConfigManager::GetInstance()->SaveToFile();
+			});
+		}
+	}
+
+	JNIEXPORT jstring JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeGetSafTreeUri(JNIEnv* env, jclass cls) {
+		std::string uri = GlobalConfigManager::GetInstance()->GetValue<std::string>("saf_tree_uri", "");
+		return env->NewStringUTF(uri.c_str());
+	}
+
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeSetStartupArgs(JNIEnv* env, jclass cls, jstring startupPath, jobjectArray args) {
+		const char* pszPath = startupPath ? env->GetStringUTFChars(startupPath, NULL) : nullptr;
+		if (pszPath) {
+			g_AndroidStartupPath = pszPath;
+			env->ReleaseStringUTFChars(startupPath, pszPath);
+		}
+		jsize count = args ? env->GetArrayLength(args) : 0;
+		for (jsize i = 0; i < count; ++i) {
+			jstring arg = (jstring)env->GetObjectArrayElement(args, i);
+			if (arg) {
+				const char* pszArg = env->GetStringUTFChars(arg, NULL);
+				if (pszArg) {
+					g_AndroidStartupArgs.emplace_back(pszArg);
+					env->ReleaseStringUTFChars(arg, pszArg);
+				}
+				env->DeleteLocalRef(arg);
+			}
+		}
 	}
 }

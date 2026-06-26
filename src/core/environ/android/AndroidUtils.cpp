@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include "tjs.h"
 #include "MsgIntf.h"
 #include "md5.h"
@@ -18,6 +19,7 @@
 #include "ConfigManager/LocaleConfigManager.h"
 #include "Platform.h"
 #include "platform/CCCommon.h"
+#include "cocos2d/MainScene.h"
 #include <EGL/egl.h>
 #include <queue>
 #include "base/CCDirector.h"
@@ -587,9 +589,67 @@ void Android_PushEvents(const std::function<void()> &func) {
 }
 #endif
 void TVPCheckAndSendDumps(const std::string &dumpdir, const std::string &packageName, const std::string &versionStr);
+
+// Populated by Java_org_tvp_kirikiri2_KR2Activity_nativeSetStartupArgs in
+// krkr2_android.cpp (called from KR2Activity.onCreate via intent extras) and
+// consumed below. Mirrors Win32 argv[1] (startup) and argv[2..] (options).
+extern std::string g_AndroidStartupPath;
+extern std::vector<std::string> g_AndroidStartupArgs;
+
+int TVPCheckArchive(const ttstr &localname);
+
 bool TVPCheckStartupArg() {
 	// check dump
 	TVPCheckAndSendDumps(Android_GetDumpStoragePath(), GetPackageName(), TVPGetPackageVersionString());
+
+	// Consume launch arguments stashed by nativeSetStartupArgs (intent extras
+	// forwarded from KR2Activity.onCreate). Mirrors Win32 Platform.cpp argv
+	// parsing: g_AndroidStartupPath is the startup archive/folder,
+	// g_AndroidStartupArgs are "-key=value" / "-flag" options.
+	const std::string &startupPath = g_AndroidStartupPath;
+	bool bootable = false;
+	if (!startupPath.empty()) {
+		ttstr tjsPath(startupPath);
+		if (TVPCheckExistentLocalFile(tjsPath)) {
+			if (TVPCheckArchive(tjsPath) == 1) {
+				bootable = true;
+			}
+		} else {
+			TVPListDir(startupPath, [&](const std::string &_name, int mask) {
+				if (mask & S_IFREG) {
+					std::string name(_name);
+					std::transform(name.begin(), name.end(), name.begin(), [](int c)->int {
+						if (c <= 'Z' && c >= 'A')
+							return c - ('A' - 'a');
+						return c;
+					});
+					if (name == "startup.tjs") {
+						bootable = true;
+					}
+				}
+			});
+		}
+	}
+	// Parse "-key=value" / "-flag" options into TVPProgramArguments so TJS2
+	// scripts can read them via System.commandLineArgument. Applied regardless
+	// of whether a startup path was supplied (args are independent on Android,
+	// unlike Win32 positional argv).
+	for (const std::string &arg : g_AndroidStartupArgs) {
+		size_t pos = arg.find('=');
+		if (pos == arg.npos) {
+			ttstr name(arg);
+			TVPSetCommandLine(name.c_str(), TJS_W("yes"));
+		} else {
+			ttstr name(arg.substr(0, pos));
+			ttstr val(arg.substr(pos + 1));
+			TVPSetCommandLine(name.c_str(), val);
+		}
+	}
+	if (bootable) {
+		TVPMainScene::GetInstance()->startupFrom(startupPath);
+		return true;
+	}
+
 #if 0
 	// register event dispatcher
 	cocos2d::Director *director = cocos2d::Director::getInstance();

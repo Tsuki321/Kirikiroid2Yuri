@@ -24,12 +24,12 @@
 ## Phase 3 — Storage
 
 - Scoped bypass: `MediaStoreHack.java`.
-- SAF: partial in `KR2Activity.java`; persist document-tree URI in `GlobalPreference.xml` (TODO).
+- SAF: `KR2Activity.java` picker (`triggerStorageAccessFramework` / `onActivityResult` requestCode 3) persists the document-tree URI in Android `SharedPreferences["URI"]` and now mirrors it into the engine via `nativeSetSafTreeUri` → `GlobalConfigManager` (`<Item key="saf_tree_uri" value="..."/>` in `GlobalPreference.xml`). Symmetric `nativeGetSafTreeUri` lets the engine read the URI back. In-engine preference item `preference_android_fetch_sdcard_permission` (`tTVPPreferenceInfoFetchSDCardPermission` in `PreferenceConfig.h`) re-triggers the SAF picker; locale strings exist in en/ja/zh_cn/zh_tw.
 
 ## Phase 4 — Config / CLI
 
 - `GlobalPreference.xml` via `GlobalConfigManager`.
-- Android `TVPCheckStartupArg`: dump check only; intent extras → `_argv` (TODO).
+- Android `TVPCheckStartupArg` (`AndroidUtils.cpp`): runs the Breakpad dump check, then consumes launch args stashed by `nativeSetStartupArgs`. `KR2Activity.onCreate` reads intent extras (`startupPath` String → `.xp3`/bootable folder; `args` String[] of `-key=value`/`-flag`) and forwards them to native globals (`g_AndroidStartupPath` / `g_AndroidStartupArgs` in `krkr2_android.cpp`). `TVPCheckStartupArg` parses options into `TVPProgramArguments` via `TVPSetCommandLine` (exposed to TJS2 as `System.commandLineArgument`) and dispatches `startupFrom(path)` when the path is a bootable archive (`TVPCheckArchive == 1`) or directory containing `startup.tjs`; otherwise falls back to the file selector. Mirrors Win32 `Platform.cpp:91-134`.
 
 ## Phase 5 — Desktop
 

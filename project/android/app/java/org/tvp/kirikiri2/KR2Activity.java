@@ -319,6 +319,20 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
             requestExternalWrite();
         }
 		initDump(this.getFilesDir().getAbsolutePath() + "/dump");
+
+		// Forward launch intent extras to the engine. Recognized extras:
+		//   "startupPath" : String  -> path to a .xp3 archive or a bootable folder
+		//   "args"        : String[] -> per-game options, each "-key=value" or "-flag"
+		// These mirror Win32 argv[1] (startup) and argv[2..] (options); the native
+		// side stashes them and TVPCheckStartupArg consumes them on the cocos thread.
+		Intent launchIntent = getIntent();
+		if (launchIntent != null) {
+			String startupPath = launchIntent.getStringExtra("startupPath");
+			String[] args = launchIntent.getStringArrayExtra("args");
+			if (startupPath != null || args != null) {
+				nativeSetStartupArgs(startupPath, args);
+			}
+		}
 	}
 	
 	@Override
@@ -1202,6 +1216,9 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     }
 
     private static native boolean nativeGetHideSystemButton();
+    private static native void nativeSetSafTreeUri(String uri);
+    private static native String nativeGetSafTreeUri();
+    private static native void nativeSetStartupArgs(String startupPath, String[] args);
     void hideSystemUI() {
     	if(nativeGetHideSystemButton() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
     		doSetSystemUiVisibility();
@@ -1244,23 +1261,22 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     @TargetApi(Build.VERSION_CODES.KITKAT)
     protected void onActivityResult(int requestCode, int responseCode, Intent intent) {
         if (requestCode == 3) {
-            String p = Sp.getString("URI", null);
-            Uri oldUri = null;
-            if (p != null) oldUri = Uri.parse(p);
             Uri treeUri = null;
             if (responseCode == Activity.RESULT_OK) {
                 // Get Uri from Storage Access Framework.
                 treeUri = intent.getData();
                 // Persist URI - this is required for verification of writability.
-                if (treeUri != null) Sp.edit().putString("URI", treeUri.toString()).commit();
+                if (treeUri != null) {
+                    String uriStr = treeUri.toString();
+                    Sp.edit().putString("URI", uriStr).commit();
+                    // Mirror the URI into the engine's GlobalPreference.xml so the
+                    // cross-platform config layer is aware of the granted tree.
+                    nativeSetSafTreeUri(uriStr);
+                }
             }
 
             // If not confirmed SAF, or if still not writable, then revert settings.
             if (responseCode != Activity.RESULT_OK) {
-               /* DialogUtil.displayError(getActivity(), R.string.message_dialog_cannot_write_to_folder_saf, false,
-                        currentFolder);||!FileUtil.isWritableNormalOrSaf(currentFolder)
-*/
-                if (treeUri != null) Sp.edit().putString("URI", oldUri.toString()).commit();
                 return;
             }
 
