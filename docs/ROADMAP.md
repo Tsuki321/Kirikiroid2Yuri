@@ -39,4 +39,4 @@
 
 - Replace cocos last: `MainScene.cpp`, `RenderManager.cpp`, `environ/ui/*`, Gradle `:cocos2dx`.
 
-Build validation: GitHub Actions `build_android.yml` on `v*` tags only.
+Build validation: GitHub Actions `.github/workflows/build_android.yml` on push of `v*` tags or **workflow_dispatch** (manual). No local compile required if CI deps tarballs are used (same as CI job).

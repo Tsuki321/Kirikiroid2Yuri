@@ -103,7 +103,7 @@ minor:
 
 ## 5. Todo
 
-See Roadmap.  
+See Roadmap (detailed phases and file-level notes: [`docs/ROADMAP.md`](docs/ROADMAP.md)).  
 ___
 Original information about kirikiroid2 bellow, also refered some dependencies from [ningshanwutuobang](https://github.com/ningshanwutuobang/Kirikiroid2).  
 
