@@ -23,7 +23,7 @@ SKIP_PORTS=yes bash cross_androida64.sh        # skip ports if already built
 
 # 2. APK
 cd project/android
-./gradlew assembleDebug                          # -> app/build/outputs/apk/debug/krkr2yuri_v<ver>.apk
+./gradlew assembleDebug                          # -> ../../../build_android/outputs/apk/debug/krkr2yuri_v<ver>.apk (configured by build.gradle)
 ./gradlew assembleRelease                        # requires signing env vars / sign.properties
 ```
 
@@ -41,7 +41,7 @@ These paths are gitignored and must exist before a build succeeds:
 
 - `thirdparty/port/` — extracted third-party **source** (notably `thirdparty/port/cocos2d-x`, referenced throughout CMake as `COCOS2DX_PATH`).
 - `thirdparty/build/arch_androida64/` — **compiled** static libs + headers (`PORTBUILD_PATH`). All audio/video/image/archive libs link from here.
-- `assets/` — game engine assets, extracted from a prebuilt reference APK (e.g. `Kirikiroid2_yuri_1.3.9.apk`). Gradle pulls these from `project/assets` via `assets.srcDirs`.
+- `assets/` — game engine assets, extracted from a prebuilt reference APK (e.g. `Kirikiroid2_yuri_1.3.9.apk`). Gradle pulls these from root `assets/` via `assets.srcDirs = ["../../../assets"]` (relative to `project/android/app/`).
 
 ## Architecture
 
@@ -81,7 +81,7 @@ When adding/removing engine source files, remember the CMake globs require a re-
 
 ### UI assets (`project/ui/`)
 
-CocosStudio project (`.cocos-project.json`, `cocosstudio/`) holding image assets and the localization XMLs in `Resources/res/locale/` (en/ja/zh_cn/zh_tw).
+CocosStudio project (`.cocos-project.json`, `cocosstudio/`) holding image assets and the localization XMLs in `project/ui/Resources/res/locale/` (en/ja/zh_cn/zh_tw).
 
 ## Conventions
 

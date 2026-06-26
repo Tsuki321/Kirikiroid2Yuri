@@ -26,7 +26,6 @@ target_compile_options(${PROJECT_NAME} PUBLIC
     -fPIE
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
-    src/cocos
     ${KRKR2CORE_PATH}/environ/cocos2d
     ${PORTBUILD_PATH}/include
     ${PORTBUILD_PATH}/include/breakpad

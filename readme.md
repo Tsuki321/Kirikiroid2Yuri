@@ -1,8 +1,8 @@
-# Krikiroid2-Yuri  
+# Kirikiroid2-Yuri 
 
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/YuriSizuku/Kirikiroid2Yuri?color=green&label=krkr2yuri&style=flat-square7&logo=4chan)  ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/YuriSizuku/Kirikiroid2Yuri/build_android.yml?label=android%28aarch64%29&style=flat-square)
 
-☘️ A krikiroid2 project matained by Yurisizuku.  
+☘️ A Kirikiroid2 project maintained by Yurisizuku.  
 It will support the newer android device and more formats.
 
 Roadmap :
@@ -18,16 +18,16 @@ Roadmap :
   - [x] [scriptsEx](https://github.com/wamsoft/scriptsEx) (ported; windowEx/layerExDraw stubs on Android)
 - platform
   - android
-    - [x] SDK level above 21 (android 5.1, Lolipop)
+    - [x] SDK level above 21 (android 5.1, Lollipop)
     - [x] bypass scoped storage
     - [ ] access extern sdcard by saf
   - windows
   - linux
 - develop  
-  - [x] camke project structure, documention for develop
+  - [x] cmake project structure, documentation for develop
   - [x] scripts to compile or cross compile
-  - [x] vscode and android studio project for multi enviroment
-  - [x] ci in github action to automaticly build
+  - [x] vscode and android studio project for multi environment
+  - [x] ci in github action to automatically build
 
 (This project is heavily relying on cocos. Sooner or later, I might rewrite these parts and replace them by SDL2. And because that the upstream didn't provide all the plugins source code, it still needs sometime to adapt them.)
 
@@ -37,7 +37,7 @@ Although now the apk build from source is runable, it is not perfect. Beta versi
 
 ## 2. Build  
 
-I add some futures by reverse engine before, and now this project can be build from source.  This is really a very hard work, because there are so many dependencies, lack of files, code not compatible problems.  
+I added some features by reverse engine before, and now this project can be build from source.  This was really very hard work, because there are so many dependencies, lack of files, code not compatible problems.  
 
 ### (1) prepare  
 
@@ -70,7 +70,7 @@ https://github.com/cocos2d/cocos2d-x/archive/refs/tags/cocos2d-x-3.17.2.tar.gz
 ```
 
 In windows, you must use msys2 to build ffmpeg port.  
-You can also download the prebuild ports from [thirdparty_ports.tar.gz](https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_ports.tar.gz"), [thirdparty_build.tar.gz](https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_build.tar.gz).  
+You can also download the prebuilt ports from [thirdparty_port.tar.gz](https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_port.tar.gz), [thirdparty_build.tar.gz](https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_build.tar.gz).  
 
 ## (2) android  
 
@@ -78,7 +78,7 @@ You can also download the prebuild ports from [thirdparty_ports.tar.gz](https://
 - android ndk 25.2.9519653  
 
 See `_androida64.sh` for how to build dependencies.
-Use `script/cross_android64.sh` to build ports and the use `project/android/gradlew assembleDebug` to build apk.
+Use `script/cross_androida64.sh` to build ports and the use `project/android/gradlew assembleDebug` to build apk.
 
 ## 3. Compatibility  
 
@@ -87,7 +87,7 @@ Use `script/cross_android64.sh` to build ports and the use `project/android/grad
 
 ## 4. Issues (including solved)
 
-(build from souce, beta version)  
+(build from source, beta version)  
 
 major:  
 
@@ -105,7 +105,7 @@ minor:
 
 See Roadmap (detailed phases and file-level notes: [`docs/ROADMAP.md`](docs/ROADMAP.md)).  
 ___
-Original information about kirikiroid2 bellow, also refered some dependencies from [ningshanwutuobang](https://github.com/ningshanwutuobang/Kirikiroid2).  
+Original information about Kirikiroid2 below, also references some dependencies from [ningshanwutuobang](https://github.com/ningshanwutuobang/Kirikiroid2).  
 
 ## Kirikiroid2 - A cross-platform port of Kirikiri2/KirikiriZ  
 

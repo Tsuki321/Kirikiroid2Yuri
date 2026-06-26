@@ -37,6 +37,7 @@
 
 ## Phase 6 — SDL2
 
-- Replace cocos last: `MainScene.cpp`, `RenderManager.cpp`, `environ/ui/*`, Gradle `:cocos2dx`.
+- Replace cocos last: `MainScene.cpp`, `AppDelegate.cpp`, `YUVSprite.cpp`, `environ/ui/*`, Gradle `:cocos2dx`.
+- Note: `src/core/visual/RenderManager.cpp` is the engine's software renderer (used by some paths), not cocos rendering. It may need adaptation but is separate from the cocos migration.
 
 Build validation: GitHub Actions `.github/workflows/build_android.yml` on push of `v*` tags or **workflow_dispatch** (manual). No local compile required if CI deps tarballs are used (same as CI job).
