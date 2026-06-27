@@ -46,6 +46,22 @@ jobs:
         wget https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_port.tar.gz
         tar xvzf thirdparty_port.tar.gz
 
+  test:
+    # Host unit tests — no thirdparty deps, no Android SDK. Runs in parallel
+    # with the fetch/build jobs. Pure-logic components only (md5, bitap, ...).
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure
+      run: cmake -B build_test -DKRKR2_BUILD_TESTS=ON
+
+    - name: Build tests
+      run: cmake --build build_test -j
+
+    - name: Run tests
+      run: ctest --test-dir build_test --output-on-failure
+
   build_android:
     runs-on: ubuntu-20.04
     needs: 
