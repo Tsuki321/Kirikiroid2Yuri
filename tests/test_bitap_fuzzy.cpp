@@ -1,6 +1,6 @@
-#include "bitap_fuzzy.hpp"
-
 #include <gtest/gtest.h>
+
+#include "bitap_fuzzy.hpp"
 
 #include <cstdint>
 #include <string>
