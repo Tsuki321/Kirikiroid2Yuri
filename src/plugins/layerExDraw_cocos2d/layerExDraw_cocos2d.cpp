@@ -75,13 +75,13 @@ void FontInfo::refreshMetrics() {
 
 NCB_REGISTER_CLASS(Font) {
 	NCB_CONSTRUCTOR(ttstr, tjs_real, tjs_int);
-	NCB_PROPERTY(familyName, familyName, familyName);
-	NCB_PROPERTY(emSize, emSize, emSize);
-	NCB_PROPERTY(style, style, style);
-	NCB_PROPERTY(forceSelfPathDraw, forceSelfPathDraw, forceSelfPathDraw);
-	NCB_PROPERTY_RO(ascent, ascent);
-	NCB_PROPERTY_RO(descent, descent);
-	NCB_PROPERTY_RO(lineSpacing, lineSpacing);
+	NCB_PROPERTY(familyName, getFamilyName, setFamilyName);
+	NCB_PROPERTY(emSize, getEmSize, setEmSize);
+	NCB_PROPERTY(style, getStyle, setStyle);
+	NCB_PROPERTY(forceSelfPathDraw, getForceSelfPathDraw, setForceSelfPathDraw);
+	NCB_PROPERTY_RO(ascent, getAscent);
+	NCB_PROPERTY_RO(descent, getDescent);
+	NCB_PROPERTY_RO(lineSpacing, getLineSpacing);
 }
 
 //---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ NCB_REGISTER_CLASS(Appearance) {
 	NCB_METHOD(clear);
 	NCB_METHOD(addBrush);
 	NCB_METHOD(addPen);
-	NCB_PROPERTY_RO(firstColor, firstColor);
+	NCB_PROPERTY_RO(firstColor, getFirstColor);
 }
 
 //---------------------------------------------------------------------------

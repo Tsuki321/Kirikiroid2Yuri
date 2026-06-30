@@ -26,6 +26,18 @@ struct FontInfo {
 	}
 
 	void refreshMetrics();
+
+	ttstr getFamilyName() const { return familyName; }
+	void setFamilyName(const ttstr &v) { familyName = v; }
+	tjs_real getEmSize() const { return emSize; }
+	void setEmSize(tjs_real v) { emSize = v; }
+	tjs_int getStyle() const { return style; }
+	void setStyle(tjs_int v) { style = v; }
+	bool getForceSelfPathDraw() const { return forceSelfPathDraw; }
+	void setForceSelfPathDraw(bool v) { forceSelfPathDraw = v; }
+	tjs_real getAscent() const { return ascent; }
+	tjs_real getDescent() const { return descent; }
+	tjs_real getLineSpacing() const { return lineSpacing; }
 };
 
 struct DrawInfo {
@@ -47,6 +59,7 @@ struct Appearance {
 	void clear() { items.clear(); firstColor = 0xFF000000; }
 	void addBrush(tjs_uint32 color, tjs_real ox, tjs_real oy);
 	void addPen(tjs_uint32 color, tjs_real width_, tjs_real ox, tjs_real oy);
+	tjs_uint32 getFirstColor() const { return firstColor; }
 };
 
 struct PathData {
