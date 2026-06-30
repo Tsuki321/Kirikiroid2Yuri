@@ -8,6 +8,23 @@
 
 #define NCB_MODULE_NAME TJS_W("scriptsEx.dll")
 
+static inline tjs_error TJS_INTF_METHOD
+Try_iTJSDispatch2_PropSet(iTJSDispatch2 *obj, tjs_uint32 flag, const tjs_char *name, tjs_uint32 *hint, const tTJSVariant *val, iTJSDispatch2 *objthis) {
+	return obj->PropSet(flag, name, hint, val, objthis);
+}
+static inline tjs_error TJS_INTF_METHOD
+Try_iTJSDispatch2_PropSetByNum(iTJSDispatch2 *obj, tjs_uint32 flag, tjs_int num, const tTJSVariant *val, iTJSDispatch2 *objthis) {
+	return obj->PropSetByNum(flag, num, val, objthis);
+}
+static inline tjs_error TJS_INTF_METHOD
+Try_iTJSDispatch2_PropGet(iTJSDispatch2 *obj, tjs_uint32 flag, const tjs_char *name, tjs_uint32 *hint, tTJSVariant *result, iTJSDispatch2 *objthis) {
+	return obj->PropGet(flag, name, hint, result, objthis);
+}
+static inline tjs_error TJS_INTF_METHOD
+Try_iTJSDispatch2_PropGetByNum(iTJSDispatch2 *obj, tjs_uint32 flag, tjs_int num, tTJSVariant *result, iTJSDispatch2 *objthis) {
+	return obj->PropGetByNum(flag, num, result, objthis);
+}
+
 /**
  * メソッド追加用
  */
