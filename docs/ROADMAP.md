@@ -13,7 +13,7 @@
 |--------|--------|
 | scriptsEx | Ported (`scriptsEx.cpp`, `bitap_fuzzy.hpp`) |
 | windowEx | Android stub (`windowEx_stub.cpp`); full port needs Win32 |
-| layerExDraw / GdiPlus | Stub class + clear error on Android (`layerExDraw_stub.cpp`) |
+| layerExDraw / GdiPlus | Scaffold: full API registration + `drawString`/`measureString` proof-of-concept (`layerExDraw_cocos2d/`); enable via `-DKRKR2_LAYEREXDRAW_COCOS2D=ON`. Stub (`layerExDraw_stub.cpp`) is silent no-op by default. |
 | layerEx base | In-tree (`LayerExBase.cpp`, `layerExBase.hpp`) |
 
 ## Phase 2 — CX / XP3

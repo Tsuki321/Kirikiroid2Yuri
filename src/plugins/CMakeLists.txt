@@ -3,12 +3,21 @@ project(krkr2plugin)
 set(KRKR2PLUGIN_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 set(KRKR2CORE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../core)
 
+option(KRKR2_LAYEREXDRAW_COCOS2D "Use cocos2d-x layerExDraw implementation (experimental, full API registration)" OFF)
+
 # search kr2plugin src
 file(GLOB KR2KR2PLUGIN_CODE
     ${KRKR2PLUGIN_PATH}/*.c
     ${KRKR2PLUGIN_PATH}/*.cpp
 )
 list(APPEND KR2KR2PLUGIN_CODE ${KRKR2PLUGIN_PATH}/ncbind/ncbind.cpp)
+
+if(KRKR2_LAYEREXDRAW_COCOS2D)
+    list(REMOVE_ITEM KR2KR2PLUGIN_CODE ${KRKR2PLUGIN_PATH}/layerExDraw_stub.cpp)
+    list(APPEND KR2KR2PLUGIN_CODE
+        ${KRKR2PLUGIN_PATH}/layerExDraw_cocos2d/layerExDraw_cocos2d.cpp
+    )
+endif()
 
 # make krkr2plugin
 add_library(${PROJECT_NAME} STATIC ${KR2KR2PLUGIN_CODE})
