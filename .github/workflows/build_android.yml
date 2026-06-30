@@ -11,13 +11,13 @@ env:
 
 jobs:
   fetch_thirdparty_build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: check thirdparty build
       id: check_thirdparty_build
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with: 
         path: ./thirdparty/build
         key: thirdparty_build
@@ -29,13 +29,13 @@ jobs:
         tar xvzf thirdparty_build.tar.gz
 
   fetch_thirdparty_port:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: check thirdparty port
       id: check_thirdparty_port
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with: 
         path: ./thirdparty/port
         key: thirdparty_port
@@ -51,7 +51,7 @@ jobs:
     # with the fetch/build jobs. Pure-logic components only (md5, bitap, ...).
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Configure
       run: cmake -B build_test -DKRKR2_BUILD_TESTS=ON
@@ -63,22 +63,22 @@ jobs:
       run: ctest --test-dir build_test --output-on-failure
 
   build_android:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs: 
       - fetch_thirdparty_build
       - fetch_thirdparty_port
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: get thirdparty build cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with: 
         key: thirdparty_build
         path: ./thirdparty/build
 
     - name: get thirdparty port cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with: 
         key: thirdparty_port
         path: ./thirdparty/port
