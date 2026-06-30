@@ -2,6 +2,8 @@
 
 #define NCB_MODULE_NAME TJS_W("layerExDraw.dll")
 
+struct GdiPlus {};
+
 NCB_REGISTER_CLASS(GdiPlus) {
 	Variant(TJS_W("Ok"), (int)0);
 }
