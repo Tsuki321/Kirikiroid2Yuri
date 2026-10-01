@@ -268,7 +268,7 @@ tTJSInterCodeContext::tTJSInterCodeContext(tTJSInterCodeContext *parent,
 
 		Block = block;
 		block->Add(this);
-		TJSVariantArrayStack = block->GetTJS()->GetVariantArrayStack();
+		TJSVariantArrayStack = block->GetTJS() ? block->GetTJS()->GetVariantArrayStack() : nullptr;
 		if(ContextType != ctTopLevel) Block->AddRef();
 			// owner ScriptBlock hooks global object, so to avoid mutual reference lock.
 
@@ -370,7 +370,7 @@ tTJSInterCodeContext::tTJSInterCodeContext( tTJSScriptBlock *block, const tjs_ch
 		AsGlobalContextMode = false;
 		ContextType = type;
 		Block = block;
-		TJSVariantArrayStack = block->GetTJS()->GetVariantArrayStack();
+		TJSVariantArrayStack = block->GetTJS() ? block->GetTJS()->GetVariantArrayStack() : nullptr;
 	} catch(...) {
 		delete [] Name;
 		throw;

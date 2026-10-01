@@ -6,6 +6,8 @@ function ciCheck(value, message) {
 }
 var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
+ciMessages.add("ENGINE_CI_STARTED");
+ciMessages.save(ciOutput + "started.txt");
 try {
     var value = %["answer" => 42, "text" => "fixture", "nested" => [1, 2, 3]];
     value.saveStruct(ciStorage + "text-save.tjs");
