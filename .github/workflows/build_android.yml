@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -53,11 +57,18 @@ jobs:
     # Host unit tests — no thirdparty deps, no Android SDK. Runs in parallel
     # with the fetch/build jobs. Pure-logic components only (md5, bitap, ...).
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+      CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
     steps:
     - uses: actions/checkout@v4
 
     - name: Configure
-      run: cmake -B build_test -DKRKR2_BUILD_TESTS=ON
+      run: cmake -B build_test -DKRKR2_BUILD_TESTS=ON -DKRKR2_TEST_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
 
     - name: Build tests
       run: cmake --build build_test -j

@@ -28,6 +28,7 @@
 #include "tjsGlobalStringMap.h"
 #include "tjsDebug.h"
 #include "tjsByteCodeLoader.h"
+#include "tjsByteCodeValidator.h"
 #include "tjsBinarySerializer.h"
 #include "tjsRegExp.h"
 
@@ -541,6 +542,7 @@ bool tTJS::LoadByteCode( class tTJSBinaryStream* stream, tTJSVariant *result,
 			tjs_uint8 header[tTJSScriptBlock::BYTECODE_FILE_TAG_SIZE];
 			stream->Read( header, tTJSScriptBlock::BYTECODE_FILE_TAG_SIZE );
 			if( tTJSByteCodeLoader::IsTJS2ByteCode( header ) ) {
+                if (streamlen > ByteCode::MaximumFileSize) TJS_eTJSError(TJSByteCodeBroken);
 				stream->Seek( 0, TJS_BS_SEEK_SET );
 				buff = new tjs_uint8[static_cast<unsigned int>(streamlen)];
 				stream->Read( buff, static_cast<tjs_uint>(streamlen) );

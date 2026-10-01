@@ -229,7 +229,7 @@ void tTJSScriptCache::LoadByteCode( const tjs_uint8* buff, size_t len, tTJSVaria
 			// blk->Dump();
 			blk->ExecuteTopLevel( result, context );
 		} else {
-			TJS_eTJSScriptError( TJSByteCodeBroken, blk, 0 );
+			TJS_eTJSError(TJSByteCodeBroken);
 		}
 	} catch(...) {
 		if( blk ) blk->Release();

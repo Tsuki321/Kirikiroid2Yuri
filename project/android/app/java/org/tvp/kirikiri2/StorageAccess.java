@@ -6,8 +6,6 @@ import android.net.Uri;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
-import android.system.Os;
-import android.system.OsConstants;
 import android.util.AtomicFile;
 import android.util.Log;
 import androidx.documentfile.provider.DocumentFile;
@@ -123,10 +121,6 @@ public final class StorageAccess {
             String mode = access == 0 ? "r" : access == 1 ? "rwt" : "rw";
             try (ParcelFileDescriptor descriptor = context.getContentResolver().openFileDescriptor(doc.getUri(), mode)) {
                 if (descriptor == null) return -1;
-                if (access == 2) {
-                    int flags = Os.fcntlInt(descriptor.getFileDescriptor(), OsConstants.F_GETFL, 0);
-                    Os.fcntlInt(descriptor.getFileDescriptor(), OsConstants.F_SETFL, flags | OsConstants.O_APPEND);
-                }
                 return descriptor.detachFd();
             }
         } catch (Exception e) { Log.w(TAG, "Cannot open document", e); return -1; }

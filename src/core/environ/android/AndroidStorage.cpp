@@ -3,6 +3,8 @@
 #include "Platform.h"
 #include "platform/android/jni/JniHelper.h"
 #include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace {
 struct Call {
@@ -40,7 +42,12 @@ int TVPOpenDocumentFile(const std::string &path, int access) {
     jstring name = call.string(path);
     jint fd = name ? call.method.env->CallStaticIntMethod(call.method.classID, call.method.methodID, name, access) : -1;
     call.method.env->DeleteLocalRef(name);
-    return call.ok() ? fd : -1;
+    if (!call.ok()) return -1;
+    if (fd >= 0 && access == 2) {
+        int flags = fcntl(fd, F_GETFL);
+        if (flags < 0 || fcntl(fd, F_SETFL, flags | O_APPEND) < 0) { close(fd); return -1; }
+    }
+    return fd;
 }
 
 bool TVPStatDocumentFile(const std::string &path, tTVP_stat &info) {

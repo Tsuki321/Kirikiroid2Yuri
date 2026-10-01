@@ -45,3 +45,8 @@ add_executable(test_file_operations test_file_operations.cpp)
 target_include_directories(test_file_operations PRIVATE ${SRC_ROOT}/core/base)
 target_link_libraries(test_file_operations PRIVATE gtest_main Threads::Threads)
 gtest_discover_tests(test_file_operations PROPERTIES TIMEOUT 30)
+
+add_executable(test_bytecode test_bytecode.cpp)
+target_include_directories(test_bytecode PRIVATE ${SRC_ROOT}/core/tjs2)
+target_link_libraries(test_bytecode PRIVATE gtest_main)
+gtest_discover_tests(test_bytecode PROPERTIES TIMEOUT 60)

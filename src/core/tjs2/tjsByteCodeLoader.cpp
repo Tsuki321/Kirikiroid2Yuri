@@ -11,6 +11,7 @@
 #include "tjs.h"
 #include "tjsScriptBlock.h"
 #include "tjsByteCodeLoader.h"
+#include "tjsByteCodeValidator.h"
 #include "tjsGlobalStringMap.h"
 
 namespace TJS
@@ -27,6 +28,7 @@ bool tTJSByteCodeLoader::IsTJS2ByteCode( const tjs_uint8* buff )
 	return true;
 }
 tTJSScriptBlock* tTJSByteCodeLoader::ReadByteCode( tTJS* owner, const tjs_char* name, const tjs_uint8* buf, size_t size ) {
+    if (!ByteCode::Validate(buf, size)) return NULL;
 	ReadBuffer = buf;
 	ReadIndex = 0;
 	ReadSize = (tjs_uint32)size;
@@ -240,7 +242,7 @@ void tTJSByteCodeLoader::ReadObjects( tTJSScriptBlock* block, const tjs_uint8* b
 		for( int i = 0; i < datacount; i++ ) {
 			int pos = i << 1;
 			int type = data[pos];
-			int index = data[pos+1];
+			int index = static_cast<tjs_uint16>(data[pos+1]);
 			switch( type ) {
 			case TYPE_VOID:
 				vdata[i].Clear();
@@ -302,7 +304,7 @@ void tTJSByteCodeLoader::ReadObjects( tTJSScriptBlock* block, const tjs_uint8* b
 			}
 		}
 
-		tTJSInterCodeContext* obj = new tTJSInterCodeContext( block, StringArray[name].c_str(), (tTJSContextType)contextType,
+		tTJSInterCodeContext* obj = new tTJSInterCodeContext( block, name >= 0 ? StringArray[name].c_str() : NULL, (tTJSContextType)contextType,
 			code, codeSize, vdata, datacount, maxVariableCount, variableReserveCount, maxFrameCount, funcDeclArgCount, funcDeclUnnamedArgArrayBase,
 			funcDeclCollapseBase, true, srcPos, srcPosArraySize, scgetterps );
 		objs[o] = obj;

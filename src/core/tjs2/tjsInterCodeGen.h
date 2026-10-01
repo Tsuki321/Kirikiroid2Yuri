@@ -16,6 +16,7 @@
 #include <stack>
 #include <list>
 #include "tjsVariant.h"
+#include "tjsByteCodeOpcodes.h"
 #include "tjsInterface.h"
 #include "tjsNamespace.h"
 #include "tjsError.h"
@@ -41,42 +42,7 @@ namespace TJS
 //---------------------------------------------------------------------------
 extern int _yyerror(const tjs_char * msg, void *pm, tjs_int pos = -1);
 //---------------------------------------------------------------------------
-#define TJS_NORMAL_AND_PROPERTY_ACCESSER(x) x, x##PD, x##PI, x##P
 
-enum tTJSVMCodes{
-
-	VM_NOP, VM_CONST, VM_CP, VM_CL, VM_CCL, VM_TT, VM_TF, VM_CEQ, VM_CDEQ, VM_CLT,
-	VM_CGT, VM_SETF, VM_SETNF, VM_LNOT, VM_NF, VM_JF, VM_JNF, VM_JMP,
-
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_INC),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_DEC),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_LOR),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_LAND),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_BOR),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_BXOR),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_BAND),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_SAR),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_SAL),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_SR),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_ADD),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_SUB),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_MOD),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_DIV),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_IDIV),
-	TJS_NORMAL_AND_PROPERTY_ACCESSER(VM_MUL),
-
-	VM_BNOT, VM_TYPEOF, VM_TYPEOFD, VM_TYPEOFI, VM_EVAL, VM_EEXP, VM_CHKINS,
-	VM_ASC, VM_CHR, VM_NUM, VM_CHS, VM_INV, VM_CHKINV,
-	VM_INT, VM_REAL, VM_STR, VM_OCTET,
-	VM_CALL, VM_CALLD, VM_CALLI, VM_NEW,
-	VM_GPD, VM_SPD, VM_SPDE, VM_SPDEH, VM_GPI, VM_SPI, VM_SPIE,
-	VM_GPDS, VM_SPDS, VM_GPIS, VM_SPIS,  VM_SETP, VM_GETP,
-	VM_DELD, VM_DELI, VM_SRV, VM_RET, VM_ENTRY, VM_EXTRY, VM_THROW,
-	VM_CHGTHIS, VM_GLOBAL, VM_ADDCI, VM_REGMEMBER, VM_DEBUGGER,
-
-	__VM_LAST /* = last mark ; this is not a real operation code */} ;
-
-#undef TJS_NORMAL_AND_PROPERTY_ACCESSER
 //---------------------------------------------------------------------------
 enum tTJSSubType{ stNone=VM_NOP, stEqual=VM_CP, stBitAND=VM_BAND, stBitOR=VM_BOR,
 	stBitXOR=VM_BXOR, stSub=VM_SUB, stAdd=VM_ADD, stMod=VM_MOD, stDiv=VM_DIV,
