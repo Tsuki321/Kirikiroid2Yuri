@@ -76,4 +76,7 @@ inline bool WriteAtomic(const std::string &path, const void *data, size_t size) 
 }
 
 } // namespace TVPFileIO
+#undef st_atime
+#undef st_mtime
+#undef st_ctime
 #endif

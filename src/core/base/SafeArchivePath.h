@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#undef st_atime
+#undef st_mtime
+#undef st_ctime
 namespace TVPArchivePath {
 inline bool Components(const std::string &name, std::vector<std::string> &parts) {
     parts.clear();

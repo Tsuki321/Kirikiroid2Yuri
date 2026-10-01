@@ -29,6 +29,7 @@ class tTJSScriptBlock
 {
 public:
 	tTJSScriptBlock(tTJS * owner);
+	explicit tTJSScriptBlock(bool constparse);
 	virtual ~tTJSScriptBlock();
 
 	// for Bytecode               
@@ -57,6 +58,7 @@ private:
 	tjs_int FirstErrorPos;
 
 	bool UsingPreProcessor;
+	const bool ConstParse;
 
 public:
 	tjs_int CompileErrorCount;

@@ -880,6 +880,7 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 
         // Next check SAF writability.
         DocumentFile document = getDocumentFile(file, false,c);
+        if (document == null) return false;
 
         if (document == null) {
             return false;
@@ -941,55 +942,8 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     }
     
     public static DocumentFile getDocumentFile(final File file, final boolean isDirectory,Context context) {
-        String baseFolder = getExtSdCardFolder(file,context);
-        boolean originalDirectory=false;
-        if (baseFolder == null) {
-            return null;
-        }
-
-        String relativePath = null;
-        try {
-            String fullPath = file.getCanonicalPath();
-            if(!baseFolder.equals(fullPath))
-            relativePath = fullPath.substring(baseFolder.length() + 1);
-            else originalDirectory=true;
-        }
-        catch (IOException e) {
-            return null;
-        }
-        catch (Exception f){
-            originalDirectory=true;
-            //continue
-        }
-        String as=PreferenceManager.getDefaultSharedPreferences(context).getString("URI",null);
-
-        Uri treeUri =null;
-        if(as!=null)treeUri=Uri.parse(as);
-        if (treeUri == null) {
-            return null;
-        }
-
-        // start with root of SD card and then parse through document tree.
-        DocumentFile document = DocumentFile.fromTreeUri(context, treeUri);
-        if(originalDirectory)return document;
-        String[] parts = relativePath.split("\\/");
-        for (int i = 0; i < parts.length; i++) {
-            DocumentFile nextDocument = document.findFile(parts[i]);
-            if (nextDocument == null) {
-            	try {
-	                if ((i < parts.length - 1) || isDirectory) {
-	                    nextDocument = document.createDirectory(parts[i]);
-	                } else {
-	                    nextDocument = document.createFile("image", parts[i]);
-	                }
-	            } catch (Exception e) {
-	            	return null;
-	            }
-            }
-            document = nextDocument;
-        }
-
-        return document;
+        try { return StorageAccess.resolve(context, file.getPath(), true, isDirectory); }
+        catch (Exception e) { Log.w("StorageAccess", "Cannot resolve document", e); return null; }
     }
     
     static public boolean RenameFile(String from, String to) {

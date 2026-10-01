@@ -448,8 +448,10 @@ extern std::set<ttstr> TVPRegisteredPlugins;
 static bool TVPPluginLoading = false;
 void TVPLoadPlugin(const ttstr & name)
 {
-	bool success = TVPLoadInternalPlugin(name);
-    return; // seal all plugins
+    if (TVPLoadInternalPlugin(name)) return;
+    TVPAddImportantLog(TJS_W("Unsupported plugin requested: ") + name);
+    TVPThrowExceptionMessage(TVPCannotLoadPlugin, name);
+    return;
 #if 0
 	// load plugin
 	if(TVPPluginLoading)

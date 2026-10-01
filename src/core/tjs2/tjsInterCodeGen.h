@@ -78,6 +78,7 @@ class tTJSExprNode
 	tTJSVariant *Val;
 
 public:
+
 	tTJSExprNode();
 	~tTJSExprNode() { Clear(); }
 
@@ -460,6 +461,7 @@ public:
 	//---------------------------------------------------------- disassembler
 	// implemented in tjsDisassemble.cpp
 
+	bool CopyConstData(tTJSVariant *result);
 	static tTJSString GetValueComment(const tTJSVariant &val);
 
 	void Disassemble(

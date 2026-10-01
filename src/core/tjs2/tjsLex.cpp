@@ -1189,6 +1189,8 @@ tTJSSkipCommentResult tTJSLexicalAnalyzer::SkipUntil_endif()
 //---------------------------------------------------------------------------
 tTJSSkipCommentResult tTJSLexicalAnalyzer::ProcessPPStatement()
 {
+    if (!Block->GetTJS())
+        TJS_eTJSError(TJS_W("Preprocessor directives are not allowed in structured data"));
 	// process pre-prosessor statements.
 	// here "Current" points '@'.
 	const tjs_char *org = Current;
@@ -1965,6 +1967,5 @@ void tTJSLexicalAnalyzer::SetNextIsBareWord(void)
 
 
 } // namespace TJS
-
 
 

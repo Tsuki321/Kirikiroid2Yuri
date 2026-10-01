@@ -411,7 +411,7 @@ void tTJSInterCodeContext::Finalize(void)
 	ClearNodesToDelete();
 
 	if(SourcePosArray) TJS_free(SourcePosArray), SourcePosArray = NULL;
-	
+
 #ifdef ENABLE_DEBUGGER
 	if( Parent ) {
 		Parent->Release();
@@ -3435,7 +3435,7 @@ void tTJSInterCodeContext::ExitTryCode()
 			}
 		}
 	}
-	
+
 	if(NestVector.size() == 0)
 	{
 		_yyerror(TJSSyntaxError, Block);
@@ -3990,6 +3990,18 @@ std::vector<tjs_uint8>* tTJSInterCodeContext::ExportByteCode( bool outputdebug, 
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
+bool tTJSInterCodeContext::CopyConstData( tTJSVariant* result )
+{
+	if( DataArea != NULL && DataAreaSize == 1 &&
+		CodeAreaSize > 5 && CodeArea[0] == VM_CONST && CodeArea[3] == VM_SRV && CodeArea[5] == VM_RET ) {
+		result->CopyRef( DataArea[CodeArea[2]] );
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 } // namespace TJS
 
 

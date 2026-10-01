@@ -44,6 +44,10 @@ void TVPPrintLog(const char *str);
 
 void TVPFetchSDCardPermission(); // for android only
 
+// POSIX macros alias timespec fields; this structure stores plain seconds.
+#undef st_atime
+#undef st_mtime
+#undef st_ctime
 struct tTVP_stat {
 	uint16_t st_mode;
 	uint64_t st_size;

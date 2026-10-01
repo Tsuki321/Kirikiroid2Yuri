@@ -103,7 +103,10 @@ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/loadStruct)
 	}
 	delete stream;
 	if( isbin ) return TJS_S_OK;
-	return TJS_E_INVALIDPARAM;
+    tTJSVariant ignored;
+    iTJSTextReadStream *text = TJSCreateTextStreamForRead(name, mode);
+    return tTJS::LoadTextDictionaryArray(text, result ? result : &ignored)
+        ? TJS_S_OK : TJS_E_INVALIDPARAM;
 }
 TJS_END_NATIVE_STATIC_METHOD_DECL(/*func. name*/loadStruct)
 //----------------------------------------------------------------------
@@ -810,7 +813,6 @@ iTJSDispatch2 * TJSCreateDictionaryObject(iTJSDispatch2 **classout)
 
 //---------------------------------------------------------------------------
 } // namespace TJS
-
 
 
 
