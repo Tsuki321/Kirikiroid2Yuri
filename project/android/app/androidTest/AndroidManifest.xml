@@ -2,6 +2,7 @@
     <application>
         <provider android:name="org.tvp.kirikiri2.TestDocumentsProvider"
             android:authorities="com.yuri.kirikiri2.tests.documents"
+            android:permission="android.permission.MANAGE_DOCUMENTS"
             android:exported="true" android:grantUriPermissions="true" />
     </application>
 </manifest>

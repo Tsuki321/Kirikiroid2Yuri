@@ -36,7 +36,12 @@ public class StorageAccessTest {
     @BeforeClass public static void setup() {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Bundle request = new Bundle(); request.putString("package", context.getPackageName());
-        Bundle response = context.getContentResolver().call(Uri.parse("content://" + TestDocumentsProvider.AUTHORITY), "grantFixture", null, request);
+        android.app.UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        Bundle response;
+        automation.adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
+        try {
+            response = context.getContentResolver().call(Uri.parse("content://" + TestDocumentsProvider.AUTHORITY), "grantFixture", null, request);
+        } finally { automation.dropShellPermissionIdentity(); }
         assertNotNull(response);
         Uri tree = Uri.parse(response.getString("tree"));
         context.getContentResolver().takePersistableUriPermission(tree,
