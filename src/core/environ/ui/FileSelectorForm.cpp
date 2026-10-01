@@ -1,4 +1,5 @@
 #include <memory>
+#include "MsgIntf.h"
 #include "FileSelectorForm.h"
 #include "StorageImpl.h"
 #include "ui/UIListView.h"
