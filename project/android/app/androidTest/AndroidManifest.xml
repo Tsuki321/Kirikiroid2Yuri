@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider android:name="org.tvp.kirikiri2.TestDocumentsProvider"
+            android:authorities="com.yuri.kirikiri2.tests.documents"
+            android:exported="true" android:grantUriPermissions="true" />
+    </application>
+</manifest>

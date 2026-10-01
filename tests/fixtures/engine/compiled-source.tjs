@@ -1,0 +1,5 @@
+function ciSum(a, b = 2) { return a + b; }
+var ciValues = [10, 20, 10];
+var ciTotal = 0;
+for (var ciIndex = 0; ciIndex < ciValues.count; ++ciIndex) ciTotal += ciValues[ciIndex];
+try { global.ciCompiled = ciSum(ciTotal); } catch (error) { global.ciCompiled = -1; }

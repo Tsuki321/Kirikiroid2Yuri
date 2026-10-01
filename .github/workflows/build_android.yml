@@ -21,14 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: check thirdparty build
       id: check_thirdparty_build
       uses: actions/cache@v4
-      with: 
+      with:
         path: ./thirdparty/build
         key: thirdparty_build
-    
+
     - name: fetch thirdparty build
       if: steps.check_thirdparty_build.outputs.cache-hit != 'true'
       run: |
@@ -39,14 +39,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: check thirdparty port
       id: check_thirdparty_port
       uses: actions/cache@v4
-      with: 
+      with:
         path: ./thirdparty/port
         key: thirdparty_port
-    
+
     - name: fetch thirdparty port
       if: steps.check_thirdparty_port.outputs.cache-hit != 'true'
       run: |
@@ -78,7 +78,7 @@ jobs:
 
   build_android:
     runs-on: ubuntu-latest
-    needs: 
+    needs:
       - test
       - fetch_thirdparty_build
       - fetch_thirdparty_port
@@ -88,16 +88,16 @@ jobs:
 
     - name: get thirdparty build cache
       uses: actions/cache@v4
-      with: 
+      with:
         key: thirdparty_build
         path: ./thirdparty/build
 
     - name: get thirdparty port cache
       uses: actions/cache@v4
-      with: 
+      with:
         key: thirdparty_port
         path: ./thirdparty/port
-   
+
     - uses: actions/setup-java@v3
       with:
         java-version:  |
@@ -128,7 +128,7 @@ jobs:
         mkdir -p ./build_android
         cd project/android
         chmod +x ./gradlew
-        ./gradlew assembleDebug --no-daemon
+        ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon
 
     - name: Check native 16 KB alignment
       run: python3 tests/android/check_apk.py build_android/outputs/apk/debug/*.apk
@@ -147,6 +147,12 @@ jobs:
       with:
         name: krkr2yuri-debug-apk
         path: ./build_android/outputs/apk/debug/*.apk
+
+    - name: Upload instrumented test APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: krkr2yuri-android-tests
+        path: ./build_android/outputs/apk/androidTest/debug/*.apk
 
   emulator:
     name: Android ${{ matrix.api }} (${{ matrix.target }})
@@ -171,6 +177,10 @@ jobs:
         with:
           name: krkr2yuri-debug-apk
           path: apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: krkr2yuri-android-tests
+          path: test-apk
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules

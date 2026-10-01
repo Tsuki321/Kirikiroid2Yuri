@@ -1,0 +1,40 @@
+var ciMessages = [];
+function ciCheck(value, message) {
+    if (!value) throw "CI assertion: " + message;
+    ciMessages.add("PASS " + message);
+}
+var ciStorage = "@@STORAGE@@/";
+var ciOutput = "@@OUTPUT@@/";
+try {
+    var value = %["answer" => 42, "text" => "fixture", "nested" => [1, 2, 3]];
+    value.saveStruct(ciStorage + "text-save.tjs");
+    var loaded = Dictionary.loadStruct(ciStorage + "text-save.tjs");
+    ciCheck(loaded.answer == 42 && loaded.text == "fixture" && loaded.nested[2] == 3, "text save/load");
+    value.saveStruct(ciStorage + "binary-save.tjs", "b");
+    loaded = Dictionary.loadStruct(ciStorage + "binary-save.tjs");
+    ciCheck(loaded.answer == 42 && loaded.nested.count == 3, "binary save/load");
+    Plugins.link("scriptsEx.dll");
+    Plugins.link("scriptsEx.dll");
+    ciCheck(true, "plugin reload is idempotent");
+    var rejected = false;
+    try { Plugins.link("ci-missing-plugin.dll"); } catch (error) { rejected = true; }
+    ciCheck(rejected, "missing plugin reported");
+    global.ciCompiled = 0;
+    Scripts.compileStorage(ciStorage + "compiled-source.tjs", ciStorage + "compiled.tjb");
+    Scripts.execStorage(ciStorage + "compiled.tjb");
+    ciCheck(global.ciCompiled == 42, "compile/load bytecode");
+    rejected = false;
+    try { Scripts.execStorage(ciStorage + "broken.tjb"); } catch (error) { rejected = true; }
+    ciCheck(rejected, "truncated bytecode rejected");
+    global.ciSideEffect = 0;
+    rejected = false;
+    try { Dictionary.loadStruct(ciStorage + "unsafe.txt"); } catch (error) { rejected = true; }
+    ciCheck(rejected && global.ciSideEffect == 0, "structured data does not execute code");
+    rejected = false;
+    try { Dictionary.loadStruct(ciStorage + "preprocessor.txt"); } catch (error) { rejected = true; }
+    ciCheck(rejected, "structured data rejects preprocessor directives");
+    ciMessages.add("ENGINE_CI_PASS");
+} catch (error) {
+    ciMessages.add("ENGINE_CI_FAIL " + (typeof error == "string" ? error : error.message));
+}
+ciMessages.save(ciOutput + "result.txt", "utf-8");
