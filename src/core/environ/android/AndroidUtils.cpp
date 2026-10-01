@@ -1,4 +1,6 @@
 #include "AndroidUtils.h"
+#include "AndroidStorage.h"
+#include "FileOperations.h"
 #include "minizip/unzip.h"
 #include "zlib.h"
 #include <map>
@@ -369,6 +371,8 @@ std::vector<std::string> TVPGetDriverPath() {
 		}
 	}
 	
+	const auto documentRoots = TVPDocumentRoots();
+	ret.insert(ret.end(), documentRoots.begin(), documentRoots.end());
 	if (!ret.empty()) return ret;
 
 	char buffer[256] = { 0 };
@@ -783,7 +787,12 @@ bool TVPCreateFolders(const ttstr &folder)
 	JniMethodInfo methodInfo;
 	if (JniHelper::getStaticMethodInfo(methodInfo, "org/tvp/kirikiri2/KR2Activity", "CreateFolders", "(Ljava/lang/String;)Z")) {
 		jstring jstr = methodInfo.env->NewStringUTF(folder.AsStdString().c_str());
-		bool ret = methodInfo.env->CallStaticBooleanMethod(methodInfo.classID, methodInfo.methodID, jstr);
+		bool ret = jstr && methodInfo.env->CallStaticBooleanMethod(methodInfo.classID, methodInfo.methodID, jstr);
+        if (methodInfo.env->ExceptionCheck()) {
+            methodInfo.env->ExceptionDescribe();
+            methodInfo.env->ExceptionClear();
+            ret = false;
+        }
 		methodInfo.env->DeleteLocalRef(jstr);
 		methodInfo.env->DeleteLocalRef(methodInfo.classID);
 		return ret;
@@ -791,42 +800,39 @@ bool TVPCreateFolders(const ttstr &folder)
 	return false;
 }
 
-static bool TVPWriteDataToFileJava(const std::string &filename, const void* data, unsigned int size) {
-	JniMethodInfo methodInfo;
-	if (JniHelper::getStaticMethodInfo(methodInfo, "org/tvp/kirikiri2/KR2Activity", "WriteFile", "(Ljava/lang/String;[B)Z")) {
-		cocos2d::FileUtils *fileutil = cocos2d::FileUtils::getInstance();
-		bool ret = false;
-		int retry = 3;
-		do {
-			jstring jstr = methodInfo.env->NewStringUTF(filename.c_str());
-			jbyteArray arr = methodInfo.env->NewByteArray(size);
-			methodInfo.env->SetByteArrayRegion(arr, 0, size, (jbyte*)data);
-			ret = methodInfo.env->CallStaticBooleanMethod(methodInfo.classID, methodInfo.methodID, jstr, arr);
-			methodInfo.env->DeleteLocalRef(arr);
-			methodInfo.env->DeleteLocalRef(jstr);
-			methodInfo.env->DeleteLocalRef(methodInfo.classID);
-		} while (!fileutil->isFileExist(filename) && --retry);
-		return ret;
-	}
-	return false;
+static bool TVPWriteDataToFileJava(const std::string &filename, const void *data, unsigned int size) {
+    JniMethodInfo method;
+    if (size > static_cast<unsigned int>(INT_MAX) || !JniHelper::getStaticMethodInfo(method,
+        "org/tvp/kirikiri2/KR2Activity", "WriteFile", "(Ljava/lang/String;[B)Z")) return false;
+    ttstr wide(filename);
+    jstring name = method.env->NewString(reinterpret_cast<const jchar *>(wide.c_str()), wide.length());
+    jbyteArray bytes = method.env->NewByteArray(size);
+    bool ok = false;
+    if (name && bytes && !method.env->ExceptionCheck()) {
+        method.env->SetByteArrayRegion(bytes, 0, size, static_cast<const jbyte *>(data));
+        if (!method.env->ExceptionCheck())
+            ok = method.env->CallStaticBooleanMethod(method.classID, method.methodID, name, bytes);
+    }
+    if (method.env->ExceptionCheck()) {
+        method.env->ExceptionDescribe();
+        method.env->ExceptionClear();
+        ok = false;
+    }
+    method.env->DeleteLocalRef(bytes);
+    method.env->DeleteLocalRef(name);
+    method.env->DeleteLocalRef(method.classID);
+    return ok;
 }
 
 bool TVPWriteDataToFile(const ttstr &filepath, const void *data, unsigned int size) {
-	std::string filename = filepath.AsStdString();
-	const char *parent = strrchr(filename.c_str(), '/');
-	if (parent && parent != filename.c_str()) {
-		std::string dir(filename.c_str(), parent - filename.c_str());
-		TVPCreateFolders(ttstr(dir));
-	}
-	FILE *fp = fopen(filename.c_str(), "wb");
-	if (fp) {
-		size_t writed = fwrite(data, 1, size, fp);
-		fclose(fp);
-		if (writed == size) {
-			return true;
-		}
-	}
-	return TVPWriteDataToFileJava(filename, data, size);
+    const std::string filename = filepath.AsStdString();
+    const size_t slash = filename.rfind('/');
+    if (slash != std::string::npos && slash != 0) {
+        const ttstr parent(filename.substr(0, slash));
+        if (!TVPCheckExistentLocalFolder(parent) && !TVPCreateFolders(parent)) return false;
+    }
+    if (TVPFileIO::WriteAtomic(filename, data, size)) return true;
+    return TVPWriteDataToFileJava(filename, data, size);
 }
 
 std::string TVPGetCurrentLanguage() {
@@ -920,6 +926,7 @@ bool TVP_stat(const char *name, tTVP_stat &s) {
 	// static_assert(sizeof(t.st_size) == 4, "");
 	static_assert(sizeof(t.st_size) == 8, "");
 	bool ret = !stat(name, &t);
+	if (!ret) return TVPStatDocumentFile(name, s);
 	s.st_mode = t.st_mode;
 	s.st_size = t.st_size;
 	s.st_atime = t.st_atim.tv_sec;

@@ -14,6 +14,9 @@
 
 #include "StorageIntf.h"
 #include <functional>
+#include <atomic>
+#include <cstdio>
+FILE *TVPOpenArchiveDestination(const std::string &root, const std::string &entry);
 
 
 
@@ -188,7 +191,7 @@ protected:
 	const tTVPUnpackArchiveCallbacks *_callbacks = nullptr;
 
 public:
-	bool StopRequired = false;
+	std::atomic<bool> StopRequired{false};
 
 	virtual ~iTVPUnpackArchiveImpl() {}
 	

@@ -50,7 +50,6 @@ class tTVPLocalFileStream : public tTJSBinaryStream
 private:
 	//HANDLE Handle;
     int Handle;
-    tTVPMemoryStream *MemBuffer = nullptr;
     ttstr FileName;
 
 public:

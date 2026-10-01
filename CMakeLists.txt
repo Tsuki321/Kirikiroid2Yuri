@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.22)
 project(krkr2yuri)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -16,6 +16,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Android")
 	add_library(${PROJECT_NAME} SHARED
 		project/android/app/cpp/krkr2_android.cpp
 	)
+	target_link_options(${PROJECT_NAME} PRIVATE -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
 	target_compile_options(${PROJECT_NAME} PUBLIC
 		-fPIE
 	)

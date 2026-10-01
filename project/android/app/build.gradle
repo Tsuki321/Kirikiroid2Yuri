@@ -3,6 +3,8 @@ plugins {
 }
 
 android {
+    namespace "com.yuri.kirikiri2"
+    packagingOptions { jniLibs { useLegacyPackaging true } }
     // compileSdkVersion PROP_TARGET_SDK_VERSION
     ndkVersion '25.2.9519653'
     buildToolsVersion '33.0.2'

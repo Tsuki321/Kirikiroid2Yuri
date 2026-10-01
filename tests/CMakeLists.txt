@@ -12,6 +12,13 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 include(GoogleTest)
+find_package(Threads REQUIRED)
+
+option(KRKR2_TEST_SANITIZERS "Run host tests with address/undefined sanitizers" OFF)
+if(KRKR2_TEST_SANITIZERS)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
 
 set(SRC_ROOT ${CMAKE_SOURCE_DIR}/src)
 
@@ -33,3 +40,8 @@ add_executable(test_bitap_fuzzy
 target_include_directories(test_bitap_fuzzy PRIVATE ${SRC_ROOT}/plugins)
 target_link_libraries(test_bitap_fuzzy PRIVATE gtest_main)
 gtest_discover_tests(test_bitap_fuzzy)
+
+add_executable(test_file_operations test_file_operations.cpp)
+target_include_directories(test_file_operations PRIVATE ${SRC_ROOT}/core/base)
+target_link_libraries(test_file_operations PRIVATE gtest_main Threads::Threads)
+gtest_discover_tests(test_file_operations PROPERTIES TIMEOUT 30)

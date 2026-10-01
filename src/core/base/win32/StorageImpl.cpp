@@ -36,6 +36,10 @@
 #include "dirent.h"
 #include "TickCount.h"
 #include <fcntl.h>
+#include "FileOperations.h"
+#ifdef __ANDROID__
+#include "android/AndroidStorage.h"
+#endif
 #include <unistd.h>
 #include "combase.h"
 #include "win32io.h"
@@ -137,7 +141,13 @@ void TVPListDir(const std::string &folder, std::function<void(const std::string&
 			cb(direntp->d_name, stat_buf.st_mode);
 		}
 		closedir(dirp);
+		return;
 	}
+#ifdef __ANDROID__
+    TVPListDocuments(folder, [&cb](const ttstr &, tTVPLocalFileInfo *info) {
+        cb(info->NativeName, info->Mode);
+    });
+#endif
 }
 
 void TVPGetLocalFileListAt(const ttstr &name, const std::function<void(const ttstr&, tTVPLocalFileInfo*)>& cb) {
@@ -175,7 +185,11 @@ void TVPGetLocalFileListAt(const ttstr &name, const std::function<void(const tts
 			cb(file, &info);
 		}
 		closedir(dirp);
+		return;
 	}
+#ifdef __ANDROID__
+    TVPListDocuments(folder, cb);
+#endif
 }
 //---------------------------------------------------------------------------
 void TJS_INTF_METHOD tTVPFileMedia::GetListAt(const ttstr &_name, iTVPStorageLister *lister)
@@ -736,130 +750,69 @@ bool TVPCreateFolders(const ttstr &folder)
 // tTVPLocalFileStream
 //---------------------------------------------------------------------------
 tTVPLocalFileStream::tTVPLocalFileStream(const ttstr &origname,
-	const ttstr &localname, tjs_uint32 flag)
-    : MemBuffer(nullptr), FileName(localname), Handle(-1)
+    const ttstr &localname, tjs_uint32 flag)
+    : FileName(localname), Handle(-1)
 {
-	tjs_uint32 access = flag & TJS_BS_ACCESS_MASK;
-    if(access == TJS_BS_WRITE) {
-        if (TVPCheckExistentLocalFile(localname)) {
-        } else {
-			ttstr dirpath = TVPLocalExtractFilePath(localname);
-			const tjs_char *p = dirpath.c_str();
-			tjs_int i = dirpath.GetLen();
-			if (p[i-1] == TJS_W('/') || p[i-1] == TJS_W('\\')) i--;
-			dirpath = dirpath.SubString(0, i);
-			if (!TVPCheckExistentLocalFolder(dirpath) && !TVPCreateFolders(dirpath)) {
-				TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
-			}
-//			_lastFileSystemChanged = true;
-        }
-		MemBuffer = new tTVPMemoryStream();
-		return;
-	}
-
-	unsigned int rw = 0;
-	switch(access)
-	{
-	case TJS_BS_READ:
-		rw |= O_RDONLY;				break;
-	case TJS_BS_WRITE:
-		rw |= O_RDWR | O_CREAT | O_TRUNC;	break;
-	case TJS_BS_APPEND:
-        rw |= O_APPEND;	    break;
-	case TJS_BS_UPDATE:
-		rw |= O_RDWR;			    break;
-	}
-
-	tTJSNarrowStringHolder holder(localname.c_str());
-	Handle = open(holder, rw, 0666);
-	if (Handle < 0) {
-		if (access == TJS_BS_APPEND || access == TJS_BS_UPDATE) {
-			// use whole file writing
-			Handle = open(holder, O_RDONLY, 0666);
-			if (Handle >= 0) {
-				tjs_uint64 size = GetSize();
-				if (size < 4 * 1024 * 1024) { // only support file size <= 4M
-					MemBuffer = new tTVPMemoryStream();
-					MemBuffer->SetSize(size);
-					read(Handle, MemBuffer->GetInternalBuffer(), size);
-		}
-				close(Handle);
-				Handle = -1;
-			}
-		}
-		if (!MemBuffer)
-		TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
-	}
-	// push current tick as an environment noise
-	uint32_t tick = TVPGetRoughTickCount32();
-	TVPPushEnvironNoise(&tick, sizeof(tick));
+    const tjs_uint32 access = flag & TJS_BS_ACCESS_MASK;
+    if (access == TJS_BS_WRITE || access == TJS_BS_APPEND) {
+        ttstr parent = TVPLocalExtractFilePath(localname);
+        if (!parent.IsEmpty() && !TVPCheckExistentLocalFolder(parent) && !TVPCreateFolders(parent))
+            TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
+    }
+    Handle = TVPFileIO::Open(localname.AsStdString().c_str(), access);
+#ifdef __ANDROID__
+    if (Handle < 0)
+        Handle = TVPOpenDocumentFile(localname.AsStdString(), access);
+#endif
+    if (Handle < 0)
+        TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
+    if (access == TJS_BS_APPEND && lseek64(Handle, 0, SEEK_END) < 0) {
+        close(Handle);
+        Handle = -1;
+        TVPThrowExceptionMessage(TVPCannotOpenStorage, origname);
+    }
+    TVPPushEnvironNoise(&Handle, sizeof(Handle));
 }
 //---------------------------------------------------------------------------
-bool TVPWriteDataToFile(const ttstr &filepath, const void *data, unsigned int len);
 tTVPLocalFileStream::~tTVPLocalFileStream()
 {
-    if(MemBuffer) {
-		if (!TVPWriteDataToFile(FileName, MemBuffer->GetInternalBuffer(), MemBuffer->GetSize())) {
-			delete MemBuffer;
-			ttstr filename(FileName);
-			FileName.~tTJSString();
-			free(this);
-			TVPThrowExceptionMessage(TJS_W("File Writing Error: %1"), filename);
-		}
-		delete MemBuffer;
-    }
-    if (Handle >= 0) {
-		close(Handle);
-	}
-
-	// push current tick as an environment noise
-	// (timing information from file accesses may be good noises)
-	uint32_t tick = TVPGetRoughTickCount32();
-	TVPPushEnvironNoise(&tick, sizeof(tick));
+    // Writes happen while the stream is alive, so I/O errors reach the caller.
+    // A destructor must neither free itself nor throw during stack unwinding.
+    if (Handle >= 0) close(Handle);
 }
 //---------------------------------------------------------------------------
 tjs_uint64 TJS_INTF_METHOD tTVPLocalFileStream::Seek(tjs_int64 offset, tjs_int whence)
 {
-    if(MemBuffer) {
-        return MemBuffer->Seek(offset, whence);
-	}
-	return lseek64(Handle, offset, whence);
+    const tjs_int64 position = lseek64(Handle, offset, whence);
+    if (position < 0) TVPThrowExceptionMessage(TVPReadError);
+    return position;
 }
 //---------------------------------------------------------------------------
-tjs_uint TJS_INTF_METHOD tTVPLocalFileStream::Read(void *buffer, tjs_uint read_size)
+tjs_uint TJS_INTF_METHOD tTVPLocalFileStream::Read(void *buffer, tjs_uint size)
 {
-    if(MemBuffer) {
-        return MemBuffer->Read(buffer, read_size);
-	}
-    return read(Handle, buffer, read_size);
+    const ssize_t count = TVPFileIO::Read(Handle, buffer, size);
+    if (count < 0) TVPThrowExceptionMessage(TVPReadError);
+    return static_cast<tjs_uint>(count);
 }
 //---------------------------------------------------------------------------
-tjs_uint TJS_INTF_METHOD tTVPLocalFileStream::Write(const void *buffer, tjs_uint write_size)
+tjs_uint TJS_INTF_METHOD tTVPLocalFileStream::Write(const void *buffer, tjs_uint size)
 {
-    if(MemBuffer) {
-        return MemBuffer->Write(buffer, write_size);
-	}
-    return write(Handle, buffer, write_size);
+    if (!TVPFileIO::WriteAll(Handle, buffer, size))
+        TVPThrowExceptionMessage(TVPWriteError);
+    return size;
 }
 //---------------------------------------------------------------------------
 void TJS_INTF_METHOD tTVPLocalFileStream::SetEndOfStorage()
 {
-    if(MemBuffer) {
-        return MemBuffer->SetEndOfStorage();
-	}
-    lseek64(Handle, 0, SEEK_END);
+    if (!TVPFileIO::TruncateHere(Handle)) TVPThrowExceptionMessage(TVPWriteError);
 }
 //---------------------------------------------------------------------------
 tjs_uint64 TJS_INTF_METHOD tTVPLocalFileStream::GetSize()
 {
-    if(MemBuffer) {
-        return MemBuffer->GetSize();
-    }
-	tjs_uint64 ret;
-    tjs_int64 curpos = lseek64(Handle, 0, SEEK_CUR);
-    ret = lseek64(Handle, 0, SEEK_END);
-    lseek64(Handle, curpos, SEEK_SET);
-	return ret;
+    struct stat info;
+    if (fstat(Handle, &info) != 0 || info.st_size < 0)
+        TVPThrowExceptionMessage(TVPReadError);
+    return static_cast<tjs_uint64>(info.st_size);
 }
 //---------------------------------------------------------------------------
 

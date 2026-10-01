@@ -1,3 +1,4 @@
+#include <memory>
 #include "FileSelectorForm.h"
 #include "StorageImpl.h"
 #include "ui/UIListView.h"
@@ -670,11 +671,24 @@ void TVPBaseFileSelectorForm::onUnpackClicked(cocos2d::Ref *owner)
 	tjs_uint count = arc->GetCount();
 	for (tjs_uint i = 0; i < count; ++i) {
 		ttstr name = arc->GetName(i);
-		ttstr fullpath = outpath + name;
-		tTJSBinaryStream *st = arc->CreateStreamByIndex(i);
-		if (!st) continue;
-		TVPSaveStreamToFile(st, 0, st->GetSize(), fullpath);
-		delete st;
+        std::unique_ptr<tTJSBinaryStream> st(arc->CreateStreamByIndex(i));
+        if (!st) continue;
+        FILE *output = TVPOpenArchiveDestination(outpath.AsStdString(), name.AsStdString());
+        if (!output) {
+            delete arc;
+            TVPThrowExceptionMessage(TVPWriteError);
+        }
+        bool ok = true;
+        try {
+            char buffer[65536];
+            for (;;) {
+                tjs_uint count = st->Read(buffer, sizeof(buffer));
+                if (!count) break;
+                if (fwrite(buffer, 1, count, output) != count) { ok = false; break; }
+            }
+        } catch (...) { fclose(output); delete arc; throw; }
+        if (fclose(output) != 0) ok = false;
+        if (!ok) { delete arc; TVPThrowExceptionMessage(TVPWriteError); }
 	}
 
 	delete arc;

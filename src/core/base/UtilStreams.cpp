@@ -11,6 +11,11 @@
 #include "tjsCommHead.h"
 
 #include "UtilStreams.h"
+#include "SafeArchivePath.h"
+#include "StartOnceWorker.h"
+#ifdef __ANDROID__
+#include "android/AndroidStorage.h"
+#endif
 #include "MsgIntf.h"
 #include "DebugIntf.h"
 #include "EventIntf.h"
@@ -469,45 +474,38 @@ tTVPArchive *TVPOpenLibArchive(const ttstr & name, tTJSBinaryStream *st, bool no
 }
 #endif
 
-static FILE *_fileopen(const std::string &strpath) {
-	FILE *fp = fopen(strpath.c_str(), "wb");
-	if (!fp) { // make dirs
-		ttstr path = TVPExtractStoragePath(strpath);
-		TVPCreateFolders(path);
-		fp = fopen(strpath.c_str(), "wb");
-	}
-	return fp;
+FILE *TVPOpenArchiveDestination(const std::string &root, const std::string &entry) {
+    std::vector<std::string> parts;
+    if (!TVPArchivePath::Components(entry, parts)) return nullptr;
+    int fd = TVPArchivePath::OpenFile(root, entry);
+#ifdef __ANDROID__
+    if (fd < 0) {
+        tTVP_stat info;
+        // Only a document tree may use the provider fallback; never retry an
+        // unsafe local path through an unchecked fopen or mkdir operation.
+        if (!TVPStatDocumentFile(root, info)) return nullptr;
+        std::string path = root;
+        if (!path.empty() && path.back() == '/') path.pop_back();
+        for (size_t i = 0; i + 1 < parts.size(); ++i) {
+            path += "/" + parts[i];
+            if (!TVPCreateFolders(ttstr(path))) return nullptr;
+        }
+        path += "/" + parts.back();
+        fd = TVPOpenDocumentFile(path, TJS_BS_WRITE);
+    }
+#endif
+    if (fd < 0) return nullptr;
+    FILE *file = fdopen(fd, "wb");
+    if (!file) close(fd);
+    return file;
 }
 
 class tTVPUnpackArchiveThread {
-	std::thread *ThreadObj;
-	std::mutex Mutex;
-	std::condition_variable Cond;
-	tTVPUnpackArchive *Owner;
-
-	void Entry() {
-		{
-			std::unique_lock<std::mutex> lk(Mutex);
-			Cond.wait(lk);
-		}
-		Owner->Process();
-	}
-
+    TVPStartOnceWorker Worker;
 public:
-	tTVPUnpackArchiveThread(tTVPUnpackArchive *owner) : Owner(owner) {
-		ThreadObj = new std::thread(&tTVPUnpackArchiveThread::Entry, this);
-	}
-
-	~tTVPUnpackArchiveThread() {
-		if (ThreadObj->joinable()) {
-			ThreadObj->join();
-		}
-		delete ThreadObj;
-	}
-
-	void Start() {
-		Cond.notify_all();
-	}
+    explicit tTVPUnpackArchiveThread(tTVPUnpackArchive *owner)
+        : Worker([owner]() { owner->Process(); }) {}
+    void Start() { Worker.Start(); }
 };
 
 class tTVPUnpackArchiveImplWrap : public iTVPUnpackArchiveImpl {
@@ -549,7 +547,7 @@ public:
 			std::string filename = pTVPArc->GetName(index).AsStdString();
 			if (filename.size() > 600) continue;
 			std::string fullpath = OutPath + filename;
-			FILE *fp = _fileopen(fullpath);
+			FILE *fp = TVPOpenArchiveDestination(OutPath, filename);
 			if (!fp) {
 				_callbacks->FuncOnError(ARCHIVE_FAILED, "Cannot open output file");
 				break;
@@ -703,7 +701,7 @@ public:
 				continue;
 			}
 			std::string fullpath = OutPath + filename;
-			FILE *fp = _fileopen(fullpath);
+			FILE *fp = TVPOpenArchiveDestination(OutPath, filename);
 			if (!fp) {
 				_callbacks->FuncOnError(ARCHIVE_FAILED, "Cannot open output file");
 				break;
