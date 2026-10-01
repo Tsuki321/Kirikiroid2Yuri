@@ -349,7 +349,7 @@ public:
 	void UpdateStreamInfos();
 
 	bool IsStop() { return m_bStopStatus; }
-	double GetFPS() { return (double)m_CurrentVideo.hint.fpsrate / m_CurrentVideo.hint.fpsscale; }
+	double GetFPS() { return m_CurrentVideo.hint.fpsscale > 0 ? (double)m_CurrentVideo.hint.fpsrate / m_CurrentVideo.hint.fpsscale : 0; }
 	int64_t GetTotalTime() { return llrint(m_State.time_total); }
 	void GetVideoSize(long *width, long *height);
 	CDVDMessageQueue& GetMessageQueue() { return m_messenger; }

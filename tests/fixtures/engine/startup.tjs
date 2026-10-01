@@ -37,7 +37,9 @@ try {
     Plugins.link("windowEx.dll");
     var ciWindow = new Window();
     ciWindow.setSize(320, 240);
-    var ciLayer = new Layer(ciWindow, null);
+    var ciPrimary = new Layer(ciWindow, null);
+    ciPrimary.setSize(320, 240);
+    var ciLayer = new Layer(ciWindow, ciPrimary);
     ciLayer.setSize(320, 240);
     ciLayer.imageWidth = 320;
     ciLayer.imageHeight = 240;

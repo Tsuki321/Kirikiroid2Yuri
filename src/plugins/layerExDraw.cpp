@@ -411,6 +411,17 @@ NCB_REGISTER_CLASS(GdiPlus){
     Variant(TJS_W("DashStyleSolid"),0);
 }
 #define LAYER_METHOD(name,op) RawCallback(TJS_W(#name),&LayerDraw::invoke<Draw::op>,0)
+NCB_GET_INSTANCE_HOOK(LayerDraw) {
+    NCB_INSTANCE_GETTER(object) {
+        ClassT *instance=GetNativeInstance(object);
+        if(!instance) {
+            std::unique_ptr<ClassT> created(new ClassT(object));
+            SetNativeInstance(object,created.get());
+            instance=created.release();
+        }
+        return instance;
+    }
+};
 NCB_ATTACH_CLASS_WITH_HOOK(LayerDraw,Layer){
     NCB_PROPERTY(smoothingMode,getSmoothingMode,setSmoothingMode);NCB_PROPERTY(textRenderingHint,getTextRenderingHint,setTextRenderingHint);
     LAYER_METHOD(drawString,Text);LAYER_METHOD(measureString,Measure);LAYER_METHOD(drawLine,Line);LAYER_METHOD(drawLines,Lines);

@@ -16,13 +16,16 @@ NS_KRMOVIE_BEGIN
 #define MAX_BUFFER_COUNT 4
 
 class TVPMoviePlayer : public iTVPVideoOverlay, public CBaseRenderer {
+    int StopFrame = -1;
+    bool StopFrameReached = false;
+    double RequestedPlayRate = 1.0;
 public:
 	~TVPMoviePlayer();
 	virtual void AddRef() override { RefCount++; }
 	virtual void Release() override;
 
 	virtual void SetVisible(bool b) override { Visible = b; }
-	virtual void Play() override { m_pPlayer->Play(); }
+	virtual void Play() override { StopFrameReached = false; m_pPlayer->Play(); m_pPlayer->SetSpeed(RequestedPlayRate); }
 	virtual void Stop() override { m_pPlayer->Stop(); }
 	virtual void Pause() override { m_pPlayer->Pause(); }
 	virtual void SetPosition(uint64_t tick) override;
@@ -55,10 +58,9 @@ public:
 	virtual void SelectVideoStream(unsigned long num) override;
 	virtual void GetEnableVideoStreamNum(long *num) override;
 
-	// TODO
-	virtual void SetStopFrame(int frame) override {}
-	virtual void GetStopFrame(int *frame) override {}
-	virtual void SetDefaultStopFrame() override {}
+	virtual void SetStopFrame(int frame) override;
+	virtual void GetStopFrame(int *frame) override;
+	virtual void SetDefaultStopFrame() override { StopFrame = -1; StopFrameReached = false; }
 
 	// function for overlay mode
 	virtual void SetWindow(class tTJSNI_Window* window) override {}
@@ -119,6 +121,7 @@ public:
 
 protected:
 	TVPMoviePlayer();
+    virtual void OnPlayEvent(KRMovieEvent, void *) {}
 	iTVPSoundBuffer* GetSoundDevice();
 
 	uint32_t	RefCount = 1;

@@ -1,3 +1,6 @@
+#include <cmath>
+#include <climits>
+#include "MsgIntf.h"
 #include <thread>
 extern "C" {
 #include "libswscale/swscale.h"
@@ -37,6 +40,7 @@ void TVPMoviePlayer::Release()
 
 void TVPMoviePlayer::SetPosition(uint64_t tick)
 {
+    StopFrameReached = false;
 	m_pPlayer->SeekTime(tick);
 }
 
@@ -47,7 +51,7 @@ void TVPMoviePlayer::GetPosition(uint64_t *tick)
 
 void TVPMoviePlayer::GetStatus(tTVPVideoStatus *status)
 {
-	if (m_pPlayer->IsStop()) *status = vsStopped;
+	if (StopFrameReached || m_pPlayer->IsStop()) *status = vsStopped;
 	else if (m_pPlayer->GetSpeed() == 0) *status = vsPaused;
 	else *status = vsPlaying;
 	//	else *status = vsProcessing;
@@ -58,10 +62,26 @@ void TVPMoviePlayer::Rewind()
 	SetPosition(0);
 }
 
-void TVPMoviePlayer::SetFrame(int f)
+void TVPMoviePlayer::SetFrame(int frame)
 {
-	// TODO seek accurately
-	m_pPlayer->SeekTime(f / m_pPlayer->GetFPS() * DVD_PLAYSPEED_NORMAL);
+    double fps = m_pPlayer->GetFPS();
+    if (frame < 0 || !std::isfinite(fps) || fps <= 0)
+        TVPThrowExceptionMessage(TJS_W("Cannot seek to a frame without a valid video frame rate"));
+    StopFrameReached = false;
+    m_pPlayer->SeekTime(static_cast<int64_t>(std::llround(frame * 1000.0 / fps)));
+}
+
+void TVPMoviePlayer::SetStopFrame(int frame)
+{
+    if (frame < -1) TVPThrowExceptionMessage(TJS_W("Invalid movie stop frame"));
+    StopFrame = frame;
+    StopFrameReached = false;
+}
+
+void TVPMoviePlayer::GetStopFrame(int *frame)
+{
+    if (StopFrame >= 0) *frame = StopFrame;
+    else { int count = 0; GetNumberOfFrame(&count); *frame = count > 0 ? count - 1 : 0; }
 }
 
 void TVPMoviePlayer::GetFrame(int *f)
@@ -76,7 +96,8 @@ void TVPMoviePlayer::GetFPS(double *f)
 
 void TVPMoviePlayer::GetNumberOfFrame(int *f)
 {
-	*f = m_pPlayer->GetTotalTime() * m_pPlayer->GetFPS() / DVD_PLAYSPEED_NORMAL;
+	double frames = m_pPlayer->GetTotalTime() * m_pPlayer->GetFPS() / DVD_PLAYSPEED_NORMAL;
+    *f = !std::isfinite(frames) || frames <= 0 ? 0 : frames >= INT_MAX ? INT_MAX : static_cast<int>(frames);
 }
 
 void TVPMoviePlayer::GetTotalTime(int64_t *t)
@@ -90,16 +111,19 @@ void TVPMoviePlayer::GetVideoSize(long *width, long *height)
 }
 
 void TVPMoviePlayer::SetPlayRate(double rate) {
-	m_pPlayer->SetSpeed(rate);
+    if (!std::isfinite(rate) || rate <= 0) TVPThrowExceptionMessage(TJS_W("Invalid movie playback rate"));
+    RequestedPlayRate = rate;
+    m_pPlayer->SetSpeed(rate);
 }
 
 void TVPMoviePlayer::GetPlayRate(double *rate) {
-	*rate = m_pPlayer->GetSpeed();
+	*rate = RequestedPlayRate;
 }
 
 iTVPSoundBuffer* TVPMoviePlayer::GetSoundDevice() {
 	IDVDStreamPlayerAudio *audioplayer = m_pPlayer->GetAudioPlayer();
 	if (!audioplayer) return nullptr;
+	if (!audioplayer->GetOutputDevice()) return nullptr;
 	IAEStream *audiostream = audioplayer->GetOutputDevice()->m_pAudioStream;
 	if (!audiostream) return nullptr;
 	return audiostream->GetNativeImpl();
@@ -107,6 +131,7 @@ iTVPSoundBuffer* TVPMoviePlayer::GetSoundDevice() {
 
 void TVPMoviePlayer::GetAudioBalance(long *balance)
 {
+    *balance = 0;
 	iTVPSoundBuffer* alsound = GetSoundDevice();
 	if (alsound) {
 		*balance = alsound->GetPan() * 100000;
@@ -129,6 +154,7 @@ void TVPMoviePlayer::SetAudioVolume(long volume)
 
 void TVPMoviePlayer::GetAudioVolume(long *volume)
 {
+    *volume = 0;
 	iTVPSoundBuffer* alsound = GetSoundDevice();
 	if (alsound) *volume = alsound->GetVolume() * 100000;
 }
@@ -187,7 +213,15 @@ void TVPMoviePlayer::Flush()
 
 void TVPMoviePlayer::FrameMove()
 {
-	m_pPlayer->FrameMove();
+    m_pPlayer->FrameMove();
+    if (StopFrame >= 0 && !StopFrameReached && !m_pPlayer->IsStop() && m_pPlayer->GetSpeed() > 0) {
+        int frame = 0; GetFrame(&frame);
+        if (frame >= StopFrame) {
+            m_pPlayer->Pause();
+            StopFrameReached = true;
+            OnPlayEvent(KRMovieEvent::Ended, nullptr);
+        }
+    }
 }
 
 void TVPMoviePlayer::SetLoopSegement(int beginFrame, int endFrame)

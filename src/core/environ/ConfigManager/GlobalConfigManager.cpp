@@ -4,19 +4,33 @@
 #include "Platform.h"
 #include "UtilStreams.h"
 #include "LocaleConfigManager.h"
+#include <vector>
+#ifdef __ANDROID__
+#include "android/AndroidStorage.h"
+#include <unistd.h>
+#endif
 
 bool TVPWriteDataToFile(const ttstr &filepath, const void *data, unsigned int len);
 class XMLMemPrinter : public tinyxml2::XMLPrinter {
 	tTVPMemoryStream _stream;
 	char _buffer[4096];
 public:
-	virtual void Print(const char* format, ...) {
-		va_list param;
-		va_start(param, format);
-		int n = vsnprintf(_buffer, 4096, format, param);
-		va_end(param);
-		_stream.Write(_buffer, n);
-	}
+    virtual void Print(const char* format, ...) {
+        va_list args, copy;
+        va_start(args, format);
+        va_copy(copy, args);
+        int length = vsnprintf(_buffer, sizeof(_buffer), format, copy);
+        va_end(copy);
+        if (length >= 0 && static_cast<size_t>(length) < sizeof(_buffer)) {
+            va_end(args);
+            _stream.Write(_buffer, length);
+        } else if (length >= 0) {
+            std::vector<char> buffer(static_cast<size_t>(length) + 1);
+            vsnprintf(buffer.data(), buffer.size(), format, args);
+            va_end(args);
+            _stream.Write(buffer.data(), length);
+        } else va_end(args);
+    }
 	void SaveFile(const std::string &path) {
 		if (!TVPWriteDataToFile(path, _stream.GetInternalBuffer(), _stream.GetSize())) {
 			TVPShowSimpleMessageBox(
@@ -38,6 +52,8 @@ GlobalConfigManager* GlobalConfigManager::GetInstance() {
 
 void iSysConfigManager::Initialize() {
 	AllConfig.clear();
+    CustomArguments.clear();
+    KeyMap.clear();
 	ConfigUpdated = false;
 
 	tinyxml2::XMLDocument doc;
@@ -47,6 +63,12 @@ void iSysConfigManager::Initialize() {
 	fp = _wfopen(ttstr(GetFilePath()).c_str(), TJS_W("rb"));
 #else
 	fp = fopen(GetFilePath().c_str(), "rb");
+#ifdef __ANDROID__
+    if (!fp) {
+        int fd = TVPOpenDocumentFile(GetFilePath(), TJS_BS_READ);
+        if (fd >= 0) { fp = fdopen(fd, "rb"); if (!fp) close(fd); }
+    }
+#endif
 #endif
 
 	if (fp && !doc.LoadFile(fp)) {
