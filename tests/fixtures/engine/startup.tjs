@@ -2,6 +2,7 @@ var ciMessages = [];
 function ciCheck(value, message) {
     if (!value) throw "CI assertion: " + message;
     ciMessages.add("PASS " + message);
+    ciMessages.save(ciOutput + "progress.txt");
 }
 var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
@@ -13,6 +14,14 @@ try {
     value.saveStruct(ciStorage + "binary-save.tjs", "b");
     loaded = Dictionary.loadStruct(ciStorage + "binary-save.tjs");
     ciCheck(loaded.answer == 42 && loaded.nested.count == 3, "binary save/load");
+    value.saveStruct(ciStorage + "compressed-save.tjs", "z");
+    loaded = Dictionary.loadStruct(ciStorage + "compressed-save.tjs");
+    ciCheck(loaded.answer == 42, "compressed text save/load");
+    if (ciStorage.indexOf("/documents/") == 0) {
+        var fullRejected = false;
+        try { value.saveStruct(ciStorage + "full.dat", "z"); } catch (error) { fullRejected = true; }
+        ciCheck(fullRejected, "disk-full at close is catchable");
+    }
     Plugins.link("scriptsEx.dll");
     Plugins.link("scriptsEx.dll");
     ciCheck(true, "plugin reload is idempotent");

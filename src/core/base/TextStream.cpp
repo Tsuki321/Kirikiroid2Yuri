@@ -473,6 +473,7 @@ class tTVPTextWriteStream : public iTJSTextWriteStream
 	tjs_uint CompressionSizePosition;
 	tjs_nchar *CompressionBuffer;
 	bool CompressionFailed;
+    bool CompressionInitialized;
 
 public:
 	tTVPTextWriteStream(const ttstr & name, const ttstr &modestr)
@@ -489,6 +490,8 @@ public:
 		CompressionSizePosition = 0;
 		CompressionBuffer = NULL;
 		CompressionFailed = false;
+        CompressionInitialized = false;
+        try {
 
 		// check c/z mode
 		const tjs_char *p;
@@ -563,6 +566,7 @@ public:
 				TVPThrowExceptionMessage(TVPCompressionFailed);
 			}
 
+            CompressionInitialized = true;
 			CompressionBuffer = new tjs_nchar[COMPRESSION_BUFFER_SIZE];
 
 			ZStream->next_in = NULL;
@@ -575,55 +579,34 @@ public:
 			WriteI64LE((tjs_uint64)0);
 			WriteI64LE((tjs_uint64)0);
 		}
+        } catch (...) { Cleanup(); throw; }
 	}
 
-	~tTVPTextWriteStream()
-	{
-		if(CryptMode == 2)
-		{
+    void Cleanup() noexcept {
+        if (ZStream) {
+            if (CompressionInitialized) deflateEnd(ZStream);
+            delete ZStream; ZStream = nullptr;
+        }
+        delete[] CompressionBuffer; CompressionBuffer = nullptr;
+        delete Stream; Stream = nullptr;
+    }
+    ~tTVPTextWriteStream() { Cleanup(); }
 
-			if (! CompressionFailed) {
-				try {
-					// close zlib stream
-					int result = 0;
-					do {
-						result = deflate(ZStream, Z_FINISH);
-						if (result != Z_OK
-						    && result != Z_STREAM_END) {
-							TVPThrowExceptionMessage(TVPCompressionFailed);
-						}
-						Stream->WriteBuffer(CompressionBuffer, COMPRESSION_BUFFER_SIZE - ZStream->avail_out);
-						ZStream->next_out = reinterpret_cast<Bytef*>( CompressionBuffer );
-						ZStream->avail_out = COMPRESSION_BUFFER_SIZE;
-					} while (result != Z_STREAM_END);
-
-					// rollback and write compression size.
-					Stream->SetPosition(CompressionSizePosition);
-					WriteI64LE((tjs_uint64)ZStream->total_out);
-					WriteI64LE((tjs_uint64)ZStream->total_in);
-				}
-				catch(...) {
-					// delete zlib compress stream
-					if (ZStream) {
-						deflateEnd(ZStream);
-						delete ZStream;
-					}
-					delete[] CompressionBuffer;
-					delete Stream;
-					throw;
-				}
-			}
-			// delete zlib compress stream
-			if (ZStream) {
-				deflateEnd(ZStream);
-				delete ZStream;
-			}
-			delete[] CompressionBuffer;
-
-		}
-
-		if(Stream) delete Stream;
-	}
+    void Finish() {
+        if (CryptMode != 2 || CompressionFailed) return;
+        CompressionFailed = true;
+        int result;
+        do {
+            result = deflate(ZStream, Z_FINISH);
+            if (result != Z_OK && result != Z_STREAM_END) TVPThrowExceptionMessage(TVPCompressionFailed);
+            Stream->WriteBuffer(CompressionBuffer, COMPRESSION_BUFFER_SIZE - ZStream->avail_out);
+            ZStream->next_out = reinterpret_cast<Bytef *>(CompressionBuffer);
+            ZStream->avail_out = COMPRESSION_BUFFER_SIZE;
+        } while (result != Z_STREAM_END);
+        Stream->SetPosition(CompressionSizePosition);
+        WriteI64LE(ZStream->total_out);
+        WriteI64LE(ZStream->total_in);
+    }
 
 	void WriteI64LE(tjs_uint64 v)
 	{
@@ -750,7 +733,11 @@ public:
 		}
 	}
 
-	void TJS_INTF_METHOD Destruct() { delete this; }
+    void TJS_INTF_METHOD Destruct() {
+        try { Finish(); }
+        catch (...) { delete this; throw; }
+        delete this;
+    }
 };
 //---------------------------------------------------------------------------
 iTJSTextReadStream * TVPCreateTextStreamForRead(const ttstr & name,

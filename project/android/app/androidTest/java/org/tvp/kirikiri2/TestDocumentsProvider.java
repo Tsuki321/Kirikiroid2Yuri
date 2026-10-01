@@ -19,8 +19,11 @@ public class TestDocumentsProvider extends DocumentsProvider {
         DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED
     };
     private File root;
+    private android.os.HandlerThread proxyThread;
     @Override public boolean onCreate() {
         root = new File(getContext().getFilesDir(), "documents");
+        proxyThread = new android.os.HandlerThread("FixtureFiles");
+        proxyThread.start();
         return root.isDirectory() || root.mkdirs();
     }
     private File file(String id) throws FileNotFoundException {
@@ -66,6 +69,23 @@ public class TestDocumentsProvider extends DocumentsProvider {
     }
     @Override public boolean isChildDocument(String parent, String child) { return child.startsWith(parent + "/"); }
     @Override public ParcelFileDescriptor openDocument(String id, String mode, CancellationSignal signal) throws FileNotFoundException {
+        if (id.endsWith("/full.dat") && mode.contains("w")) {
+            android.os.storage.StorageManager storage = (android.os.storage.StorageManager)
+                getContext().getSystemService(android.content.Context.STORAGE_SERVICE);
+            try {
+                return storage.openProxyFileDescriptor(ParcelFileDescriptor.MODE_READ_WRITE,
+                    new android.os.ProxyFileDescriptorCallback() {
+                        @Override public long onGetSize() { return 0; }
+                        @Override public int onRead(long offset, int size, byte[] data) { return 0; }
+                        @Override public int onWrite(long offset, int size, byte[] data) throws android.system.ErrnoException {
+                            if (offset + size > 32) throw new android.system.ErrnoException("write", android.system.OsConstants.ENOSPC);
+                            return size;
+                        }
+                        @Override public void onFsync() {}
+                        @Override public void onRelease() {}
+                    }, new android.os.Handler(proxyThread.getLooper()));
+            } catch (IOException e) { throw new FileNotFoundException(e.getMessage()); }
+        }
         return ParcelFileDescriptor.open(file(id), ParcelFileDescriptor.parseMode(mode));
     }
     @Override public String createDocument(String parent, String mime, String name) throws FileNotFoundException {
