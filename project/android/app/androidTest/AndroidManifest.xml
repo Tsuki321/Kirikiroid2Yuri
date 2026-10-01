@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name="org.tvp.kirikiri2.GrantDocumentActivity"
+            android:exported="true" android:theme="@android:style/Theme.NoDisplay" />
         <provider android:name="org.tvp.kirikiri2.TestDocumentsProvider"
             android:authorities="com.yuri.kirikiri2.tests.documents"
             android:permission="android.permission.MANAGE_DOCUMENTS"

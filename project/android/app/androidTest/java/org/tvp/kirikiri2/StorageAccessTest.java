@@ -3,7 +3,6 @@ package org.tvp.kirikiri2;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -33,19 +32,22 @@ public class StorageAccessTest {
         }
     }
     private static void write(String path, String text) { assertTrue(path, StorageAccess.write(context, path, text.getBytes(StandardCharsets.UTF_8))); }
-    @BeforeClass public static void setup() {
+    @BeforeClass public static void setup() throws Exception {
         context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        Bundle request = new Bundle(); request.putString("package", context.getPackageName());
-        android.app.UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
-        Bundle response;
-        automation.adoptShellPermissionIdentity("android.permission.MANAGE_DOCUMENTS");
-        try {
-            response = context.getContentResolver().call(Uri.parse("content://" + TestDocumentsProvider.AUTHORITY), "grantFixture", null, request);
-        } finally { automation.dropShellPermissionIdentity(); }
-        assertNotNull(response);
-        Uri tree = Uri.parse(response.getString("tree"));
-        context.getContentResolver().takePersistableUriPermission(tree,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        Intent grant = new Intent().setClassName(
+            InstrumentationRegistry.getInstrumentation().getContext().getPackageName(), GrantDocumentActivity.class.getName());
+        context.startActivity(grant.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        Uri tree = android.provider.DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games");
+        boolean granted = false;
+        long deadline = android.os.SystemClock.uptimeMillis() + 10000;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            try {
+                context.getContentResolver().takePersistableUriPermission(tree,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                granted = true; break;
+            } catch (SecurityException pending) { Thread.sleep(50); }
+        }
+        assertTrue("Provider activity must grant a persistable tree", granted);
         String[] roots = StorageAccess.roots(context);
         assertTrue(roots.length > 0);
         for (String root : roots) if (root.startsWith("/documents/Games-")) documents = root;

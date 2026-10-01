@@ -1,10 +1,7 @@
 package org.tvp.kirikiri2;
 
-import android.content.Intent;
 import android.database.Cursor;
 import android.database.MatrixCursor;
-import android.net.Uri;
-import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
@@ -90,17 +87,5 @@ public class TestDocumentsProvider extends DocumentsProvider {
         File before = file(document), after = new File(before.getParentFile(), name);
         if (name.contains("/") || !before.renameTo(after)) throw new FileNotFoundException("Cannot rename fixture");
         return id(after);
-    }
-    @Override public Bundle call(String method, String arg, Bundle extras) {
-        if (!"grantFixture".equals(method)) return super.call(method, arg, extras);
-        try {
-            File games = new File(root, "Games");
-            if (!games.isDirectory() && !games.mkdirs()) throw new IOException("Cannot create fixture tree");
-            Uri tree = DocumentsContract.buildTreeDocumentUri(AUTHORITY, "root/Games");
-            getContext().grantUriPermission(extras.getString("package"), tree,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
-            Bundle result = new Bundle(); result.putString("tree", tree.toString()); return result;
-        } catch (IOException e) { throw new IllegalStateException(e); }
     }
 }
