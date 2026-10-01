@@ -33,6 +33,49 @@ try {
     rejected = false;
     try { Dictionary.loadStruct(ciStorage + "preprocessor.txt"); } catch (error) { rejected = true; }
     ciCheck(rejected, "structured data rejects preprocessor directives");
+    Plugins.link("layerExDraw.dll");
+    Plugins.link("windowEx.dll");
+    var ciWindow = new Window();
+    ciWindow.setSize(320, 240);
+    var ciLayer = new Layer(ciWindow, null);
+    ciLayer.setSize(320, 240);
+    ciLayer.imageWidth = 320;
+    ciLayer.imageHeight = 240;
+    ciLayer.type = ltAlpha;
+    ciWindow.visible = true;
+    ciLayer.clear(0);
+    var ciBrush = new GdiPlus.Appearance();
+    ciBrush.addBrush(0xff336699);
+    ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
+    ciCheck((ciLayer.getMainPixel(15, 15) & 0xffffff) == 0x336699, "rectangle paints correct pixels");
+    ciLayer.setTransform([1, 0, 0, 1, 50, 0]);
+    ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
+    ciLayer.resetTransform();
+    ciCheck((ciLayer.getMainPixel(65, 15) & 0xffffff) == 0x336699, "drawing transform");
+    var ciFont = new GdiPlus.Font("sans-serif", 16, GdiPlus.FontStyleRegular);
+    var smallMetric = ciFont.lineSpacing;
+    ciFont.emSize = 24;
+    ciCheck(ciFont.ascent > 0 && ciFont.lineSpacing > smallMetric, "font metrics update");
+    ciLayer.drawString(ciFont, ciBrush, 5, 100, "Hello");
+    var ciTextPixels = 0;
+    for (var ciY = 100; ciY < 135; ++ciY)
+        for (var ciX = 5; ciX < 100; ++ciX)
+            if (ciLayer.getMaskPixel(ciX, ciY) > 0) ++ciTextPixels;
+    ciCheck(ciTextPixels > 20, "text rasterizes visible glyphs");
+    var ciPath = new GdiPlus.Path();
+    ciPath.drawEllipse(120, 10, 30, 30);
+    ciLayer.drawPath(ciBrush, ciPath);
+    ciCheck((ciLayer.getMainPixel(135, 25) & 0xffffff) == 0x336699, "path rendering");
+    ciLayer.saveImage(ciStorage + "drawing.png", "image/png");
+    var ciImage = new GdiPlus.Image(ciStorage + "drawing.png");
+    ciCheck(ciImage.width == 320 && ciImage.height == 240, "image encode/decode");
+    ciLayer.clear(0);
+    ciLayer.drawImage(0, 0, ciImage);
+    ciCheck((ciLayer.getMainPixel(15, 15) & 0xffffff) == 0x336699, "image drawing");
+    ciWindow.minimize();
+    ciCheck(!ciWindow.visible, "window minimize");
+    ciWindow.restore();
+    ciCheck(ciWindow.visible, "window restore");
     ciMessages.add("ENGINE_CI_PASS");
 } catch (error) {
     ciMessages.add("ENGINE_CI_FAIL " + (typeof error == "string" ? error : error.message));

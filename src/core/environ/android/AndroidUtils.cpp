@@ -716,71 +716,11 @@ void TVPFetchSDCardPermission() {
 }
 
 bool TVPCheckStartupPath(const std::string &path) {
-	// check writing permission first
-	int pos = path.find_last_of('/');
-	if (pos == path.npos) return false;
-	std::string parent = path.substr(0, pos);
-	std::string testPath = parent + cocos2d::StringUtils::format("/_check_save_%d.tmp", time(nullptr));
-	JniMethodInfo methodInfo;
-	bool success = false;
-	if (JniHelper::getStaticMethodInfo(methodInfo, "org/tvp/kirikiri2/KR2Activity", "isWritableNormal", "(Ljava/lang/String;)Z")) {
-		jstring jstrPath = methodInfo.env->NewStringUTF(testPath.c_str());
-		success = methodInfo.env->CallStaticBooleanMethod(methodInfo.classID, methodInfo.methodID, jstrPath);
-		methodInfo.env->DeleteLocalRef(jstrPath);
-		TVPDeleteFile(testPath.c_str());
-#if 0
-		if (success) {
-			parent += "/savedata";
-			if (!TVPCheckExistentLocalFolder(parent)) {
-				TVPCreateFolders(parent);
-			}
-			jstrPath = methodInfo.env->NewStringUTF(parent.c_str());
-			success = methodInfo.env->CallStaticBooleanMethod(methodInfo.classID, methodInfo.methodID, jstrPath);
-			methodInfo.env->DeleteLocalRef(jstrPath);
-		}
-#endif
-	}
-
-	if (!success) {
-		std::vector<std::string> paths;
-		// paths.emplace_back(GetInternalStoragePath());
-		GetExternalStoragePath(paths);
-		std::string pathlist;
-		for (const std::string &path : paths) {
-			pathlist += "\n";
-			pathlist += path;
-		}
-		std::string msg = LocaleConfigManager::GetInstance()->GetText("use_internal_path") + pathlist;
-#if 0
-		if (pathlist.size() > 0) {
-			size_t pos = msg.find("%1");
-			if (pos != msg.npos) {
-				msg = msg.replace(msg.begin() + pos, msg.begin() + pos + 2, pathlist.back());
-			}
-		}
-#endif
-		std::vector<ttstr> btns;
-		btns.emplace_back("OK");
-		TVPShowSimpleMessageBox(msg, LocaleConfigManager::GetInstance()->GetText("readonly_storage"), btns);
-		return false;
-#if 0
-		btns.push_back(LocaleConfigManager::GetInstance()->GetText("continue_run"));
-		bool isLOLLIPOP = IsLollipop();
-		if (isLOLLIPOP)
-			btns.push_back(LocaleConfigManager::GetInstance()->GetText("get_sdcard_permission"));
-		else
-			btns.push_back(LocaleConfigManager::GetInstance()->GetText("cancel"));
-		int result = TVPShowSimpleMessageBox(msg, LocaleConfigManager::GetInstance()->GetText("readonly_storage"), btns);
-		if (isLOLLIPOP && result == 1) {
-			TVPFetchSDCardPermission();
-		}
-		if (result != 0)
-			return false;
-#endif
-	}
-
-	return true;
+    // Reading a game must not depend on creating a file in its parent folder.
+    // In particular, a document-tree grant may cover only the selected folder.
+    return TVPCheckExistentLocalFolder(ttstr(path)) || TVPCheckExistentLocalFile(ttstr(path));
 }
+
 
 bool TVPCreateFolders(const ttstr &folder)
 {

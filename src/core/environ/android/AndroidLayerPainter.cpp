@@ -65,7 +65,8 @@ tTVPRect TVPPaintLayer(tTJSNI_Layer *layer, const TVPLayerPaintRequest &request)
     patch.Update(pixels.data(), width * 4, 0, 0, width, height);
     // Upload only the affected patch, including when the destination is an OpenGL texture.
     tTVPBaseTexture *destination = const_cast<tTVPBaseTexture *>(layer->GetMainImage());
-    destination->Blt(x, y, &patch, tTVPRect(0, 0, width, height), bmAlphaOnAlpha, 255, false);
+    destination->Blt(x, y, &patch, tTVPRect(0, 0, width, height),
+        layer->GetType() == ltAddAlpha ? bmAlphaOnAddAlpha : bmAlphaOnAlpha, 255, false);
     layer->SetImageModified(true);
     tTVPRect result(x, y, x+width, y+height);
     layer->Update(result);
