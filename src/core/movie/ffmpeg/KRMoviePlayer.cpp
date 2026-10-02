@@ -111,7 +111,7 @@ void TVPMoviePlayer::GetVideoSize(long *width, long *height)
 }
 
 void TVPMoviePlayer::SetPlayRate(double rate) {
-    if (!std::isfinite(rate) || rate <= 0) TVPThrowExceptionMessage(TJS_W("Invalid movie playback rate"));
+    if (!std::isfinite(rate) || std::abs(rate) > 64) TVPThrowExceptionMessage(TJS_W("Invalid movie playback rate"));
     RequestedPlayRate = rate;
     m_pPlayer->SetSpeed(rate);
 }

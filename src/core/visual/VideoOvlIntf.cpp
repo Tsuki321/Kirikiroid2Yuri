@@ -737,6 +737,27 @@ TJS_BEGIN_NATIVE_PROP_DECL(frame)
 	TJS_END_NATIVE_PROP_SETTER
 }
 TJS_END_NATIVE_PROP_DECL(frame)
+// Stop at an explicit frame, or use -1 to restore the end of the movie.
+TJS_BEGIN_NATIVE_PROP_DECL(stopFrame)
+{
+    TJS_BEGIN_NATIVE_PROP_GETTER
+    {
+        TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_VideoOverlay);
+        *result = _this->GetStopFrame();
+        return TJS_S_OK;
+    }
+    TJS_END_NATIVE_PROP_GETTER
+    TJS_BEGIN_NATIVE_PROP_SETTER
+    {
+        TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_VideoOverlay);
+        tjs_int frame = param->AsInteger();
+        if (frame == -1) _this->SetDefaultStopFrame();
+        else _this->SetStopFrame(frame);
+        return TJS_S_OK;
+    }
+    TJS_END_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_PROP_DECL(stopFrame)
 //----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_PROP_DECL(fps)
 {

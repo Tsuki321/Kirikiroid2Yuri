@@ -90,6 +90,8 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: build-tools;33.0.2 platforms;android-29 ndk;25.2.9519653
+      - name: Install fixture generator
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Build, sign test APKs, and verify alignment
         env:
           CI_DEBUG_KEYSTORE_B64: ${{ secrets.CI_DEBUG_KEYSTORE_B64 }}

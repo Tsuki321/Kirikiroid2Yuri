@@ -42,8 +42,8 @@ android {
                 }
             }
         }
-        versionCode (System.getenv('BUILD_VERSION_CODE') ?: '65').toInteger()
-        versionName System.getenv('BUILD_VERSION_NAME') ?: '1.4.0beta'
+        versionCode = (System.getenv('BUILD_VERSION_CODE') ?: '65').toInteger()
+        versionName = System.getenv('BUILD_VERSION_NAME') ?: '1.4.0beta'
     }
     signingConfigs {
         debug {

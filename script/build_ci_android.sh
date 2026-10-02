@@ -3,6 +3,10 @@ set -euo pipefail
 ci_root="$(cd "$(dirname "$0")/.." && pwd)"
 ci_keys="$RUNNER_TEMP/krkr-signing"
 mkdir -p "$ci_keys" "$ci_root/test-results"
+ffmpeg -nostdin -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=64x64:rate=10:duration=2 \
+  -an -c:v mpeg4 -pix_fmt yuv420p -threads 1 "$ci_root/tests/fixtures/engine/test.avi"
+ffmpeg -nostdin -hide_banner -loglevel error -y -f lavfi -i sine=frequency=440:sample_rate=44100:duration=1 \
+  -c:a pcm_s16le "$ci_root/tests/fixtures/engine/tone.wav"
 export CI_KEYSTORE_PATH="$ci_keys/development.p12"
 if [[ -n "${CI_DEBUG_KEYSTORE_B64:-}" ]]; then
   printf '%s' "$CI_DEBUG_KEYSTORE_B64" | base64 --decode > "$CI_KEYSTORE_PATH"

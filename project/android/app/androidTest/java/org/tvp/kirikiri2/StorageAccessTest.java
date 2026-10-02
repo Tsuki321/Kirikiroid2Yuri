@@ -98,17 +98,31 @@ public class StorageAccessTest {
     @Test public void zPrepareEngineFixturesForProcessRestart() throws Exception {
         Context tests = InstrumentationRegistry.getInstrumentation().getContext();
         String script = read(tests.getAssets().open("engine/startup.tjs"));
+        String movieScript = read(tests.getAssets().open("engine/movie-startup.tjs"));
         String program = read(tests.getAssets().open("engine/compiled-source.tjs"));
         File base = new File(context.getFilesDir(), "engine-ci");
         assertTrue(StorageAccess.mkdirs(context, base.getPath()));
         StringBuilder manifest = new StringBuilder();
-        String[] names = {"local", "documents"};
+        String[] names = {"local", "documents", "movie-local", "movie-documents"};
         for (String name : names) {
-            String storage = name.equals("local") ? new File(base, name).getPath() : documents + "/Engine";
+            String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
             String output = new File(base, name + "-result").getPath();
             assertTrue(StorageAccess.mkdirs(context, storage));
             assertTrue(StorageAccess.mkdirs(context, output));
-            write(storage + "/startup.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
+            write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : script)
+                .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
+            if (name.startsWith("movie")) {
+                try (InputStream input = tests.getAssets().open("engine/test.avi"); ByteArrayOutputStream movie = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[8192]; int size;
+                    while ((size = input.read(buffer)) != -1) movie.write(buffer, 0, size);
+                    assertTrue(StorageAccess.write(context, storage + "/test.avi", movie.toByteArray()));
+                }
+            }
+            try (InputStream input = tests.getAssets().open("engine/tone.wav"); ByteArrayOutputStream tone = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192]; int size;
+                while ((size = input.read(buffer)) != -1) tone.write(buffer, 0, size);
+                assertTrue(StorageAccess.write(context, storage + "/tone.wav", tone.toByteArray()));
+            }
             write(storage + "/compiled-source.tjs", program);
             assertTrue(StorageAccess.write(context, storage + "/broken.tjb", new byte[] {'T','J','S','2','1','0','0',0}));
             write(storage + "/unsafe.txt", "(global.ciSideEffect = 1, %[]) ");

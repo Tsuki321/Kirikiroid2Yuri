@@ -1,0 +1,58 @@
+var ciMessages = [];
+var ciStorage = "@@STORAGE@@/";
+var ciOutput = "@@OUTPUT@@/";
+var ciWindow = new Window();
+ciWindow.setSize(320, 240);
+ciWindow.visible = true;
+var ciTimer = new Timer();
+var ciMovie = new VideoOverlay(ciWindow);
+var ciAudio = new WaveSoundBuffer();
+var ciTicks = 0;
+var ciPhase = 0;
+function ciCheck(value, message) {
+    if (!value) throw "CI assertion: " + message;
+    ciMessages.add("PASS " + message);
+    ciMessages.save(ciOutput + "progress.txt");
+}
+function ciFinish(error) {
+    ciTimer.enabled = false;
+    ciMovie.close();
+    ciAudio.stop();
+    ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + error);
+    ciMessages.save(ciOutput + "result.txt");
+}
+try {
+    ciAudio.open(ciStorage + "tone.wav");
+    ciCheck(ciAudio.totalTime >= 900, "PCM audio decode");
+    ciAudio.volume = 0;
+    ciAudio.play();
+    ciMovie.open(ciStorage + "test.avi");
+    ciCheck(ciMovie.fps >= 9 && ciMovie.fps <= 11, "video frame rate");
+    ciCheck(ciMovie.numberOfFrame >= 19 && ciMovie.totalTime >= 1900, "video duration and frame count");
+    ciMovie.stopFrame = 12;
+    ciCheck(ciMovie.stopFrame == 12, "stop frame setting");
+    ciMovie.playRate = 1.5;
+    ciCheck(ciMovie.playRate == 1.5, "playback rate");
+    ciMovie.visible = true;
+    ciMovie.play();
+    ciTimer.interval = 100;
+    ciTimer.onTimer = function() {
+        try {
+            ++ciTicks;
+            if (ciTicks > 100) throw "Movie did not reach its stop frame";
+            if (ciPhase == 0 && ciMovie.position > 0 && ciMovie.status == "play") {
+                ciMovie.pause();
+                ciCheck(ciMovie.status == "pause", "movie pause");
+                ciPhase = 1;
+            } else if (ciPhase == 1) {
+                ciCheck(ciMovie.playRate == 1.5, "pause preserves playback rate");
+                ciMovie.play();
+                ciPhase = 2;
+            } else if (ciPhase == 2 && ciMovie.status == "stop") {
+                ciCheck(ciTicks < 30, "movie stops at requested frame");
+                ciFinish();
+            }
+        } catch (error) { ciFinish(typeof error == "string" ? error : error.message); }
+    };
+    ciTimer.enabled = true;
+} catch (error) { ciFinish(typeof error == "string" ? error : error.message); }
