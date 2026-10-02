@@ -10,18 +10,18 @@ ciMessages.add("ENGINE_CI_STARTED");
 ciMessages.save(ciOutput + "started.txt");
 try {
     var value = %["answer" => 42, "text" => "fixture", "nested" => [1, 2, 3]];
-    Dictionary.saveStruct.call(value, ciStorage + "text-save.tjs");
+    (Dictionary.saveStruct incontextof value)(ciStorage + "text-save.tjs");
     var loaded = Dictionary.loadStruct(ciStorage + "text-save.tjs");
     ciCheck(loaded.answer == 42 && loaded.text == "fixture" && loaded.nested[2] == 3, "text save/load");
-    Dictionary.saveStruct.call(value, ciStorage + "binary-save.tjs", "b");
+    (Dictionary.saveStruct incontextof value)(ciStorage + "binary-save.tjs", "b");
     loaded = Dictionary.loadStruct(ciStorage + "binary-save.tjs");
     ciCheck(loaded.answer == 42 && loaded.nested.count == 3, "binary save/load");
-    Dictionary.saveStruct.call(value, ciStorage + "compressed-save.tjs", "z");
+    (Dictionary.saveStruct incontextof value)(ciStorage + "compressed-save.tjs", "z");
     loaded = Dictionary.loadStruct(ciStorage + "compressed-save.tjs");
     ciCheck(loaded.answer == 42, "compressed text save/load");
     if (ciStorage.indexOf("/documents/") == 0) {
         var fullRejected = false;
-        try { Dictionary.saveStruct.call(value, ciStorage + "full.dat", "z"); } catch (error) { fullRejected = true; }
+        try { (Dictionary.saveStruct incontextof value)(ciStorage + "full.dat", "z"); } catch (error) { fullRejected = true; }
         ciCheck(fullRejected, "disk-full at close is catchable");
     }
     Plugins.link("scriptsEx.dll");

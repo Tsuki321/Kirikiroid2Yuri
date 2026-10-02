@@ -3,3 +3,20 @@ var ciValues = [10, 20, 10];
 var ciTotal = 0;
 for (var ciIndex = 0; ciIndex < ciValues.count; ++ciIndex) ciTotal += ciValues[ciIndex];
 try { global.ciCompiled = ciSum(ciTotal); } catch (error) { global.ciCompiled = -1; }
+
+class CiBase {
+    var stored;
+    function CiBase(value) { stored = value; }
+    property current {
+        getter() { return stored; }
+        setter(value) { stored = value; }
+    }
+    function add(value) { return stored + value; }
+}
+class CiDerived extends CiBase {
+    function CiDerived(value) { super.CiBase(value); }
+    function total(value) { return super.add(value); }
+}
+var ciObject = new CiDerived(39);
+ciObject.current = 40;
+if (ciObject.total(2) != 42) throw "Compiled inheritance/property regression";

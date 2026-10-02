@@ -19,7 +19,8 @@ void Chunk(std::vector<uint8_t> &out, uint32_t tag, const std::vector<uint8_t> &
     out.insert(out.end(), payload.begin(), payload.end());
 }
 std::vector<uint8_t> Program(const std::vector<int16_t> &code,
-                             const std::vector<std::pair<uint16_t, uint16_t>> &constants = {}) {
+                             const std::vector<std::pair<uint16_t, uint16_t>> &constants = {},
+                             const std::vector<uint32_t> &entries = {}) {
     std::vector<uint8_t> data(7 * 4, 0), object, objects, file;
     const int32_t metadata[] = {-1, -1, 0, 0, 2, 4, 0, 0, -1, -1, -1, -1};
     for (int32_t field : metadata)
@@ -35,8 +36,10 @@ std::vector<uint8_t> Program(const std::vector<int16_t> &code,
         Put16(object, constant.first);
         Put16(object, constant.second);
     }
-    Put32(object, 0);
-    Put32(object, 0); // superclass pointers, properties
+    Put32(object, entries.size());
+    for (auto entry : entries)
+        Put32(object, entry);
+    Put32(object, 0); // properties
     Put32(objects, 0);
     Put32(objects, 1);
     Chunk(objects, 0x32534a54, object, false);
@@ -102,4 +105,12 @@ TEST(Bytecode, MutatedHeadersAndCountsRemainBounded) {
             mutated[random() % mutated.size()] = static_cast<uint8_t>(random());
         (void)Valid(mutated); // ASan/UBSan check every parser path reached here.
     }
+}
+
+TEST(Bytecode, SuperclassGetterEntriesAllowUnreachablePadding) {
+    EXPECT_TRUE(Valid(Program({VM_RET, VM_NOP}, {}, {0})));
+    EXPECT_TRUE(Valid(Program({VM_RET, VM_NOP, VM_RET, VM_NOP}, {}, {0, 2})));
+    EXPECT_FALSE(Valid(Program({VM_RET, VM_NOP}, {}, {1})));
+    EXPECT_FALSE(Valid(Program({VM_RET, VM_NOP}, {}, {2})));
+    EXPECT_FALSE(Valid(Program({VM_JMP, 3, VM_RET, VM_NOP})));
 }

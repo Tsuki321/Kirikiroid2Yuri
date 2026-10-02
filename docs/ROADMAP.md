@@ -2,7 +2,7 @@
 
 ## Phase 0 — Android beta stability
 
-- Global preferences: `PreferenceConfig.h` persists on each change; `TVPWriteDataToFile` overwrites via `fopen(..., "wb")`.
+- Global preferences: `PreferenceConfig.h` persists on each change; `TVPWriteDataToFile` replaces local preferences using a temporary file and rename, with a document-provider fallback.
 - Title path list: `FileSelectorForm.cpp` keeps `ListItem.csb` cell wrapper for correct hit targets.
 - In-game menu: nested menus use `eEnterAniOverFromRight`.
 - Message box: `setSwallowTouches(true)` on dialog buttons.
@@ -12,8 +12,8 @@
 | Plugin | Status |
 |--------|--------|
 | scriptsEx | Ported (`scriptsEx.cpp`, `bitap_fuzzy.hpp`) |
-| windowEx | Android stub (`windowEx_stub.cpp`); full port needs Win32 |
-| layerExDraw / GdiPlus | Scaffold: full API registration + `drawString`/`measureString` proof-of-concept (`layerExDraw_cocos2d/`); enable via `-DKRKR2_LAYEREXDRAW_COCOS2D=ON`. Stub (`layerExDraw_stub.cpp`) is silent no-op by default. |
+| windowEx | Virtual-window minimize, maximize and restore; other Windows APIs remain outside the Android implementation. |
+| layerExDraw / GdiPlus | Android raster backend for text, metrics, paths, transforms, basic brushes and images. Advanced modes report errors. See `VALIDATION.md`. |
 | layerEx base | In-tree (`LayerExBase.cpp`, `layerExBase.hpp`) |
 
 ## Phase 2 — CX / XP3
@@ -23,7 +23,7 @@
 
 ## Phase 3 — Storage
 
-- Scoped bypass: `MediaStoreHack.java`.
+- Target SDK29 retains legacy access. Granted document trees have native open/seek/list/create/rename/delete support via `StorageAccess.java` and `AndroidStorage.cpp`.
 - SAF: `KR2Activity.java` picker (`triggerStorageAccessFramework` / `onActivityResult` requestCode 3) persists the document-tree URI in Android `SharedPreferences["URI"]` and now mirrors it into the engine via `nativeSetSafTreeUri` → `GlobalConfigManager` (`<Item key="saf_tree_uri" value="..."/>` in `GlobalPreference.xml`). Symmetric `nativeGetSafTreeUri` lets the engine read the URI back. In-engine preference item `preference_android_fetch_sdcard_permission` (`tTVPPreferenceInfoFetchSDCardPermission` in `PreferenceConfig.h`) re-triggers the SAF picker; locale strings exist in en/ja/zh_cn/zh_tw.
 
 ## Phase 4 — Config / CLI
@@ -41,25 +41,10 @@
 - Replace cocos2d-x with SDL2 in: `MainScene.cpp`, `AppDelegate.cpp`, `YUVSprite.cpp`, `environ/ui/*`, Gradle `:cocos2dx` module.
 - Note: `src/core/visual/RenderManager.cpp` is the engine's software renderer (used by some paths), not cocos rendering. It may need adaptation but is separate from the cocos migration.
 
-## Phase 7 — Unit tests (proposed)
+## Phase 7 - Regression tests
 
-- **Goal:** Add a host-executable test suite (Google Test) targeting pure-logic engine components that don't require Android/cocos runtime.
-- **Why:** Currently validation is manual only (build APK + run a game). Unit tests give regression coverage for refactors (notably Phase 6 SDL2 migration) and verify ported plugins against reference vectors.
-- **Test framework:** Google Test (gtest) + CTest, built as a host target (not on-device). Host = the dev machine or CI runner, cross-compiling not needed for these since they're platform-independent logic.
-- **Candidate components (high value, low coupling):**
+GitHub Actions builds both Android APK variants and host tests. Host tests run with GCC and Clang under address/undefined-behavior sanitizers. Android instrumentation checks real persisted document grants; separate native TJS fixtures exercise local files and document trees after process restart.
 
-  | Area | File(s) | Rationale |
-  |------|---------|-----------|
-  | TJS2 VM | `src/core/tjs2/*` (lexer, bytecode interp) | Core engine logic; well-isolated |
-  | XP3 archive | `src/core/base/XP3Archive.cpp` | Parse + extract; verify against sample `.xp3` |
-  | ZIP / 7z / TAR | `src/core/base/{ZIPArchive,7zArchive,TARArchive}.cpp` | Format correctness |
-  | MD5 | `src/core/utils/md5` (used by `scriptsEx`) | Known-answer vectors (RFC 1321) |
-  | Fuzzy match | `src/plugins/scriptsEx.cpp` + `bitap_fuzzy.hpp` | Pure algorithm, easy to vectorize |
-  | Character set | `src/core/base/CharacterSet.cpp` | Encoding round-trips (SJIS/UTF-8/UTF-16) |
-  | Streams | `src/core/base/{BinaryStream,TextStream,UtilStreams}.cpp` | Read/write invariants |
-  | Config | `src/core/environ/ConfigManager/PreferenceConfig.h` | XML parse/serialize round-trip |
+Debug and optimized/minified release APKs are checked on API30 and API35 (16 KB) emulators. ELF segments and APK packing are checked for 16 KB alignment. Release publication depends on the host tests and entire emulator matrix.
 
-- **Layout:** `tests/` at repo root, mirroring `src/` structure; `tests/CMakeLists.txt` gated behind `option(KRKR2_BUILD_TESTS "Build unit tests" OFF)` so production builds are unaffected.
-- **CI:** Add a `test` job to `.github/workflows/build_android.yml` (matrix on ubuntu-latest) running `cmake -DKRKR2_BUILD_TESTS=ON && ctest`. Tests link only the needed `.cpp` files (avoid pulling cocos/android), so they must be built with the test CMakeLists, not `add_subdirectory(src/core)`.
-
-Build validation: GitHub Actions `.github/workflows/build_android.yml` on push of `v*` tags or **workflow_dispatch** (manual). No local compile required if CI deps tarballs are used (same as CI job).
+See [VALIDATION.md](VALIDATION.md) for coverage, artifacts, signing, dependency reproducibility and known gaps.

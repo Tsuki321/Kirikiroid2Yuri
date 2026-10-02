@@ -39,6 +39,9 @@ android {
                     targets 'krkr2yuri'
                     arguments "-DCMAKE_FIND_ROOT_PATH=", "-DANDROID_STL=c++_static", "-DANDROID_TOOLCHAIN=clang", "-DANDROID_ARM_NEON=TRUE"
                     cppFlags "-frtti -fexceptions -fsigned-char"
+                    if (System.getenv('CCACHE_DIR')) {
+                        arguments '-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache'
+                    }
                 }
             }
         }

@@ -62,6 +62,7 @@ inline void Instructions(Object &object) {
     const std::vector<int32_t> &code = object.code;
     const size_t total = code.size();
     object.boundaries.assign(total, 0);
+    std::vector<uint32_t> next(total, 0);
     std::vector<size_t> jumps;
     size_t pc = 0;
     auto available = [&](size_t count) { Require(count <= total - pc); };
@@ -79,11 +80,9 @@ inline void Instructions(Object &object) {
         Require(target >= 0 && static_cast<uint64_t>(target) < total);
         jumps.push_back(static_cast<size_t>(target));
     };
-    int32_t last = VM_RET;
     while (pc < total) {
         object.boundaries[pc] = 1;
         int32_t op = code[pc];
-        last = op;
         size_t count = 0;
         if (op >= VM_LOR && op <= VM_MULP) {
             int variant = (op - VM_LOR) % 4;
@@ -259,11 +258,37 @@ inline void Instructions(Object &object) {
             }
         }
         available(count);
+        next[pc] = static_cast<uint32_t>(pc + count);
         pc += count;
     }
     for (size_t destination : jumps)
         Require(object.boundaries[destination] != 0);
-    Require(total == 0 || last == VM_RET || last == VM_JMP || last == VM_THROW);
+    // The compiler leaves unreachable NOP padding after superclass getter
+    // bodies. Validate fallthrough from every actual entry, not the last word.
+    std::vector<size_t> pending;
+    if (total)
+        pending.push_back(0);
+    for (int32_t entry : object.superPointers) {
+        Require(entry >= 0 && size_t(entry) < total && object.boundaries[entry]);
+        pending.push_back(static_cast<size_t>(entry));
+    }
+    std::vector<uint8_t> visited(total, 0);
+    while (!pending.empty()) {
+        size_t instruction = pending.back();
+        pending.pop_back();
+        if (visited[instruction])
+            continue;
+        visited[instruction] = 1;
+        int32_t op = code[instruction];
+        if (op == VM_RET || op == VM_THROW)
+            continue;
+        if (op == VM_JMP || op == VM_JF || op == VM_JNF || op == VM_ENTRY)
+            pending.push_back(static_cast<size_t>(int64_t(instruction) + code[instruction + 1]));
+        if (op != VM_JMP) {
+            Require(next[instruction] < total);
+            pending.push_back(next[instruction]);
+        }
+    }
 }
 
 inline bool Validate(const uint8_t *bytes, size_t size) {
@@ -371,12 +396,6 @@ inline bool Validate(const uint8_t *bytes, size_t size) {
             while (node >= 0 && state[node] == 1) {
                 state[node] = 2;
                 node = parsed[node].parent;
-            }
-            if (!parsed[i].superPointers.empty()) {
-                Require(parsed[i].superGetter >= 0);
-                const auto &boundaries = parsed[parsed[i].superGetter].boundaries;
-                for (int32_t pointer : parsed[i].superPointers)
-                    Require(pointer >= 0 && size_t(pointer) < boundaries.size() && boundaries[pointer]);
             }
         }
         return true;

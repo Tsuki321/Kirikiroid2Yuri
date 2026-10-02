@@ -9,18 +9,18 @@ Roadmap :
 
 - core
   - [ ] replace rendering from cocos to SDL2
-  - [ ] command line or config files for setting
+  - [x] command line or config files for setting
   - [ ] recent cx game (hash filename) decryption support
 - plugin
-  - [ ] [windowEx](https://github.com/wamsoft/windowEx)
+  - [ ] [windowEx](https://github.com/wamsoft/windowEx) (Android minimize/maximize/restore implemented; other Windows APIs remain)
   - [ ] [layerEx](https://github.com/wamsoft/layerEx)
-  - [ ] [layerExDraw](https://github.com/wamsoft/layerExDraw) (gdiPlus)
-  - [x] [scriptsEx](https://github.com/wamsoft/scriptsEx) (ported; windowEx/layerExDraw stubs on Android)
+  - [ ] [layerExDraw](https://github.com/wamsoft/layerExDraw) (Android text, paths, transforms and images implemented; advanced modes remain)
+  - [x] [scriptsEx](https://github.com/wamsoft/scriptsEx) (ported)
 - platform
   - android
     - [x] SDK level above 21 (android 5.1, Lollipop)
     - [x] bypass scoped storage
-    - [ ] access extern sdcard by saf
+    - [x] access granted document trees through SAF
   - windows
   - linux
 - develop  
@@ -30,6 +30,8 @@ Roadmap :
   - [x] ci in github action to automatically build
 
 (This project is heavily relying on cocos. Sooner or later, I might rewrite these parts and replace them by SDL2. And because that the upstream didn't provide all the plugins source code, it still needs sometime to adapt them.)
+
+Implementation and CI coverage: [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## 1. usage  
 
