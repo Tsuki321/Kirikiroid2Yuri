@@ -56,7 +56,7 @@ public:
 
 	void Deallocate(tjs_int num, tTJSVariant *ptr);
 
-	void Compact() { InternalCompact(); }
+	void Compact() { if(!OperationDisabledCount) InternalCompact(); }
 
 }/* *TJSVariantArrayStack = NULL*/;
 //---------------------------------------------------------------------------

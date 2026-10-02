@@ -629,7 +629,7 @@ void tTJSVariantArrayStack::InternalCompact(void)
 			bool availableoffset = false;
 			size_t offset = 0;
 			if( Current != NULL && Arrays != NULL ) {
-				offset = (size_t)Current - (size_t)Arrays;
+				offset = Current - Arrays;
 				availableoffset = true;
 			}
 

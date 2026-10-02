@@ -87,6 +87,24 @@ protected:
         runtime->EvalExpression(expression, &result);
         return result.AsInteger();
     }
+    void InstallCollector() {
+        class Collector : public tTJSDispatch {
+            tTJS *runtime;
+        public:
+            explicit Collector(tTJS *engine) : runtime(engine) {}
+            tjs_error TJS_INTF_METHOD FuncCall(tjs_uint32, const tjs_char *, tjs_uint32 *,
+                tTJSVariant *, tjs_int, tTJSVariant **, iTJSDispatch2 *) override {
+                runtime->DoGarbageCollection();
+                return TJS_S_OK;
+            }
+        };
+        auto collector = new Collector(runtime);
+        tTJSVariant function(collector);
+        collector->Release();
+        auto global = runtime->GetGlobalNoAddRef();
+        ASSERT_EQ(TJS_S_OK, global->PropSet(TJS_MEMBERENSURE, TJS_W("collect"), nullptr,
+                                          &function, global));
+    }
 };
 
 TEST_F(TJSRuntime, ArrayCreationNativeMethodsAndTextStreams) {
@@ -144,6 +162,27 @@ TEST_F(TJSRuntime, SubclassConstructionAndExceptionsPreserveTheExecutionStack) {
                  "try { object.missingMethod(); } catch (error) { caught = true; }"));
     EXPECT_EQ(42, Integer(TJS_W("object.read()")));
     EXPECT_EQ(1, Integer(TJS_W("caught")));
+}
+
+TEST_F(TJSRuntime, GarbageCollectionReleasesUnusedObjectsAndAllowsReentry) {
+    InstallCollector();
+    Script(TJS_W("var finalized = 0;"
+                 "class Tracked { function finalize() { ++finalized; collect(); } }"
+                 "var object = new Tracked(); object = void;"));
+    runtime->DoGarbageCollection();
+    EXPECT_EQ(1, Integer(TJS_W("finalized")));
+}
+
+TEST_F(TJSRuntime, GarbageCollectionPreservesNestedActiveFrames) {
+    InstallCollector();
+    Text source = TJS_W("function descend(depth) {");
+    // Each call keeps enough locals live to occupy multiple stack blocks.
+    for (int i = 0; i < 64; ++i)
+        source += Text(TJS_W("var local")) + ttstr(i).c_str() + TJS_W(" = depth;");
+    source += TJS_W("if (depth) return descend(depth - 1) + local63;"
+                    "collect(); return local0; } var total = descend(32);");
+    Script(source.c_str());
+    EXPECT_EQ(528, Integer(TJS_W("total")));
 }
 
 TEST(TJSFormatting, MixedArgumentsAndFloatingPointRounding) {

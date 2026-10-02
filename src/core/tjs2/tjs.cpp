@@ -253,8 +253,10 @@ void tTJS::Release()
 //---------------------------------------------------------------------------
 void tTJS::Shutdown()
 {
-	TJSVariantArrayStackCompactNow();
-	Global->Clear();
+	// This stack belongs to this interpreter. The global compaction hook is
+	// disabled because other interpreters may be executing on other threads.
+	if(VariantArrayStack) VariantArrayStack->Compact();
+	if(Global) Global->Clear();
 	if(Global) Global->Release(), Global = NULL;
 	if(Cache) delete Cache, Cache = NULL;
 }
@@ -519,7 +521,7 @@ tjs_int32 tTJS::GetPPValue(const tjs_char *name)
 void tTJS::DoGarbageCollection()
 {
 	// do garbage collection
-	TJSVariantArrayStackCompactNow();
+	if(VariantArrayStack) VariantArrayStack->Compact();
 	TJSCompactStringHeap();
 }
 //---------------------------------------------------------------------------
