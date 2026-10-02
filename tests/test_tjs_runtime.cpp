@@ -2,6 +2,7 @@
 #include "tjsCommHead.h"
 #include "tjsError.h"
 #include "tjsHashSearch.h"
+#include "tjsObject.h"
 #include "TickCount.h"
 #include <algorithm>
 #include <chrono>
