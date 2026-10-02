@@ -9,6 +9,13 @@
 
 # Add any project specific keep options here:
 
+# Native code looks these classes and methods up by their Java names.
+# StorageAccess is also the public storage interface exercised by instrumentation.
+-keep class org.tvp.kirikiri2.KR2Activity { *; }
+-keep class org.tvp.kirikiri2.LayerPainter { *; }
+-keep class org.tvp.kirikiri2.StorageAccess { *; }
+-keep class org.libsdl.app.** { *; }
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:

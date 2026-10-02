@@ -14,4 +14,4 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
 endif()
 
-add_subdirectory(${KRKR2YURI_DIR} ${KRKR2YURI_DIR}/build_android)
+add_subdirectory(${KRKR2YURI_DIR} ${CMAKE_BINARY_DIR}/engine)

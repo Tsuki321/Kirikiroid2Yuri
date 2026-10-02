@@ -42,12 +42,21 @@ android {
                 }
             }
         }
-        versionCode 1
-        versionName "1.4.0beta"
+        versionCode (System.getenv('BUILD_VERSION_CODE') ?: '65').toInteger()
+        versionName System.getenv('BUILD_VERSION_NAME') ?: '1.4.0beta'
     }
     signingConfigs {
+        debug {
+            if (System.getenv('CI_KEYSTORE_PATH')) {
+                storeFile file(System.getenv('CI_KEYSTORE_PATH'))
+                storeType 'PKCS12'
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
         release {
-            storeFile file('sign.jks')
+            storeFile file(System.getenv('SIGN_STORE_FILE') ?: 'sign.jks')
             def signPropsFile = file('sign.properties')
             if (signPropsFile.exists()) {
                 Properties signProps = new Properties()
@@ -70,7 +79,7 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig signingConfigs.release.storeFile.exists() ? signingConfigs.release : null
         }
 
         debug {

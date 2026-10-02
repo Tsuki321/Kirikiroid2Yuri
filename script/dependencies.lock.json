@@ -1,0 +1,18 @@
+{
+  "build": {
+    "url": "https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_build.tar.gz",
+    "sha256": "99edcfefc9685b14fe8a7cc2a63aa90be2d4f4652ae6843cd189490eb49f9729",
+    "size": 181280537
+  },
+  "source": {
+    "url": "https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/deps/thirdparty_port.tar.gz",
+    "sha256": "ba188338d8ca4e9b73854523fe39febca276b5cad2b89227010853ca88119d8a",
+    "size": 820552749
+  },
+  "assets": {
+    "url": "https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/1.3.9_yuri/Kirikiroid2_yuri_1.3.9.apk",
+    "sha256": "782d85ed767ec8c07d69709b668275f3872ae6472b02343038538f011337c83d",
+    "size": 32374846
+  },
+  "native_inputs_sha256": "9a015d90ad51a4d4b542326b190ec9379ef75cb709dcdc8909e475e19209d331"
+}
