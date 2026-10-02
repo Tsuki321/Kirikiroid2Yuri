@@ -64,12 +64,7 @@ static void GetStringProperty(tTJSVariant *result, const tTJSVariant *str,
 		{
 			// get string length
 			const tTJSVariantString * s = str->AsStringNoAddRef();
-#ifdef __CODEGUARD__
-			if(!s)
-				*result = tTVInteger(0); // tTJSVariantString::GetLength can return zero if 'this' is NULL
-			else
-#endif
-			*result = tTVInteger(s->GetLength());
+			*result = tTVInteger(s ? s->GetLength() : 0);
 			return;
 		}
 		else if(name[0] >= TJS_W('0') && name[0] <= TJS_W('9'))
@@ -77,7 +72,7 @@ static void GetStringProperty(tTJSVariant *result, const tTJSVariant *str,
 			const tTJSVariantString * valstr = str->AsStringNoAddRef();
 			const tjs_char *s = str->GetString();
 			tjs_int n = TJS_atoi(name);
-			tjs_int len = valstr->GetLength();
+			tjs_int len = valstr ? valstr->GetLength() : 0;
 			if(n == len) { *result = tTJSVariant(TJS_W("")); return; }
 			if(n<0 || n>len)
 				TJS_eTJSError(TJSRangeError);
@@ -95,7 +90,7 @@ static void GetStringProperty(tTJSVariant *result, const tTJSVariant *str,
 		const tTJSVariantString * valstr = str->AsStringNoAddRef();
 		const tjs_char *s = str->GetString();
 		tjs_int n = (tjs_int)member.AsInteger();
-		tjs_int len = valstr->GetLength();
+		tjs_int len = valstr ? valstr->GetLength() : 0;
 		if(n == len) { *result = tTJSVariant(TJS_W("")); return; }
 		if(n<0 || n>len)
 			TJS_eTJSError(TJSRangeError);

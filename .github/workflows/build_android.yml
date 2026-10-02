@@ -50,6 +50,7 @@ jobs:
       - name: Configure sanitizers
         # The Python inspection tests also assert that member payloads are never read.
         run: |
+          sudo apt-get update && sudo apt-get install -y libonig-dev
           python3 -B -m unittest discover -s tests -p 'test_*.py' -v
           cmake -B build_test -DKRKR2_BUILD_TESTS=ON -DKRKR2_TEST_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build tests

@@ -926,7 +926,7 @@ void tTJSVariant::operator |= (const tTJSVariant &rhs)
 void tTJSVariant::increment(void)
 {
 	if(vt == tvtString)
-		String->ToNumber(*this);
+		tonumber();
 
 	if(vt == tvtReal)
 	{
@@ -944,7 +944,7 @@ void tTJSVariant::increment(void)
 void tTJSVariant::decrement(void)
 {
 	if(vt == tvtString)
-		String->ToNumber(*this);
+		tonumber();
 
 	if(vt == tvtReal)
 	{
@@ -1070,7 +1070,7 @@ void tTJSVariant::tonumber()
 
 	if(vt==tvtString)
 	{
-		String->ToNumber(*this);
+		if(String) String->ToNumber(*this); else *this = 0;
 		return;
 	}
 

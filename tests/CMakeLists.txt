@@ -60,3 +60,17 @@ add_executable(test_alpha_blend test_alpha_blend.cpp)
 target_include_directories(test_alpha_blend PRIVATE ${SRC_ROOT}/core/tjs2 ${SRC_ROOT}/core/visual)
 target_link_libraries(test_alpha_blend PRIVATE gtest_main)
 gtest_discover_tests(test_alpha_blend)
+
+# Exercise the actual interpreter with release optimization and sanitizers.
+# Android's ARM translation layer cannot always unwind a native crash, so these
+# tests provide source-level diagnostics for the same script/native operations.
+find_path(ONIG_INCLUDE_DIR oniguruma.h REQUIRED)
+find_library(ONIG_LIBRARY onig REQUIRED)
+file(GLOB TJS_RUNTIME_SOURCES CONFIGURE_DEPENDS ${SRC_ROOT}/core/tjs2/*.cpp)
+add_executable(test_tjs_runtime test_tjs_runtime.cpp ${TJS_RUNTIME_SOURCES})
+set_target_properties(test_tjs_runtime PROPERTIES CXX_STANDARD 14)
+target_compile_options(test_tjs_runtime PRIVATE -O2)
+target_compile_definitions(test_tjs_runtime PRIVATE NDEBUG)
+target_include_directories(test_tjs_runtime PRIVATE ${SRC_ROOT}/core/tjs2 ${SRC_ROOT}/core/utils ${ONIG_INCLUDE_DIR})
+target_link_libraries(test_tjs_runtime PRIVATE gtest_main Threads::Threads ${ONIG_LIBRARY})
+gtest_discover_tests(test_tjs_runtime PROPERTIES TIMEOUT 60)

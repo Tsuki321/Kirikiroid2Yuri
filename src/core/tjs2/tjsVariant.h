@@ -791,7 +791,7 @@ public:
 	{
 		// returns String
 		if(vt!=tvtString) TJSThrowVariantConvertError(*this, tvtString);
-		return *String;
+		return String ? String->operator const tjs_char *() : NULL;
 	}
 
 	TJS_METHOD_DEF(tjs_uint32 *, GetHint, ())
@@ -863,7 +863,7 @@ public:
 		{
 		case tvtVoid:    return 0;
 		case tvtObject:  TJSThrowVariantConvertError(*this, tvtInteger);
-		case tvtString:  return String->ToInteger();
+		case tvtString:  return String ? String->ToInteger() : 0;
 		case tvtInteger: return Integer;
 		case tvtReal:    TJSSetFPUE(); return (tTVInteger)Real;
 		case tvtOctet:   TJSThrowVariantConvertError(*this, tvtInteger);
@@ -877,7 +877,7 @@ public:
 		{
 		case tvtVoid:    targ = (tjs_int)0; return;
 		case tvtObject:  TJSThrowVariantConvertError(*this, tvtInteger, tvtReal);
-		case tvtString:  String->ToNumber(targ); return;
+		case tvtString:  if(String) String->ToNumber(targ); else targ = 0; return;
 		case tvtInteger: targ = Integer; return;
 		case tvtReal:    TJSSetFPUE(); targ = Real; return;
 		case tvtOctet:   TJSThrowVariantConvertError(*this, tvtInteger, tvtReal);
@@ -921,7 +921,7 @@ public:
 		{
 		case tvtVoid:    return 0;
 		case tvtObject:  TJSThrowVariantConvertError(*this, tvtReal);
-		case tvtString:  return String->ToReal();
+		case tvtString:  return String ? String->ToReal() : 0;
 		case tvtInteger: return (tTVReal)Integer;
 		case tvtReal:    return Real;
 		case tvtOctet:   TJSThrowVariantConvertError(*this, tvtReal);
@@ -1131,7 +1131,7 @@ public:
 		if(vt==tvtString)
 		{
 			tTJSVariant val;
-			String->ToNumber(val);
+			if(String) String->ToNumber(val); else val = 0;
 			return val;
 		}
 

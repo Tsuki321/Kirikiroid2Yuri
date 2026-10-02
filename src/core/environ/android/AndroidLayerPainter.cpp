@@ -5,7 +5,6 @@
 #include "MsgIntf.h"
 #include "platform/android/jni/JniHelper.h"
 #include <algorithm>
-#include <android/log.h>
 
 namespace {
 class Call {
@@ -95,11 +94,6 @@ tTVPRect TVPPaintLayer(tTJSNI_Layer *layer, const TVPLayerPaintRequest &request)
     tTVPBaseTexture *destination = const_cast<tTVPBaseTexture *>(layer->GetMainImage());
     destination->Blt(x, y, &patch, tTVPRect(0, 0, width, height),
                      layer->GetType() == ltAddAlpha ? bmAlphaOnAddAlpha : bmAlphaOnAlpha, 255, false);
-#ifndef NDEBUG
-    __android_log_print(ANDROID_LOG_INFO, "KirikiroidDrawing", "renderer=%s type=%d source=%08x uploaded=%08x destination=%08x",
-        destination->GetRenderManager()->GetName(), int(layer->GetType()), pixels[(height / 2) * width + width / 2],
-        patch.GetPoint(width / 2, height / 2), destination->GetPoint(x + width / 2, y + height / 2));
-#endif
     layer->SetImageModified(true);
     tTVPRect result(x, y, x + width, y + height);
     layer->Update(result);

@@ -68,7 +68,7 @@ tjs_char * tTJSString::InternalIndepend()
 //---------------------------------------------------------------------------
 tjs_int64 tTJSString::AsInteger() const
 {
-	return Ptr->ToInteger();
+	return Ptr ? Ptr->ToInteger() : 0;
 }
 //---------------------------------------------------------------------------
 void tTJSString::Replace(const tTJSString &from, const tTJSString &to, bool forall)
@@ -285,17 +285,11 @@ TJS::tTJSString tTJSString::SubString( unsigned int pos, unsigned int len ) cons
 
 TJS::tTJSString tTJSString::Trim()
 {
-    const tjs_char * p = c_str();
-    while( *p > '\0' && *p < 0x20 )
-        p++;
-
-    tTJSString _str(p);
-    tjs_char * p0 = (tjs_char *)_str.c_str();
-    tjs_char * p1 = (tjs_char *)_str.c_str() + _str.length() - 1;
-    while( p0 < p1 && *p1 != '\0' && *p1 < 0x20 )
-        *p1-- = '\0';
-    _str.Ptr->FixLength();
-    return _str;
+    const tjs_char *text = c_str();
+    tjs_int first = 0, end = GetLen();
+    while(first < end && text[first] > '\0' && text[first] < 0x20) ++first;
+    while(end > first && text[end - 1] > '\0' && text[end - 1] < 0x20) --end;
+    return tTJSString(text + first, end - first);
 }
 
 int tTJSString::IndexOf( const tTJSString& str, unsigned int pos /*= 0*/ ) const

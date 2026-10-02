@@ -13,10 +13,19 @@ var ciOutput = "@@OUTPUT@@/";
 ciMessages.add("ENGINE_CI_STARTED");
 ciMessages.save(ciOutput + "started.txt");
 try {
-    var value = %["answer" => 42, "text" => "fixture", "nested" => [1, 2, 3]];
+    var ciEmpty = "";
+    ciCheck(ciEmpty.length == 0 && ciEmpty[0] == "" && (int ciEmpty) == 0
+        && (real ciEmpty) == 0 && (+ciEmpty) == 0, "empty-string access and numeric conversions");
+    var ciEmptyLines = ["", "value", ""];
+    ciEmptyLines.save(ciStorage + "empty-lines.txt");
+    var ciLoadedLines = [];
+    ciLoadedLines.load(ciStorage + "empty-lines.txt");
+    ciCheck(ciLoadedLines.count == 3 && ciLoadedLines[0] == "" && ciLoadedLines[2] == "",
+        "empty lines survive text save/load");
+    var value = %["answer" => 42, "text" => "fixture", "empty" => "", "nested" => [1, 2, 3]];
     (Dictionary.saveStruct incontextof value)(ciStorage + "text-save.tjs");
     var loaded = Dictionary.loadStruct(ciStorage + "text-save.tjs");
-    ciCheck(loaded.answer == 42 && loaded.text == "fixture" && loaded.nested[2] == 3, "text save/load");
+    ciCheck(loaded.answer == 42 && loaded.text == "fixture" && loaded.empty == "" && loaded.nested[2] == 3, "text save/load");
     (Dictionary.saveStruct incontextof value)(ciStorage + "binary-save.tjs", "b");
     loaded = Dictionary.loadStruct(ciStorage + "binary-save.tjs");
     ciCheck(loaded.answer == 42 && loaded.nested.count == 3, "binary save/load");

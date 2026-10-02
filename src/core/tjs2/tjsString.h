@@ -340,7 +340,7 @@ public:
 
 		if(Ptr) Ptr->Release();
 		Ptr = TJSAllocVariantStringBuffer(len);
-		return const_cast<tjs_char*>(Ptr->operator const tjs_char *());
+		return Ptr ? const_cast<tjs_char*>(Ptr->operator const tjs_char *()) : NULL;
 	}
 
 	TJS_METHOD_DEF(tjs_char *, AppendBuffer, (tjs_uint len))
@@ -419,10 +419,9 @@ public:
 
 	TJS_CONST_METHOD_DEF(tjs_int, GetLen, ())
 	{
-#ifdef __CODEGUARD__
-		if(!Ptr) return 0; // tTJSVariantString::GetLength can return zero if 'this' is NULL
-#endif
-		return Ptr->GetLength();
+		// Empty strings have no backing object. A null member call is undefined
+		// even when the callee attempts to check 'this', and fails under -O2.
+		return Ptr ? Ptr->GetLength() : 0;
 	}
 
 	TJS_CONST_METHOD_DEF(tjs_int, length, ()) { return GetLen(); }
