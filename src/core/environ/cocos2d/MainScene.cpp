@@ -2344,10 +2344,10 @@ void TVPConsoleLog(const ttstr &l, bool important) {
 	WideCharToMultiByte(CP_ACP, 0, l.c_str(), -1, buf, sizeof(buf), nullptr, FALSE);
 	puts(buf);
 #else
-    cocos2d::log("%ls", l.c_str());
-// 	std::string utf8;
-// 	if (StringUtils::UTF16ToUTF8(l.c_str(), utf8))
-// 		cocos2d::log("%s", utf8.c_str());
+    // tjs_char is UTF-16; Android's %ls expects 32-bit wchar_t.
+    std::u16string text(reinterpret_cast<const char16_t *>(l.c_str()), l.length());
+    std::string utf8;
+    if (StringUtils::UTF16ToUTF8(text, utf8)) cocos2d::log("%s", utf8.c_str());
 #endif
 }
 
