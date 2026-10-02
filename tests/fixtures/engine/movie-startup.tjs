@@ -1,3 +1,7 @@
+function ciErrorText(error) {
+    try { if (error.message !== void) return "" + error.message; } catch (ignored) {}
+    return "" + error;
+}
 var ciMessages = [];
 var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
@@ -16,8 +20,8 @@ function ciCheck(value, message) {
 }
 function ciFinish(error) {
     ciTimer.enabled = false;
-    ciMovie.close();
-    ciAudio.stop();
+    try { ciMovie.close(); } catch (ignored) {}
+    try { ciAudio.stop(); } catch (ignored) {}
     ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + error);
     ciMessages.save(ciOutput + "result.txt");
 }
@@ -52,7 +56,7 @@ try {
                 ciCheck(ciTicks < 30, "movie stops at requested frame");
                 ciFinish();
             }
-        } catch (error) { ciFinish(typeof error == "string" ? error : error.message); }
+        } catch (error) { ciFinishciErrorText(error); }
     };
     ciTimer.enabled = true;
-} catch (error) { ciFinish(typeof error == "string" ? error : error.message); }
+} catch (error) { ciFinishciErrorText(error); }

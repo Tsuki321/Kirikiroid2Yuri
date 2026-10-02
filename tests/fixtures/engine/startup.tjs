@@ -1,3 +1,7 @@
+function ciErrorText(error) {
+    try { if (error.message !== void) return "" + error.message; } catch (ignored) {}
+    return "" + error;
+}
 var ciMessages = [];
 function ciCheck(value, message) {
     if (!value) throw "CI assertion: " + message;
@@ -57,6 +61,9 @@ try {
     ciLayer.type = ltAlpha;
     ciWindow.visible = true;
     ciLayer.clear(0);
+    ciLayer.setMainPixel(1, 1, 0x123456);
+    ciCheck(ciLayer.getMainPixel(1, 1) == 0x123456, "pixel color read/write");
+    ciLayer.clear(0);
     var ciBrush = new GdiPlus.Appearance();
     ciBrush.addBrush(0xff336699);
     ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
@@ -91,6 +98,6 @@ try {
     ciCheck(ciWindow.visible, "window restore");
     ciMessages.add("ENGINE_CI_PASS");
 } catch (error) {
-    ciMessages.add("ENGINE_CI_FAIL " + (typeof error == "string" ? error : error.message));
+    ciMessages.add("ENGINE_CI_FAIL " + ciErrorText(error));
 }
 ciMessages.save(ciOutput + "result.txt", "utf-8");

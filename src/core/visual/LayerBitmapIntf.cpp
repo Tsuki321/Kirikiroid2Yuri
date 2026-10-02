@@ -172,7 +172,9 @@ tjs_uint32 iTVPBaseBitmap::GetPoint(tjs_int x, tjs_int y) const
 	if(x < 0 || y < 0 || x >= (tjs_int)GetWidth() || y >= (tjs_int)GetHeight())
 		TVPThrowExceptionMessage(TVPOutOfRectangle);
 
-	return Bitmap->GetPoint(x, y);
+    const tjs_uint32 pixel = Bitmap->GetPoint(x, y);
+    // Renderer textures are RGBA bytes; the public bitmap API uses 0xAARRGGBB.
+    return Is32BPP() ? TVP_REVRGB(pixel) : pixel;
 #if 0
 	if(Is32BPP())
 		return  *( (const tjs_uint32*)GetScanLine(y) + x); // 32bpp
