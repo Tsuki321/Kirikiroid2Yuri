@@ -16,7 +16,7 @@ find_package(Threads REQUIRED)
 
 option(KRKR2_TEST_SANITIZERS "Run host tests with address/undefined sanitizers" OFF)
 if(KRKR2_TEST_SANITIZERS)
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
 endif()
 

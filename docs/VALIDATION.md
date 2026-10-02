@@ -8,11 +8,13 @@ these changes run in GitHub Actions.
 
 | Check | Coverage |
 |---|---|
-| GCC and Clang host tests | MD5, fuzzy matching, file append/update/truncate, atomic replacement, extraction path boundaries, symlink/hardlink rejection, worker startup/join, bytecode structure and operands |
-| Address/undefined-behavior sanitizers | Host tests, including 20,000 deterministic bytecode mutations and truncated input prefixes |
+| GCC and Clang host tests | MD5, fuzzy matching, file append/update/truncate, atomic replacement, extraction path boundaries, symlink/hardlink rejection, worker startup/join, bytecode structure and operands, XP3 index bounds and segment validation, alpha-blending endpoints |
+| Address/undefined-behavior sanitizers | Host tests, including 20,000 deterministic bytecode mutations and truncated input prefixes; sanitizer findings fail the test |
+| Optimized TJS runtime | Production interpreter compiled with `-O2`: empty-string conversion and serialization, nested structured saves, closures across array growth, inheritance, and exception-stack recovery |
+| Offline package inspector | Bounded XP3 metadata inspection, protected/obscured entry reporting, and checks that archive member payloads are never read |
 | Android instrumentation | Existing-directory creation, write failures, local replacement, real persisted document grants, Unicode/case handling, read/write/list/rename/delete, subtree boundaries |
-| Native TJS fixtures | Text/binary/compressed dictionary serialization, literal-only loading, bytecode compilation/loading, malformed bytecode, missing/repeated plugins, actual text/shape/image pixels, transforms, window controls |
-| Media fixtures | Generated PCM audio and MPEG-4 video, metadata, playback rate, pause/resume and stop frames |
+| Native TJS fixtures | Text/binary/compressed dictionary and empty-string serialization, literal-only loading, bytecode compilation/loading, malformed bytecode, missing/repeated plugins, actual text/shape/image pixels, alpha endpoints, transforms, window controls, valid and malformed XP3 archives through local and document-tree storage |
+| Media fixtures | Generated PCM audio and MPEG-4 video, metadata, playback status/rate, pause/resume and stop frames |
 | Android lifecycle | Backgrounding and returning to the existing activity |
 | APK verification | 16 KB ELF load/RELRO alignment and uncompressed library packing |
 
@@ -34,8 +36,8 @@ and manual dispatch. Artifacts include native test reports, debug and release te
 APKs, the instrumentation APK, logcat, fixture results, and screenshots.
 
 The release test APK contains the optimized/minified release code, signed with the
-CI development identity so it can use the same instrumentation APK. It is separate
-from production signing. `CI_DEBUG_KEYSTORE_B64` supplies the persistent PKCS#12
+CI development identity. Each app variant has its own matching instrumentation
+APK. Production signing is separate. `CI_DEBUG_KEYSTORE_B64` supplies the persistent PKCS#12
 development keystore; its public certificate fingerprint is checked in CI. Fork
 pull requests use a disposable test identity when that secret is unavailable.
 

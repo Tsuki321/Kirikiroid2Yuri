@@ -14,13 +14,21 @@
 #include <errno.h>
 #include <clocale>
 #include <algorithm>
-#ifdef __WIN32__
+#include <ctype.h>
+#include <limits.h>
+#include <string.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <math.h>
 #include <float.h>
+#ifdef __WIN32__
 #define isfinite _finite
 #else
 #define isfinite std::isfinite
 #endif
+#ifndef INTMAX_MAX
 #define INTMAX_MAX		0x7fffffffffffffff
+#endif
 #include <assert.h>
 
 /*
@@ -735,21 +743,13 @@ tjs_char *TJS_strrchr(const tjs_char *s, int c)
 	return ret;
 }
 
-#include <ctype.h>
-#include <limits.h>
-#include <string.h>
-#include <stdarg.h>
-//#include <inttypes.h>
-#include <stdint.h>
-#include <math.h>
-#include <float.h>
-
 /* Some useful macros */
 
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 #define MIN(a,b) ((a)<(b) ? (a) : (b))
 #define CONCAT2(x,y) x ## y
 #define CONCAT(x,y) CONCAT2(x,y)
+#undef NL_ARGMAX
 #define NL_ARGMAX 9
 
 /* Convenient bit representation for modifier flags, which all fall
