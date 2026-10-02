@@ -95,6 +95,15 @@ public class StorageAccessTest {
         assertEquals(-1, StorageAccess.open(context, documents + "/../not-granted.txt", 1));
         assertNull(StorageAccess.list(context, "/documents/not-granted"));
     }
+    @Test public void eRasterizerProducesArgbPixels() {
+        float[] rectangle = {0,10,10,1,40,10,1,40,30,1,10,30,3};
+        int[] patch = LayerPainter.render(rectangle, new float[] {1,0,0,1,0,0},
+            new int[] {0xff336699,0xff336699}, new float[] {-1,0,0,0,0,0,1,0,0,0,10,1},
+            new float[] {0,0,320,240}, "",12,0,null,true,null,0,0);
+        assertTrue(patch[2] > 0 && patch[3] > 0);
+        int index = 4 + (15 - patch[1]) * patch[2] + (15 - patch[0]);
+        assertEquals(0xff336699, patch[index]);
+    }
     @Test public void zPrepareEngineFixturesForProcessRestart() throws Exception {
         Context tests = InstrumentationRegistry.getInstrumentation().getContext();
         String script = read(tests.getAssets().open("engine/startup.tjs"));

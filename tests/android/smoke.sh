@@ -15,31 +15,43 @@ adb shell am instrument -w -r com.yuri.kirikiri2.test/androidx.test.runner.Andro
 grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt
 adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
   | tr -d '\r' > test-results/android/cases.txt
+failures=0
 while IFS=$'\t' read -r name storage output; do
   adb shell am force-stop com.yuri.kirikiri2
-  adb shell am start -W -n com.yuri.kirikiri2/.MainActivity --es startupPath "$storage"
+  if ! adb shell am start -W -n com.yuri.kirikiri2/.MainActivity --es startupPath "$storage"; then
+    echo "Cannot start engine fixture: $name" >&2
+    failures=$((failures + 1))
+    continue
+  fi
   passed=false
   for attempt in $(seq 1 60); do
     sleep 2
     if adb shell cat "$output/result.txt" > "test-results/android/$name-engine.raw" 2>/dev/null; then
       python3 tests/android/decode_result.py "test-results/android/$name-engine.raw" > "test-results/android/$name-engine.txt"
       cat "test-results/android/$name-engine.txt"
-      grep -q ENGINE_CI_PASS "test-results/android/$name-engine.txt"
-      passed=true
+      if grep -q ENGINE_CI_PASS "test-results/android/$name-engine.txt"; then passed=true; fi
       break
     fi
     if ! adb shell pidof com.yuri.kirikiri2 > "test-results/android/$name-pid.txt"; then
       echo "Engine exited before writing its result: $name" >&2
-      exit 1
+      break
     fi
   done
-  if [ "$passed" != true ]; then echo "Engine fixture timed out: $name" >&2; exit 1; fi
   adb exec-out screencap -p > "test-results/android/$name.png"
+  if [ "$passed" != true ]; then
+    echo "Engine fixture failed or timed out: $name" >&2
+    failures=$((failures + 1))
+    continue
+  fi
   if before="$(adb shell pidof com.yuri.kirikiri2)"; then
     adb shell input keyevent KEYCODE_HOME
     sleep 2
     adb shell am start -W --activity-reorder-to-front -n com.yuri.kirikiri2/.MainActivity
     sleep 2
-    test "$(adb shell pidof com.yuri.kirikiri2)" = "$before"
+    if [ "$(adb shell pidof com.yuri.kirikiri2)" != "$before" ]; then
+      echo "Activity did not survive background/resume: $name" >&2
+      failures=$((failures + 1))
+    fi
   fi
 done < test-results/android/cases.txt
+exit "$failures"

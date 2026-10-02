@@ -66,8 +66,12 @@ try {
     ciLayer.clear(0);
     var ciBrush = new GdiPlus.Appearance();
     ciBrush.addBrush(0xff336699);
-    ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
-    ciCheck((ciLayer.getMainPixel(15, 15) & 0xffffff) == 0x336699, "rectangle paints correct pixels");
+    var ciDrawBounds = ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
+    var ciDrawPixel = ciLayer.getMainPixel(15, 15) & 0xffffff;
+    ciMessages.add("Rectangle bounds " + ciDrawBounds.x + "," + ciDrawBounds.y + "," + ciDrawBounds.width + "," + ciDrawBounds.height
+        + " pixel=" + ciDrawPixel + " mask=" + ciLayer.getMaskPixel(15, 15));
+    ciMessages.save(ciOutput + "progress.txt");
+    ciCheck(ciDrawPixel == 0x336699, "rectangle paints correct pixels (actual " + ciDrawPixel + ")");
     ciLayer.setTransform([1, 0, 0, 1, 50, 0]);
     ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
     ciLayer.resetTransform();
