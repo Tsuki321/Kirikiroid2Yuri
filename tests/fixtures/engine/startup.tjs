@@ -13,6 +13,7 @@ var ciOutput = "@@OUTPUT@@/";
 ciMessages.add("ENGINE_CI_STARTED");
 ciMessages.save(ciOutput + "started.txt");
 try {
+    ciCheck("%d:%s".sprintf(42, "ok") == "42:ok", "formatted string arguments");
     var ciEmpty = "";
     ciCheck(ciEmpty.length == 0 && ciEmpty[0] == "" && (int ciEmpty) == 0
         && (real ciEmpty) == 0 && (+ciEmpty) == 0, "empty-string access and numeric conversions");

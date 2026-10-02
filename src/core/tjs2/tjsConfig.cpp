@@ -1365,24 +1365,26 @@ static void pop_arg(union arg *arg, int type, va_list *ap)
 struct _tFILE
 {
     tjs_char *p;
+    size_t remaining; // UTF-16 code units, excluding the terminator
 };
 
 static void out(_tFILE *f, const tjs_char *s, size_t l)
 {
-    memcpy(f->p, s, l * sizeof(*f->p));
-    f->p += l;
+    const size_t count = std::min(l, f->remaining);
+    if (!count) return;
+    memcpy(f->p, s, count * sizeof(*f->p));
+    f->p += count;
+    f->remaining -= count;
 }
 
 static void pad(_tFILE *f, tjs_char c, int w, int l, int fl)
 {
-	tjs_char pad[256];
 	if (fl & (LEFT_ADJ | ZERO_PAD) || l >= w) return;
-	l = w - l;
-    int n = l >sizeof pad / sizeof(pad[0])? sizeof pad / sizeof(pad[0]): l;
-    while(n--) pad[n] = c;
-	for (; l >= sizeof pad; l -= sizeof pad)
-		out(f, pad, sizeof pad / sizeof(pad[0]));
-	out(f, pad, l);
+    const size_t count = std::min(static_cast<size_t>(w - l), f->remaining);
+    if (!count) return;
+    std::fill_n(f->p, count, c);
+    f->p += count;
+    f->remaining -= count;
 }
 
 static const char xdigits[] = 
@@ -1495,7 +1497,7 @@ static int fmt_fp(_tFILE *f, long double y, int w, int p, int fl, int t)
         prefix+=6;
     } else prefix++, pl=0;
 
-    if (!finite(y)) { // ## fix no member named 'isfinite' in namespace 'std'
+    if (!isfinite(y)) {
         const tjs_char *s = (t&32)?TJS_W("inf"):TJS_W("INF");
         if (y!=y) s=(t&32)?TJS_W("nan"):TJS_W("NAN"), pl=0;
         pad(f, ' ', w, 3+pl, fl&~ZERO_PAD);
@@ -1613,7 +1615,7 @@ static int fmt_fp(_tFILE *f, long double y, int w, int p, int fl, int t)
         x = *d % i;
         /* Are there any significant digits past j? */
         if (x || d+1!=z) {
-            long double round = 0x1<<LDBL_MANT_DIG;
+            long double round = 2.0L / LDBL_EPSILON;
             long double small;
             if (*d/i & 1) round += 2;
             if (x<i/2) small=0.5;
@@ -1707,10 +1709,20 @@ static int fmt_fp(_tFILE *f, long double y, int w, int p, int fl, int t)
     return MAX(w, pl+l);
 }
 
+static bool printf_is_digit(tjs_char ch) {
+    return ch >= '0' && ch <= '9';
+}
+
 static int getint(tjs_char **s) {
-    int i;
-    for (i=0; isdigit(**s); (*s)++)
-        i = 10*i + (**s-'0');
+    int i = 0;
+    for (; printf_is_digit(**s); (*s)++) {
+        const int digit = **s - '0';
+        if (i > (INT_MAX - digit) / 10) {
+            errno = EOVERFLOW;
+            return -1;
+        }
+        i = 10*i + digit;
+    }
     return i;
 }
 
@@ -1747,7 +1759,8 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
         if (f) out(f, a, l);
         if (l) continue;
 
-        if (isdigit(s[1]) && s[2]=='$') {
+        if (printf_is_digit(s[1]) && s[2]=='$') {
+            if (s[1] == '0') return -1;
             l10n=1;
             argpos = s[1]-'0';
             s+=3;
@@ -1762,7 +1775,8 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
 
         /* Read field width */
         if (*s=='*') {
-            if (isdigit(s[1]) && s[2]=='$') {
+            if (printf_is_digit(s[1]) && s[2]=='$') {
+                if (s[1] == '0') return -1;
                 l10n=1;
                 nl_type[s[1]-'0'] = INT;
                 w = nl_arg[s[1]-'0'].i;
@@ -1771,12 +1785,14 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
                 w = f ? va_arg(*ap, int) : 0;
                 s++;
             } else return -1;
+            if (w == INT_MIN) { errno = EOVERFLOW; return -1; }
             if (w<0) fl|=LEFT_ADJ, w=-w;
         } else if ((w=getint(&s))<0) return -1;
 
         /* Read precision */
         if (*s=='.' && s[1]=='*') {
-            if (isdigit(s[2]) && s[3]=='$') {
+            if (printf_is_digit(s[2]) && s[3]=='$') {
+                if (s[2] == '0') return -1;
                 nl_type[s[2]-'0'] = INT;
                 p = nl_arg[s[2]-'0'].i;
                 s+=4;
@@ -1786,7 +1802,7 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
             } else return -1;
         } else if (*s=='.') {
             s++;
-            p = getint(&s);
+            if ((p = getint(&s)) < 0) return -1;
         } else p = -1;
 
         /* Format specifier state machine */
@@ -1864,7 +1880,7 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
             }
             p = MAX(p, z-a + !arg.i);
             break;
-        case 'c':
+        case 'c': case 'C':
             *(a=z-(p=1))=arg.i;
             fl &= ~ZERO_PAD;
             break;
@@ -1873,17 +1889,10 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
         case 's':
         case 'S':
             z = a = arg.p ? (tjs_char*)arg.p : (tjs_char*)TJS_W("(null)");
-            while(*z) z++;
-            //z = (tjs_char*)memchr(a, 0, p);
-            if (!z) z=a+p;
-            else p=z-a;
+            while ((p < 0 || z-a < p) && *z) z++;
+            p = z-a;
             fl &= ~ZERO_PAD;
             break;
-        case 'C':
-            wc[0] = arg.i;
-            wc[1] = 0;
-            arg.p = wc;
-            p = -1;
 //         case 'S':
 //             ws = (wchar_t*)arg.p;
 //             for (i=l=0; i<0U+p && *ws && (l=wctomb(mb, *ws++))>=0 && l<=0U+p-i; i+=l);
@@ -1899,10 +1908,12 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
         case 'e': case 'f': case 'g': case 'a':
         case 'E': case 'F': case 'G': case 'A':
             l = fmt_fp(f, arg.f, w, p, fl, t);
+            if (l < 0) return -1;
             continue;
         }
 
         if (p < z-a) p = z-a;
+        if (p > INT_MAX - pl) { errno = EOVERFLOW; return -1; }
         if (w < pl+p) w = pl+p;
 
         pad(f, ' ', w, pl+p, fl);
@@ -1915,7 +1926,6 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
         l = w;
     }
 
-    out(f, TJS_W(""), 1);
     if (f) return cnt;
     if (!l10n) return 0;
 
@@ -1928,16 +1938,22 @@ static int printf_core(_tFILE *f, const tjs_char *fmt, va_list *ap, union arg *n
 
 int _vsnprintf(tjs_char * s, size_t n, const tjs_char * fmt, va_list ap)
 {
-    int r;
-    _tFILE f = {s };
-    
+    _tFILE f = {s, n ? n - 1 : 0};
+    if (n) *s = 0;
     int nl_type[NL_ARGMAX+1] = {0};
-    union arg nl_arg[NL_ARGMAX+1];
-    unsigned char internal_buf[80], *saved_buf = 0;
-    va_list *pap = (va_list *)&ap;
-    r = printf_core(&f, fmt, pap, nl_arg, nl_type);
+    union arg nl_arg[NL_ARGMAX+1] = {};
+    // va_list can be an array type. Copy it into a real local object before
+    // taking its address, and preserve the caller's arguments on every ABI.
+    va_list args;
+    va_copy(args, ap);
+    int r = printf_core(NULL, fmt, &args, nl_arg, nl_type);
+    va_end(args);
+    if (r < 0) return r;
 
-    /* Null-terminate, overwriting last char if dest buffer is full */
+    va_copy(args, ap);
+    r = printf_core(&f, fmt, &args, nl_arg, nl_type);
+    va_end(args);
+    if (n) *f.p = 0;
     return r;
 }
 

@@ -134,8 +134,9 @@ private:
 	{
 		tjs_uint32 Hash;
 		tjs_uint32 Flags; // management flag
-		char Key[sizeof(KeyT)];
-		char Value[sizeof(ValueT)];
+		// These buffers hold objects constructed with placement new.
+		alignas(KeyT) char Key[sizeof(KeyT)];
+		alignas(ValueT) char Value[sizeof(ValueT)];
 		element *Prev; // previous chain item
 		element *Next; // next chain item
 		element *NPrev; // previous item in the additional order
