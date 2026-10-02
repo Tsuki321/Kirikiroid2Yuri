@@ -44,3 +44,6 @@
 #-dontwarn android.webkit.WebView
 #-dontwarn android.net.http.SslError
 #-dontwarn android.webkit.WebViewClient
+# AndroidJUnitRunner calls this shared dependency from the separate test APK.
+# AGP omits shared app dependencies there; retain its public facade in release.
+-keep class androidx.tracing.Trace { public *; }

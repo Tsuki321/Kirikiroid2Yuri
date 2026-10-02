@@ -63,6 +63,8 @@ extern unsigned char TVPNegativeMulTable65[65*256];
 /** アルファブレンド */
 struct alpha_blend_func {
 	inline tjs_uint32 operator()( tjs_uint32 d, tjs_uint32 s, tjs_uint32 a ) const {
+		// The 8-bit opacity table uses 255 for the exact source endpoint.
+		if(a == 255) return s & 0x00ffffff;
 		tjs_uint32 d1 = d & 0xff00ff;
 		d1 = (d1 + (((s & 0xff00ff) - d1) * a >> 8)) & 0xff00ff;
 		d &= 0xff00;

@@ -12,6 +12,7 @@
 #include "tjsCommHead.h"
 
 #include "XP3Archive.h"
+#include "XP3IndexValidator.h"
 #include "MsgIntf.h"
 #include "DebugIntf.h"
 #include "EventIntf.h"
@@ -20,6 +21,8 @@
 
 #include <zlib.h>
 #include <algorithm>
+#include <memory>
+#include <unordered_set>
 
 bool TVPAllowExtractProtectedStorage = true;
 
@@ -285,7 +288,7 @@ bool TVPGetXP3ArchiveOffset(tTJSBinaryStream *st, const ttstr name,
 		while(0!=(read = st->Read(buffer, one_read_size)))
 		{
 			tjs_uint p = 0;
-			while(p<read)
+				while(p <= read && read - p >= 11)
 			{
 				if(!memcmp(XP3Mark, buffer + p, 11))
 				{
@@ -345,7 +348,8 @@ void tTVPXP3Archive::Init(tTJSBinaryStream *st, tjs_int64 off, bool normalizeNam
 {
 	tjs_uint64 offset = off;
 
-	tjs_uint8 *indexdata = NULL;
+	std::unique_ptr<tTJSBinaryStream> streamOwner(st);
+	std::vector<tjs_uint8> indexbuffer;
 
 	static const tjs_uint8 cn_File[] =
 		{ 0x46/*'F'*/, 0x69/*'i'*/, 0x6c/*'l'*/, 0x65/*'e'*/ };
@@ -363,76 +367,61 @@ void tTVPXP3Archive::Init(tTJSBinaryStream *st, tjs_int64 off, bool normalizeNam
 	{
 		// retrieve archive offset
 		if(off < 0) TVPGetXP3ArchiveOffset(st, ArchiveName, offset, true);
+		const tjs_uint64 archive_size = st->GetSize();
+		if(!TVPXP3::Contains(archive_size, offset, 19))
+			TVPThrowExceptionMessage(TVPReadError);
 
 		// read index position and seek
 		st->SetPosition(11 + offset);
 
+		std::unordered_set<tjs_uint64> visited;
+		tjs_uint64 total_index_bytes = 0;
 		// read all XP3 indices
 		while(true)
 		{
-			if(indexdata) delete [] indexdata;
-
+			if(!TVPXP3::Contains(archive_size, st->GetPosition(), 8))
+				TVPThrowExceptionMessage(TVPReadError);
 			tjs_uint64 index_ofs = st->ReadI64LE();
+			if(!TVPXP3::Contains(archive_size - offset, index_ofs, 9) ||
+				!visited.insert(index_ofs).second || visited.size() > TVPXP3::MaxIndexCount)
+				TVPThrowExceptionMessage(TJS_W("XP3: invalid or cyclic index chain"));
 			st->SetPosition(index_ofs + offset);
 
 			// read index to memory
 			tjs_uint8 index_flag;
 			st->ReadBuffer(&index_flag, 1);
-			tjs_uint index_size;
-
-			if((index_flag & TVP_XP3_INDEX_ENCODE_METHOD_MASK) ==
-				TVP_XP3_INDEX_ENCODE_ZLIB)
-			{
-				// compressed index
-				tjs_uint64 compressed_size = st->ReadI64LE();
-				tjs_uint64 r_index_size = st->ReadI64LE();
-
-				if((tjs_uint)compressed_size != compressed_size ||
-					(tjs_uint)r_index_size != r_index_size)
-						TVPThrowExceptionMessage(TVPReadError);
-						// too large to handle, or corrupted
-				index_size = (tjs_int)r_index_size;
-				indexdata = new tjs_uint8[index_size];
-				tjs_uint8 *compressed = new tjs_uint8[(tjs_uint)compressed_size];
-				try
-				{
-					st->ReadBuffer(compressed, (tjs_uint)compressed_size);
-
-					unsigned long destlen = (unsigned long)index_size;
-
-					int result = uncompress(  /* uncompress from zlib */
-						(unsigned char *)indexdata,
-						&destlen, (unsigned char*)compressed,
-							(unsigned long)compressed_size);
-					if(result != Z_OK ||
-						destlen != (unsigned long)index_size)
-							TVPThrowExceptionMessage(TVPUncompressionFailed);
-				}
-				catch(...)
-				{
-					delete [] compressed;
-					throw;
-				}
-				delete [] compressed;
-			}
-			else if((index_flag & TVP_XP3_INDEX_ENCODE_METHOD_MASK) ==
-				TVP_XP3_INDEX_ENCODE_RAW)
-			{
-				// uncompressed index
-				tjs_uint64 r_index_size = st->ReadI64LE();
-				if((tjs_uint)r_index_size != r_index_size)
-					TVPThrowExceptionMessage(TVPReadError);
-						// too large to handle or corrupted
-				index_size = (tjs_uint)r_index_size;
-				indexdata = new tjs_uint8[index_size];
-				st->ReadBuffer(indexdata, index_size);
-			}
-			else
-			{
-				// unknown encode method
+			const unsigned method = index_flag & TVP_XP3_INDEX_ENCODE_METHOD_MASK;
+			if(method > TVP_XP3_INDEX_ENCODE_ZLIB || (index_flag & ~0x87))
 				TVPThrowExceptionMessage(TVPReadError);
+			tjs_uint64 stored_size = st->ReadI64LE();
+			tjs_uint64 unpacked_size = method == TVP_XP3_INDEX_ENCODE_ZLIB ? st->ReadI64LE() : stored_size;
+			if(stored_size > TVPXP3::MaxIndexBytes ||
+				unpacked_size > TVPXP3::MaxIndexBytes - total_index_bytes)
+				TVPThrowExceptionMessage(TJS_W("XP3: archive index exceeds the supported memory limit"));
+			if(!TVPXP3::Contains(archive_size, st->GetPosition(), stored_size))
+				TVPThrowExceptionMessage(TVPReadError);
+			total_index_bytes += unpacked_size;
+			const tjs_uint index_size = static_cast<tjs_uint>(unpacked_size);
+			indexbuffer.resize(std::max<tjs_uint>(1, index_size));
+			tjs_uint8 *indexdata = indexbuffer.data();
+			if(method == TVP_XP3_INDEX_ENCODE_ZLIB)
+			{
+				std::vector<tjs_uint8> compressed(static_cast<size_t>(stored_size));
+				st->ReadBuffer(compressed.data(), static_cast<tjs_uint>(stored_size));
+				unsigned long destlen = static_cast<unsigned long>(indexbuffer.size());
+				int result = uncompress(indexdata, &destlen, compressed.data(),
+					static_cast<unsigned long>(stored_size));
+				if(result != Z_OK || destlen != index_size)
+					TVPThrowExceptionMessage(TVPUncompressionFailed);
 			}
+			else if(index_size)
+				st->ReadBuffer(indexdata, index_size);
 
+			const auto index_status = TVPXP3::ValidateIndex(indexdata, index_size, archive_size, offset);
+			if(index_status == TVPXP3::IndexStatus::UnsupportedNameTable)
+				TVPThrowExceptionMessage(TJS_W("XP3: Hxv4 filename metadata is not supported by this Android engine"));
+			if(index_status != TVPXP3::IndexStatus::Valid)
+				TVPThrowExceptionMessage(TJS_W("XP3: malformed archive index"));
 
 			// read index information from memory
 			tjs_uint ch_file_start = 0;
@@ -458,9 +447,11 @@ void tTVPXP3Archive::Init(tTJSBinaryStream *st, tjs_int64 off, bool normalizeNam
 				item.OrgSize = ReadI64FromMem(indexdata + ch_info_start + 4);
 				item.ArcSize = ReadI64FromMem(indexdata + ch_info_start + 12);
 
-				tjs_int len = ReadI16FromMem(indexdata + ch_info_start + 20);
-				ttstr name = TVPStringFromBMPUnicode(
-						(const tjs_uint16 *)(indexdata + ch_info_start + 22), len);
+				const tjs_uint16 len = TVPXP3::Read16(indexdata + ch_info_start + 20);
+				std::vector<tjs_uint16> name_units(len);
+				for(tjs_uint i = 0; i < len; ++i)
+					name_units[i] = TVPXP3::Read16(indexdata + ch_info_start + 22 + i * 2);
+				ttstr name = TVPStringFromBMPUnicode(name_units.data(), len);
 				item.Name = name;
 				if (normalizeName)
 					NormalizeInArchiveStorageName(item.Name);
@@ -531,13 +522,9 @@ void tTVPXP3Archive::Init(tTJSBinaryStream *st, tjs_int64 off, bool normalizeNam
 	}
 	catch(...)
 	{
-		if(indexdata) delete [] indexdata;
-		delete st;
  		TVPAddLog( (const tjs_char*)TVPInfoFailed );
 		throw;
 	}
-	if(indexdata) delete [] indexdata;
-	delete st;
 
 	TVPAddLog( TVPFormatMessage( TVPInfoDoneWithContains, ttstr(Count), ttstr(segmentcount) ) );
 }
@@ -612,12 +599,14 @@ bool tTVPXP3Archive::FindChunk(const tjs_uint8 *data, const tjs_uint8 * name,
 	tjs_uint pos = 0;
 	while(pos < size)
 	{
+		if(size - pos < 12)
+			TVPThrowExceptionMessage(TVPReadError);
 		bool found = !memcmp(data + start, name, 4);
 		start += 4;
 		tjs_uint64 r_size = ReadI64FromMem(data + start);
 		start += 8;
 		tjs_uint size_chunk = (tjs_uint)r_size;
-		if(size_chunk != r_size)
+		if(size_chunk != r_size || size_chunk > size - pos - 12)
 			TVPThrowExceptionMessage(TVPReadError);
 		if(found)
 		{

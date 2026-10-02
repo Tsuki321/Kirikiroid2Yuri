@@ -3,6 +3,7 @@ set -euo pipefail
 mkdir -p test-results/android
 adb root
 adb wait-for-device
+adb shell settings put secure immersive_mode_confirmations confirmed
 test "$(adb shell id -u | tr -d '\r')" = 0
 adb shell getprop > test-results/android/properties.txt
 adb shell getconf PAGE_SIZE | tee test-results/android/page-size.txt
@@ -18,7 +19,7 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
 failures=0
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -ge 4
+test "$expected" -eq 6
 # adb shell reads stdin. Keep the manifest on another descriptor so starting
 # the first activity cannot consume the remaining fixture rows.
 while IFS=$'\t' read -r -u 3 name storage output; do

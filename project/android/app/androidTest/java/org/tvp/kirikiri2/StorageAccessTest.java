@@ -108,17 +108,18 @@ public class StorageAccessTest {
         Context tests = InstrumentationRegistry.getInstrumentation().getContext();
         String script = read(tests.getAssets().open("engine/startup.tjs"));
         String movieScript = read(tests.getAssets().open("engine/movie-startup.tjs"));
+        String archiveScript = read(tests.getAssets().open("engine/archive-startup.tjs"));
         String program = read(tests.getAssets().open("engine/compiled-source.tjs"));
         File base = new File(context.getFilesDir(), "engine-ci");
         assertTrue(StorageAccess.mkdirs(context, base.getPath()));
         StringBuilder manifest = new StringBuilder();
-        String[] names = {"local", "documents", "movie-local", "movie-documents"};
+        String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents"};
         for (String name : names) {
             String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
             String output = new File(base, name + "-result").getPath();
             assertTrue(StorageAccess.mkdirs(context, storage));
             assertTrue(StorageAccess.mkdirs(context, output));
-            write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : script)
+            write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
             if (name.startsWith("movie")) {
                 try (InputStream input = tests.getAssets().open("engine/test.avi"); ByteArrayOutputStream movie = new ByteArrayOutputStream()) {
@@ -133,6 +134,19 @@ public class StorageAccessTest {
                 assertTrue(StorageAccess.write(context, storage + "/tone.wav", tone.toByteArray()));
             }
             write(storage + "/compiled-source.tjs", program);
+            if (name.startsWith("archive")) {
+                String[] archives = tests.getAssets().list("archives");
+                assertNotNull(archives);
+                assertTrue("synthetic archive fixtures are packaged", archives.length >= 21);
+                for (String archive : archives) {
+                    try (InputStream input = tests.getAssets().open("archives/" + archive);
+                         ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                        byte[] buffer = new byte[4096]; int size;
+                        while ((size = input.read(buffer)) != -1) bytes.write(buffer, 0, size);
+                        assertTrue(StorageAccess.write(context, storage + "/" + archive, bytes.toByteArray()));
+                    }
+                }
+            }
             assertTrue(StorageAccess.write(context, storage + "/broken.tjb", new byte[] {'T','J','S','2','1','0','0',0}));
             write(storage + "/unsafe.txt", "(global.ciSideEffect = 1, %[]) ");
             write(storage + "/preprocessor.txt", "@set(ciSideEffect=1) (const) %[]");

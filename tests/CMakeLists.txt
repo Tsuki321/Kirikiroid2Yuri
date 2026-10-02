@@ -50,3 +50,13 @@ add_executable(test_bytecode test_bytecode.cpp)
 target_include_directories(test_bytecode PRIVATE ${SRC_ROOT}/core/tjs2)
 target_link_libraries(test_bytecode PRIVATE gtest_main)
 gtest_discover_tests(test_bytecode PROPERTIES TIMEOUT 60)
+
+add_executable(test_xp3_index test_xp3_index.cpp)
+target_include_directories(test_xp3_index PRIVATE ${SRC_ROOT}/core/base)
+target_link_libraries(test_xp3_index PRIVATE gtest_main)
+gtest_discover_tests(test_xp3_index PROPERTIES TIMEOUT 30)
+
+add_executable(test_alpha_blend test_alpha_blend.cpp)
+target_include_directories(test_alpha_blend PRIVATE ${SRC_ROOT}/core/tjs2 ${SRC_ROOT}/core/visual)
+target_link_libraries(test_alpha_blend PRIVATE gtest_main)
+gtest_discover_tests(test_alpha_blend)

@@ -2,15 +2,14 @@ function ciErrorText(error) {
     try { if (error.message !== void) return "" + error.message; } catch (ignored) {}
     return "" + error;
 }
-var ciMessages = [];
+var ciMessages = ["ENGINE_CI_STARTED"];
 var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
-var ciWindow = new Window();
-ciWindow.setSize(320, 240);
-ciWindow.visible = true;
-var ciTimer = new Timer();
-var ciMovie = new VideoOverlay(ciWindow);
-var ciAudio = new WaveSoundBuffer();
+ciMessages.save(ciOutput + "started.txt");
+var ciWindow = void;
+var ciTimer = void;
+var ciMovie = void;
+var ciAudio = void;
 var ciTicks = 0;
 var ciPhase = 0;
 function ciCheck(value, message) {
@@ -19,13 +18,19 @@ function ciCheck(value, message) {
     ciMessages.save(ciOutput + "progress.txt");
 }
 function ciFinish(error) {
-    ciTimer.enabled = false;
+    if (ciTimer !== void) ciTimer.enabled = false;
     try { ciMovie.close(); } catch (ignored) {}
     try { ciAudio.stop(); } catch (ignored) {}
     ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + error);
     ciMessages.save(ciOutput + "result.txt");
 }
 try {
+    ciWindow = new Window();
+    ciWindow.setSize(320, 240);
+    ciWindow.visible = true;
+    ciTimer = new Timer(ciWindow);
+    ciMovie = new VideoOverlay(ciWindow);
+    ciAudio = new WaveSoundBuffer(ciWindow);
     ciAudio.open(ciStorage + "tone.wav");
     ciCheck(ciAudio.totalTime >= 900, "PCM audio decode");
     ciAudio.volume = 0;

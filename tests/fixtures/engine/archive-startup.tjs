@@ -1,0 +1,36 @@
+var ciStorage = "@@STORAGE@@/";
+var ciOutput = "@@OUTPUT@@/";
+var ciMessages = ["ENGINE_CI_STARTED"];
+ciMessages.save(ciOutput + "started.txt");
+function ciErrorText(error) {
+    return error.message === void ? "" + error : "" + error.message;
+}
+function ciCheck(condition, label) {
+    if (!condition) throw "CI assertion: " + label;
+    ciMessages.add("PASS " + label);
+    ciMessages.save(ciOutput + "progress.txt");
+}
+function ciRead(name) { return Scripts.loadText(ciStorage + name + ".xp3>hello.txt"); }
+try {
+    var ciExpected = "archive fixture OK 日本語";
+    var ciValid = ["valid-raw", "valid-compressed", "valid-chained", "valid-unknown", "valid-multisegment"];
+    for (var i = 0; i < ciValid.count; ++i)
+        ciCheck(ciRead(ciValid[i]) == ciExpected, ciValid[i] + " loads correctly");
+    ciCheck(ciRead("valid-empty-file") == "", "empty archive member loads correctly");
+    var ciInvalid = ["bad-chunk-header", "bad-chunk-length", "bad-info", "bad-name",
+        "bad-segment-range", "bad-segment-size", "bad-segment-method", "bad-index-pointer",
+        "bad-index-size", "bad-compressed-size", "bad-compressed-index", "bad-index-cycle",
+        "bad-index-tail", "bad-index-count", "unsupported-names"];
+    for (var i = 0; i < ciInvalid.count; ++i) {
+        var ciError = void;
+        try { ciRead(ciInvalid[i]); } catch (error) { ciError = ciErrorText(error); }
+        ciCheck(ciError !== void, ciInvalid[i] + " is rejected");
+        if (ciInvalid[i] == "unsupported-names")
+            ciCheck(ciError.indexOf("Hxv4") >= 0, "unsupported filename metadata has a clear diagnostic");
+        ciCheck(ciRead("valid-raw") == ciExpected, "archive reader recovers after " + ciInvalid[i]);
+    }
+    ciMessages.add("ENGINE_CI_PASS");
+} catch (error) {
+    ciMessages.add("ENGINE_CI_FAIL " + ciErrorText(error));
+}
+ciMessages.save(ciOutput + "result.txt");
