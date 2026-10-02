@@ -192,6 +192,10 @@ TEST(XP3Index, DistinguishesUnsupportedNameTablesFromOrdinaryProtectionFlags) {
     Bytes index = Chunk("Hxv4", {0, 0, 0, 0});
     Add(index, file.Index());
     EXPECT_EQ(IndexStatus::UnsupportedNameTable, Validate(index));
+    Set(file.info, 4, 123, 8); // variant metadata need not follow standard segment totals
+    index = Chunk("Hxv4", {0, 0, 0, 0});
+    Add(index, file.Index());
+    EXPECT_EQ(IndexStatus::UnsupportedNameTable, Validate(index));
 }
 
 TEST(XP3Index, BoundsArbitraryAndMutatedInputsUnderSanitizers) {

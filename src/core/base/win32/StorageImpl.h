@@ -41,6 +41,7 @@ struct tTVPLocalFileInfo {
 };
 
 void TVPGetLocalFileListAt(const ttstr &name, const std::function<void(const ttstr&, tTVPLocalFileInfo*)>& cb);
+int TVPCheckArchive(const ttstr &localname, ttstr *diagnostic);
 
 //---------------------------------------------------------------------------
 // tTVPLocalFileStream

@@ -10,7 +10,11 @@ function ciCheck(condition, label) {
     ciMessages.add("PASS " + label);
     ciMessages.save(ciOutput + "progress.txt");
 }
-function ciRead(name) { return Scripts.loadText(ciStorage + name + ".xp3>hello.txt"); }
+function ciRead(name) {
+    var lines = [];
+    lines.load(ciStorage + name + ".xp3>hello.txt");
+    return lines.join("\n");
+}
 try {
     var ciExpected = "archive fixture OK 日本語";
     var ciValid = ["valid-raw", "valid-compressed", "valid-chained", "valid-unknown", "valid-multisegment"];

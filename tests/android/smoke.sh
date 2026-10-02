@@ -1,16 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p test-results/android
-adb root
-adb wait-for-device
+collect_diagnostics() {
+  timeout 20s adb logcat -d > test-results/android/logcat.txt || true
+  timeout 20s adb exec-out screencap -p > test-results/android/screenshot.png || true
+  timeout 30s adb exec-out tar -C /data/user/0/com.yuri.kirikiri2 -cf - files/engine-ci files/dump \
+    > test-results/android/runtime-files.tar 2>/dev/null || true
+  timeout 30s adb pull /data/tombstones test-results/android/tombstones >/dev/null 2>&1 || true
+}
+trap collect_diagnostics EXIT
+# adbd disconnects when switching to root, including occasionally returning a
+# failing status after the restart already succeeded. Check the resulting UID.
+for attempt in 1 2 3 4 5; do
+  adb root || true
+  if timeout 30s adb wait-for-device && [ "$(adb shell id -u | tr -d '\r')" = 0 ]; then break; fi
+  sleep 2
+done
 adb shell settings put secure immersive_mode_confirmations confirmed
 test "$(adb shell id -u | tr -d '\r')" = 0
 adb shell getprop > test-results/android/properties.txt
 adb shell getconf PAGE_SIZE | tee test-results/android/page-size.txt
 adb logcat -c
-trap 'adb logcat -d > test-results/android/logcat.txt; adb exec-out screencap -p > test-results/android/screenshot.png; adb exec-out tar -C /data/user/0/com.yuri.kirikiri2 -cf - files/engine-ci files/dump > test-results/android/runtime-files.tar 2>/dev/null || true' EXIT
 adb install -r -g "$(find apk -name '*.apk' -print -quit)"
 adb install -r -g "$(find test-apk -name '*.apk' -print -quit)"
+adb shell dumpsys package com.yuri.kirikiri2 > test-results/android/package.txt
 adb shell am instrument -w -r com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/instrumentation.txt
 grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt
@@ -29,6 +42,10 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     echo "Cannot start engine fixture: $name" >&2
     failures=$((failures + 1))
     continue
+  fi
+  pid="$(adb shell pidof com.yuri.kirikiri2 | tr -d '\r' || true)"
+  if [[ "$pid" =~ ^[0-9]+$ ]]; then
+    adb exec-out cat "/proc/$pid/maps" > "test-results/android/$name-maps.txt" 2>/dev/null || true
   fi
   passed=false
   for attempt in $(seq 1 60); do

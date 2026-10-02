@@ -104,15 +104,20 @@ inline IndexStatus ValidateIndex(const uint8_t *data, size_t size, uint64_t arch
         return IndexStatus::Malformed;
     size_t position = 0;
     bool unsupportedNames = false;
+    bool malformedFile = false;
     while (position < size) {
         Chunk chunk;
         if (!NextChunk(data, size, position, chunk))
             return IndexStatus::Malformed;
         if (chunk.Is("File") && !ValidateFile(chunk, archiveSize, archiveOffset))
-            return IndexStatus::Malformed;
+            malformedFile = true;
         if (chunk.Is("Hxv4"))
             unsupportedNames = true;
     }
-    return unsupportedNames ? IndexStatus::UnsupportedNameTable : IndexStatus::Valid;
+    // A known unsupported name-table variant may also transform ordinary File
+    // fields. Do not misdiagnose its metadata as a corrupt standard archive.
+    if (unsupportedNames)
+        return IndexStatus::UnsupportedNameTable;
+    return malformedFile ? IndexStatus::Malformed : IndexStatus::Valid;
 }
 } // namespace TVPXP3

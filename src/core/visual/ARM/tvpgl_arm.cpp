@@ -525,10 +525,13 @@ static uint8x8x4_t do_copy_src(uint8x8x4_t s, uint8x8x4_t d) {
 
 #ifndef Region_AlphaBlend
 static uint8x8x4_t do_AlphaBlend(uint8x8x4_t s, uint8x8x4_t d) {
-	// d + s * a - d * a
-	d.val[0] = vadd_u8(d.val[0], vsubhn_u16(vmull_u8(s.val[0], s.val[3]), vmull_u8(d.val[0], s.val[3])));
-	d.val[1] = vadd_u8(d.val[1], vsubhn_u16(vmull_u8(s.val[1], s.val[3]), vmull_u8(d.val[1], s.val[3])));
-	d.val[2] = vadd_u8(d.val[2], vsubhn_u16(vmull_u8(s.val[2], s.val[3]), vmull_u8(d.val[2], s.val[3])));
+	// Mixed vectors also need the exact opaque endpoint in each lane.
+	uint8x8_t opaque = vceq_u8(s.val[3], vdup_n_u8(255));
+	for (int channel = 0; channel < 3; ++channel) {
+		uint8x8_t mixed = vadd_u8(d.val[channel], vsubhn_u16(
+			vmull_u8(s.val[channel], s.val[3]), vmull_u8(d.val[channel], s.val[3])));
+		d.val[channel] = vbsl_u8(opaque, s.val[channel], mixed);
+	}
 	return d;
 }
 static uint8x8x4_t do_AlphaBlend_o(uint8x8x4_t s, uint8x8x4_t d, tjs_int opa) {
@@ -536,24 +539,20 @@ static uint8x8x4_t do_AlphaBlend_o(uint8x8x4_t s, uint8x8x4_t d, tjs_int opa) {
 	return do_AlphaBlend(s, d);
 }
 static uint8x8x4_t do_AlphaBlend_d_(uint8x8x4_t s, uint8x8x4_t d, uint16x8_t sopa) {
-	uint8_t tmpbuff[32 + 16];
-	uint16_t *tmpsa = (uint16_t*)((((intptr_t)tmpbuff) + 15) & ~15);
-	vst1q_u16((uint16_t *)__builtin_assume_aligned(tmpsa, 16), sopa);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[0]], s.val[3], 0);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[1]], s.val[3], 1);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[2]], s.val[3], 2);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[3]], s.val[3], 3);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[4]], s.val[3], 4);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[5]], s.val[3], 5);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[6]], s.val[3], 6);
-	s.val[3] = vset_lane_u8(TVPOpacityOnOpacityTable[tmpsa[7]], s.val[3], 7);
+	alignas(16) uint16_t indices[8];
+	uint8_t opacity[8], alpha[8];
+	vst1q_u16(indices, sopa);
+	for (int lane = 0; lane < 8; ++lane) {
+		// Preserve transparent source lanes, even over hidden destination RGB.
+		opacity[lane] = (indices[lane] >> 8) ? TVPOpacityOnOpacityTable[indices[lane]] : 0;
+		alpha[lane] = TVPNegativeMulTable[indices[lane]];
+	}
+	s.val[3] = vld1_u8(opacity);
+	d.val[3] = vld1_u8(alpha);
 	return do_AlphaBlend(s, d);
 }
 static uint8x8x4_t do_AlphaBlend_d(uint8x8x4_t s, uint8x8x4_t d) {
-	//( 255 - (255-a)*(255-b)/ 255 ); 
-	uint16x8_t isd_a16 = vmull_u8(vmvn_u8(s.val[3]), vmvn_u8(d.val[3]));
 	uint16x8_t sopa = vorrq_u16(vshll_n_u8(s.val[3], 8), vmovl_u8(d.val[3]));
-	d.val[3] = vmvn_u8(vshrn_n_u16(isd_a16, 8));
 	return do_AlphaBlend_d_(s, d, sopa);
 }
 static uint8x8x4_t do_AlphaBlend_do(uint8x8x4_t s, uint8x8x4_t d, tjs_int opa) {

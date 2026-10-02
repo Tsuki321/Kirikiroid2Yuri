@@ -191,12 +191,15 @@ void TVPMainFileSelectorForm::onCellClicked(int idx) {
 	FileInfo info = CurrentDirList[idx];
 	TVPBaseFileSelectorForm::onCellClicked(idx);
 	int archiveType;
+	ttstr archiveError;
 	if (info.IsDir) {
 		if (CheckDir(info.FullPath)) {
 			startup(info.FullPath);
 		}
-	} else if ((archiveType = TVPCheckArchive(info.FullPath.c_str())) == 1) {
+	} else if ((archiveType = TVPCheckArchive(info.FullPath.c_str(), &archiveError)) == 1) {
 		startup(info.FullPath);
+	} else if (!archiveError.IsEmpty() && FileUtils::getInstance()->getFileExtension(info.NameForCompare) == ".xp3") {
+		TVPShowSimpleMessageBox(archiveError, TJS_W("Cannot open archive"));
 	} else if (archiveType == 0 && TVPCheckIsVideoFile(info.FullPath.c_str())) {
 		SimpleMediaFilePlayer *player = SimpleMediaFilePlayer::create();
 		TVPMainScene::GetInstance()->addChild(player, 10);// pushUIForm(player);

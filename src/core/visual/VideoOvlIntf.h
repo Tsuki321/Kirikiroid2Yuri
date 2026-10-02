@@ -55,7 +55,6 @@ protected:
 	TJS::tTJSVariantClosure ActionOwner;
 	tTVPSoundStatus Status; // status
 
-	ttstr GetStatusString() const;
 	void SetStatus(tTVPSoundStatus s);
 	void SetStatusAsync(tTVPSoundStatus s);
 	void FireCallbackCommand(const ttstr & command, const ttstr & argument);
@@ -65,6 +64,7 @@ protected:
 
 public:
 	virtual void Disconnect() = 0; // called from Window object's invalidation
+	ttstr GetStatusString() const;
 	virtual bool GetVisible() const = 0;
 	virtual const tTVPRect &GetBounds() const = 0;
 	virtual tTVPVideoOverlayMode GetMode() const = 0;

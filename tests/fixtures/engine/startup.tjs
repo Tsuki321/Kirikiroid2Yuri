@@ -72,6 +72,8 @@ try {
         + " pixel=" + ciDrawPixel + " mask=" + ciLayer.getMaskPixel(15, 15));
     ciMessages.save(ciOutput + "progress.txt");
     ciCheck(ciDrawPixel == 0x336699, "rectangle paints correct pixels (actual " + ciDrawPixel + ")");
+    ciCheck(ciLayer.getMaskPixel(8, 8) == 0 && ciLayer.getMainPixel(8, 8) == 0,
+        "transparent lanes beside the rectangle remain unchanged");
     ciLayer.setTransform([1, 0, 0, 1, 50, 0]);
     ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
     ciLayer.resetTransform();

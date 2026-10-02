@@ -510,6 +510,19 @@ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onFrameUpdate)
 //-- properties
 
 //----------------------------------------------------------------------
+TJS_BEGIN_NATIVE_PROP_DECL(status)
+{
+	TJS_BEGIN_NATIVE_PROP_GETTER
+	{
+		TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_VideoOverlay);
+		*result = _this->GetStatusString();
+		return TJS_S_OK;
+	}
+	TJS_END_NATIVE_PROP_GETTER
+	TJS_DENY_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_PROP_DECL(status)
+//----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_PROP_DECL(position)
 {
 // Start: Add:	T.Imoto

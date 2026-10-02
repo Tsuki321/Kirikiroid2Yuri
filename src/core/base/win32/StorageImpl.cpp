@@ -630,8 +630,9 @@ tTVPArchive * TVPOpenArchive(const ttstr & name, bool normalizeFileName)
 	return nullptr;
 }
 //---------------------------------------------------------------------------
-int TVPCheckArchive(const ttstr &localname)
+int TVPCheckArchive(const ttstr &localname, ttstr *diagnostic)
 {
+	if (diagnostic) *diagnostic = ttstr();
 	tTVPArchive *arc = nullptr;
 	int validArchive = 2; // archive but no startup.tjs
 	try {
@@ -658,14 +659,19 @@ int TVPCheckArchive(const ttstr &localname)
 // 				}
 			}
 		}
-	} catch (eTJSError e) {
-		//arc = nullptr;
+	} catch (const eTJSError &e) {
+		if (diagnostic) *diagnostic = e.GetMessage();
 	}
 	if (arc) {
 		delete arc;
 		return validArchive;
 	}
 	return 0; // not archive
+}
+
+int TVPCheckArchive(const ttstr &localname)
+{
+	return TVPCheckArchive(localname, nullptr);
 }
 
 
