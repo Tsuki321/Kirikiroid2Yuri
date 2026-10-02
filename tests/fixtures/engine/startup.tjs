@@ -76,6 +76,28 @@ try {
     ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
     ciLayer.resetTransform();
     ciCheck((ciLayer.getMainPixel(65, 15) & 0xffffff) == 0x336699, "drawing transform");
+    ciLayer.drawRectangle(ciBrush, 10, 10, 30, 20);
+    ciCheck(ciLayer.getMainPixel(15, 15) == 0x336699 && ciLayer.getMaskPixel(15, 15) == 255,
+        "repeated opaque drawing preserves color and alpha");
+    var ciHalfRed = new GdiPlus.Appearance();
+    ciHalfRed.addBrush(0x80ff0000);
+    ciLayer.drawRectangle(ciHalfRed, 200, 10, 10, 10);
+    ciCheck(ciLayer.getMainPixel(205, 15) == 0xff0000 && ciLayer.getMaskPixel(205, 15) == 128,
+        "translucent drawing onto transparent pixels preserves straight color");
+    var ciBlue = new GdiPlus.Appearance();
+    ciBlue.addBrush(0xff0000ff);
+    ciLayer.drawRectangle(ciBlue, 220, 10, 10, 10);
+    ciLayer.drawRectangle(ciHalfRed, 220, 10, 10, 10);
+    var ciMixed = ciLayer.getMainPixel(225, 15);
+    ciCheck(((ciMixed >> 16) & 255) >= 127 && ((ciMixed >> 16) & 255) <= 129
+        && (ciMixed & 255) >= 126 && (ciMixed & 255) <= 128
+        && (ciMixed & 0xff00) == 0 && ciLayer.getMaskPixel(225, 15) == 255,
+        "translucent drawing blends with an opaque destination");
+    var ciTransparent = new GdiPlus.Appearance();
+    ciTransparent.addBrush(0x00336699);
+    ciLayer.drawRectangle(ciTransparent, 220, 10, 10, 10);
+    ciCheck(ciLayer.getMainPixel(225, 15) == ciMixed && ciLayer.getMaskPixel(225, 15) == 255,
+        "transparent drawing preserves destination pixels");
     var ciFont = new GdiPlus.Font("sans-serif", 16, GdiPlus.FontStyleRegular);
     var smallMetric = ciFont.lineSpacing;
     ciFont.emSize = 24;

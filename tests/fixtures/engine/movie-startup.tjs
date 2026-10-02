@@ -56,7 +56,7 @@ try {
                 ciCheck(ciTicks < 30, "movie stops at requested frame");
                 ciFinish();
             }
-        } catch (error) { ciFinishciErrorText(error); }
+        } catch (error) { ciFinish(ciErrorText(error)); }
     };
     ciTimer.enabled = true;
-} catch (error) { ciFinishciErrorText(error); }
+} catch (error) { ciFinish(ciErrorText(error)); }

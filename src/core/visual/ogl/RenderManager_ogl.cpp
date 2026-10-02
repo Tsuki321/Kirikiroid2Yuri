@@ -2598,7 +2598,7 @@ public:
 		CompileAndRegRegularBlendMethod("ApplyColorMap_d", opacityPrefix + colorPrefix,
 			"    s.r *= opacity;\n"
 			"    d.a = s.r + d.a - s.r * d.a;\n"
-			"    d.rgb = mix(d.rgb, color.rgb, s.r / (d.a + 0.0001));\n"
+			"    d.rgb = mix(d.rgb, color.rgb, s.r / max(d.a, 0.0001));\n"
 			"    gl_FragColor = d;\n"
 			"}");
 		TEST_SHADER(ApplyColorMap_d,
@@ -2658,7 +2658,7 @@ public:
 
 		const char *shader_ConstColorAlphaBlend_d =
 			"    d.a = opacity + d.a - opacity * d.a;\n"
-			"    d.rgb = mix(d.rgb, color.rgb, opacity / (d.a + 0.0001));\n"
+			"    d.rgb = mix(d.rgb, color.rgb, opacity / max(d.a, 0.0001));\n"
 			"    gl_FragColor = d;\n"
 			"}";
 		if (GL_CHECK_shader_framebuffer_fetch) {
@@ -2721,7 +2721,7 @@ public:
 
 		CompileAndRegRegularBlendMethod("ConstAlphaBlend_d", opacityPrefix,
 			"    d.a = opacity + d.a - opacity * d.a;\n"
-			"    d.rgb = mix(d.rgb, s.rgb, opacity / (d.a + 0.0001));\n"
+			"    d.rgb = mix(d.rgb, s.rgb, opacity / max(d.a, 0.0001));\n"
 			"    gl_FragColor = d;\n"
 			"}");
 		TEST_SHADER(ConstAlphaBlend_d,
@@ -2957,7 +2957,7 @@ public:
 		const char *shader_AlphaBlend_d =
 			"    s.a *= opacity;\n"
 			"    d.a = s.a + d.a - s.a * d.a;\n"
-			"    d.rgb = mix(d.rgb, s.rgb, s.a / (d.a + 0.0001));\n"
+			"    d.rgb = mix(d.rgb, s.rgb, s.a / max(d.a, 0.0001));\n"
 			"    gl_FragColor = d;\n"
 			"}";
 		CompileAndRegRegularBlendMethod("AlphaBlend_d", opacityPrefix, shader_AlphaBlend_d);
@@ -2967,7 +2967,7 @@ public:
 		shader_AlphaBlend_d =
 			"    s *= color;\n"
 			"    d.a = s.a + d.a - s.a * d.a;\n"
-			"    d.rgb = mix(d.rgb, s.rgb, s.a / (d.a + 0.0001));\n"
+			"    d.rgb = mix(d.rgb, s.rgb, s.a / max(d.a, 0.0001));\n"
 			"    gl_FragColor = d;\n"
 			"}";
 		CompileAndRegRegularBlendMethod("AlphaBlend_color_d", colorPrefix, shader_AlphaBlend_d);
@@ -2978,7 +2978,7 @@ public:
 				"    s *= color;\n"
 				"    if(s.a < alpha_threshold) discard;\n"
 				"    d.a = s.a + d.a - s.a * d.a;\n"
-				"    d.rgb = mix(d.rgb, s.rgb, s.a / (d.a + 0.0001));\n"
+				"    d.rgb = mix(d.rgb, s.rgb, s.a / max(d.a, 0.0001));\n"
 				"    gl_FragColor = d;\n"
 				"}");
 		}

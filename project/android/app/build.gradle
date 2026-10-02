@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    testBuildType project.findProperty('CI_TEST_BUILD_TYPE') ?: 'debug'
     sourceSets {
         androidTest {
             manifest.srcFile 'androidTest/AndroidManifest.xml'

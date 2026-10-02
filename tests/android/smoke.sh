@@ -16,7 +16,13 @@ grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt
 adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
   | tr -d '\r' > test-results/android/cases.txt
 failures=0
-while IFS=$'\t' read -r name storage output; do
+executed=0
+expected=$(wc -l < test-results/android/cases.txt)
+test "$expected" -ge 4
+# adb shell reads stdin. Keep the manifest on another descriptor so starting
+# the first activity cannot consume the remaining fixture rows.
+while IFS=$'\t' read -r -u 3 name storage output; do
+  executed=$((executed + 1))
   adb shell am force-stop com.yuri.kirikiri2
   if ! adb shell am start -W -n com.yuri.kirikiri2/.MainActivity --es startupPath "$storage"; then
     echo "Cannot start engine fixture: $name" >&2
@@ -53,5 +59,8 @@ while IFS=$'\t' read -r name storage output; do
       failures=$((failures + 1))
     fi
   fi
-done < test-results/android/cases.txt
+done 3< test-results/android/cases.txt
+echo "Engine fixtures executed: $executed/$expected; failures: $failures" \
+  | tee test-results/android/engine-summary.txt
+test "$executed" -eq "$expected"
 exit "$failures"

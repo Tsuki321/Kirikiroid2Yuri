@@ -120,8 +120,13 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: krkr2yuri-android-tests
+          name: krkr2yuri-debug-android-tests
           path: build_android/outputs/apk/androidTest/debug/*.apk
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: krkr2yuri-release-android-tests
+          path: build_android/outputs/apk/androidTest/release/*.apk
           retention-days: 7
       - uses: actions/upload-artifact@v4
         if: startsWith(github.ref, 'refs/tags/v')
@@ -164,7 +169,7 @@ jobs:
           path: apk
       - uses: actions/download-artifact@v4
         with:
-          name: krkr2yuri-android-tests
+          name: krkr2yuri-${{ matrix.variant }}-android-tests
           path: test-apk
       - name: Enable KVM
         run: |

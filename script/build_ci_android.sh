@@ -31,7 +31,8 @@ if [[ "$GITHUB_REF" == refs/tags/v* ]]; then export BUILD_VERSION_NAME="${GITHUB
 
 cd "$ci_root/project/android"
 chmod +x gradlew
-./gradlew :krkr2yuri:assembleDebug :krkr2yuri:assembleRelease :krkr2yuri:assembleDebugAndroidTest --no-daemon --max-workers=2
+./gradlew :krkr2yuri:assembleDebug :krkr2yuri:assembleDebugAndroidTest --no-daemon --max-workers=2
+./gradlew -PCI_TEST_BUILD_TYPE=release :krkr2yuri:assembleRelease :krkr2yuri:assembleReleaseAndroidTest --no-daemon --max-workers=2
 cd "$ci_root"
 python3 tests/android/check_apk.py build_android/outputs/apk/debug/*.apk build_android/outputs/apk/release/*.apk
 
@@ -42,6 +43,15 @@ release_apk="$(find build_android/outputs/apk/release -name '*.apk' -print -quit
   --key-pass pass:android --ks-key-alias androiddebugkey \
   --out build_android/outputs/apk/ci-release/krkr2yuri-ci-release.apk "$release_apk"
 "$apksigner" verify --print-certs build_android/outputs/apk/ci-release/*.apk | tee test-results/ci-release-signing.txt
+# Each test APK is built against its target variant, including R8's release
+# mapping and dependencies, and must share the target app's CI certificate.
+for variant in debug release; do
+  test_apk="$(find "build_android/outputs/apk/androidTest/$variant" -name '*.apk' -print -quit)"
+  test -n "$test_apk"
+  "$apksigner" sign --ks "$CI_KEYSTORE_PATH" --ks-type PKCS12 --ks-pass pass:android \
+    --key-pass pass:android --ks-key-alias androiddebugkey "$test_apk"
+  "$apksigner" verify "$test_apk"
+done
 if [[ -n "${CI_DEBUG_KEYSTORE_B64:-}" ]]; then
   grep -F "$(cat tests/android/ci-signing-cert.sha256)" test-results/ci-release-signing.txt
 fi
