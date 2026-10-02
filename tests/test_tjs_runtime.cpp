@@ -2,16 +2,27 @@
 #include "tjsCommHead.h"
 #include "tjsError.h"
 #include "TickCount.h"
+#include <algorithm>
 #include <chrono>
+#include <iostream>
 #include <map>
+#include <utility>
 
-// These are the interpreter's only host clock hooks. The runtime and its
+// Supply the application's clock, logging and localization hooks. The runtime and its
 // compiler, objects, native classes and serializers use the production code.
 tjs_uint64 TVPGetTickCount() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 tjs_uint32 TVPGetRoughTickCount32() { return static_cast<tjs_uint32>(TVPGetTickCount()); }
+
+ttstr TVPGetMessageByLocale(const std::string &key) { return ttstr(key.c_str()); }
+
+namespace TJS {
+void TVPConsoleLog(const tjs_char *message) {
+    std::cerr << ttstr(message).AsStdString() << '\n';
+}
+} // namespace TJS
 
 namespace {
 using Text = std::basic_string<tjs_char>;
@@ -95,7 +106,7 @@ TEST_F(TJSRuntime, EmptyStringsRemainValidWithOptimization) {
     tTJSVariant value(TJS_W("")), number;
     EXPECT_EQ(0, value.AsInteger());
     EXPECT_EQ(0.0, value.AsReal());
-    value.ToNumber(number);
+    value.AsNumber(number);
     EXPECT_EQ(0, number.AsInteger());
     EXPECT_EQ(0, (+value).AsInteger());
     value.increment();
