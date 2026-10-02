@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.os.Debug;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.storage.StorageManager;
 import android.preference.PreferenceManager;
@@ -468,7 +469,7 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     protected static View mTextEdit = null;
     SharedPreferences Sp;
 	
-	static Handler msgHandler = new Handler() {
+	static Handler msgHandler = new Handler(Looper.getMainLooper()) {
 		@Override
 		public void handleMessage(Message msg) {
 			sInstance.handleMessage(msg);
