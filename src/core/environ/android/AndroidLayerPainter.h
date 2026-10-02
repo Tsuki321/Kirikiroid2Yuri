@@ -17,5 +17,6 @@ struct TVPLayerPaintRequest {
 };
 tTVPRect TVPPaintLayer(tTJSNI_Layer *layer, const TVPLayerPaintRequest &request);
 std::array<float, 7> TVPMeasureAndroidText(const ttstr &family, float size, int style, const ttstr &text);
-std::vector<tjs_uint8> TVPEncodeAndroidImage(const std::vector<tjs_uint32> &pixels, int width, int height, const ttstr &mime, int quality);
+std::vector<tjs_uint8> TVPEncodeAndroidImage(const std::vector<tjs_uint32> &pixels, int width, int height,
+                                             const ttstr &mime, int quality);
 void TVPAddAndroidFont(const ttstr &file, const ttstr &names);

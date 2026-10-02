@@ -4,13 +4,16 @@
 #define NCB_MODULE_NAME TJS_W("windowEx.dll")
 
 struct WindowEx {
-    template<int Action>
+    template <int Action>
     static tjs_error TJS_INTF_METHOD change(tTJSVariant *, tjs_int, tTJSVariant **, iTJSDispatch2 *object) {
         tTJSNI_Window *window = nullptr;
-        if (!object || TJS_FAILED(object->NativeInstanceSupport(TJS_NIS_GETINSTANCE,
-                tTJSNC_Window::ClassID, reinterpret_cast<iTJSNativeInstance **>(&window))) || !window)
+        if (!object ||
+            TJS_FAILED(object->NativeInstanceSupport(TJS_NIS_GETINSTANCE, tTJSNC_Window::ClassID,
+                                                     reinterpret_cast<iTJSNativeInstance **>(&window))) ||
+            !window)
             return TJS_E_NATIVECLASSCRASH;
-        if (Action == 0) window->SetVisible(false);
+        if (Action == 0)
+            window->SetVisible(false);
         else {
             window->SetFullScreen(Action == 1);
             window->SetVisible(true);

@@ -17,20 +17,34 @@ namespace TVPFileIO {
 inline int Open(const char *path, unsigned int access) {
     int flags;
     switch (access) {
-    case 0: flags = O_RDONLY; break;
-    case 1: flags = O_RDWR | O_CREAT | O_TRUNC; break;
-    case 2: flags = O_RDWR | O_CREAT | O_APPEND; break;
-    case 3: flags = O_RDWR; break;
-    default: errno = EINVAL; return -1;
+    case 0:
+        flags = O_RDONLY;
+        break;
+    case 1:
+        flags = O_RDWR | O_CREAT | O_TRUNC;
+        break;
+    case 2:
+        flags = O_RDWR | O_CREAT | O_APPEND;
+        break;
+    case 3:
+        flags = O_RDWR;
+        break;
+    default:
+        errno = EINVAL;
+        return -1;
     }
     int fd;
-    do { fd = open(path, flags | O_CLOEXEC, 0666); } while (fd < 0 && errno == EINTR);
+    do {
+        fd = open(path, flags | O_CLOEXEC, 0666);
+    } while (fd < 0 && errno == EINTR);
     return fd;
 }
 
 inline ssize_t Read(int fd, void *buffer, size_t size) {
     ssize_t result;
-    do { result = read(fd, buffer, size); } while (result < 0 && errno == EINTR);
+    do {
+        result = read(fd, buffer, size);
+    } while (result < 0 && errno == EINTR);
     return result;
 }
 
@@ -39,8 +53,10 @@ inline bool WriteAll(int fd, const void *buffer, size_t size) {
     while (size) {
         const size_t chunk = size > static_cast<size_t>(SSIZE_MAX) ? SSIZE_MAX : size;
         const ssize_t written = write(fd, bytes, chunk);
-        if (written < 0 && errno == EINTR) continue;
-        if (written <= 0) return false;
+        if (written < 0 && errno == EINTR)
+            continue;
+        if (written <= 0)
+            return false;
         bytes += written;
         size -= written;
     }
@@ -49,9 +65,12 @@ inline bool WriteAll(int fd, const void *buffer, size_t size) {
 
 inline bool TruncateHere(int fd) {
     const off_t offset = lseek(fd, 0, SEEK_CUR);
-    if (offset < 0) return false;
+    if (offset < 0)
+        return false;
     int result;
-    do { result = ftruncate(fd, offset); } while (result < 0 && errno == EINTR);
+    do {
+        result = ftruncate(fd, offset);
+    } while (result < 0 && errno == EINTR);
     return result == 0;
 }
 
@@ -62,16 +81,22 @@ inline bool WriteAtomic(const std::string &path, const void *data, size_t size) 
     std::vector<char> temporary(pattern.begin(), pattern.end());
     temporary.push_back('\0');
     int fd = mkstemp(temporary.data());
-    if (fd < 0) return false;
+    if (fd < 0)
+        return false;
     bool ok = WriteAll(fd, data, size);
     if (ok) {
         int result;
-        do { result = fsync(fd); } while (result < 0 && errno == EINTR);
+        do {
+            result = fsync(fd);
+        } while (result < 0 && errno == EINTR);
         ok = result == 0;
     }
-    if (close(fd) != 0) ok = false;
-    if (ok) ok = rename(temporary.data(), path.c_str()) == 0;
-    if (!ok) unlink(temporary.data());
+    if (close(fd) != 0)
+        ok = false;
+    if (ok)
+        ok = rename(temporary.data(), path.c_str()) == 0;
+    if (!ok)
+        unlink(temporary.data());
     return ok;
 }
 

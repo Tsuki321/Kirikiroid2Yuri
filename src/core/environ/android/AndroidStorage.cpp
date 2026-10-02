@@ -11,12 +11,19 @@ struct Call {
     cocos2d::JniMethodInfo method;
     bool valid;
     Call(const char *name, const char *signature)
-        : valid(cocos2d::JniHelper::getStaticMethodInfo(method,
-            "org/tvp/kirikiri2/KR2Activity", name, signature)) {}
-    ~Call() { if (valid) { ok(); method.env->DeleteLocalRef(method.classID); } }
+        : valid(cocos2d::JniHelper::getStaticMethodInfo(method, "org/tvp/kirikiri2/KR2Activity", name,
+                                                        signature)) {}
+    ~Call() {
+        if (valid) {
+            ok();
+            method.env->DeleteLocalRef(method.classID);
+        }
+    }
     bool ok() {
-        if (!valid) return false;
-        if (!method.env->ExceptionCheck()) return true;
+        if (!valid)
+            return false;
+        if (!method.env->ExceptionCheck())
+            return true;
         method.env->ExceptionDescribe();
         method.env->ExceptionClear();
         return false;
@@ -26,36 +33,47 @@ struct Call {
         return method.env->NewString(reinterpret_cast<const jchar *>(wide.c_str()), wide.length());
     }
     std::string string(jstring value) {
-        if (!value) return std::string();
+        if (!value)
+            return std::string();
         const jchar *chars = method.env->GetStringChars(value, nullptr);
-        if (!chars) return std::string();
+        if (!chars)
+            return std::string();
         ttstr wide(reinterpret_cast<const tjs_char *>(chars), method.env->GetStringLength(value));
         method.env->ReleaseStringChars(value, chars);
         return wide.AsStdString();
     }
 };
-}
+} // namespace
 
 int TVPOpenDocumentFile(const std::string &path, int access) {
     Call call("OpenDocument", "(Ljava/lang/String;I)I");
-    if (!call.valid) return -1;
+    if (!call.valid)
+        return -1;
     jstring name = call.string(path);
-    jint fd = name ? call.method.env->CallStaticIntMethod(call.method.classID, call.method.methodID, name, access) : -1;
+    jint fd =
+        name ? call.method.env->CallStaticIntMethod(call.method.classID, call.method.methodID, name, access)
+             : -1;
     call.method.env->DeleteLocalRef(name);
-    if (!call.ok()) return -1;
+    if (!call.ok())
+        return -1;
     if (fd >= 0 && access == 2) {
         int flags = fcntl(fd, F_GETFL);
-        if (flags < 0 || fcntl(fd, F_SETFL, flags | O_APPEND) < 0) { close(fd); return -1; }
+        if (flags < 0 || fcntl(fd, F_SETFL, flags | O_APPEND) < 0) {
+            close(fd);
+            return -1;
+        }
     }
     return fd;
 }
 
 bool TVPStatDocumentFile(const std::string &path, tTVP_stat &info) {
     Call call("StatDocument", "(Ljava/lang/String;)[J");
-    if (!call.valid) return false;
+    if (!call.valid)
+        return false;
     jstring name = call.string(path);
     jlongArray result = name ? static_cast<jlongArray>(call.method.env->CallStaticObjectMethod(
-        call.method.classID, call.method.methodID, name)) : nullptr;
+                                   call.method.classID, call.method.methodID, name))
+                             : nullptr;
     call.method.env->DeleteLocalRef(name);
     bool valid = call.ok() && result && call.method.env->GetArrayLength(result) == 3;
     if (valid) {
@@ -73,14 +91,17 @@ bool TVPStatDocumentFile(const std::string &path, tTVP_stat &info) {
 }
 
 bool TVPListDocuments(const std::string &path,
-    const std::function<void(const ttstr &, tTVPLocalFileInfo *)> &callback) {
+                      const std::function<void(const ttstr &, tTVPLocalFileInfo *)> &callback) {
     Call call("ListDocuments", "(Ljava/lang/String;)[Ljava/lang/String;");
-    if (!call.valid) return false;
+    if (!call.valid)
+        return false;
     jstring name = call.string(path);
     jobjectArray entries = name ? static_cast<jobjectArray>(call.method.env->CallStaticObjectMethod(
-        call.method.classID, call.method.methodID, name)) : nullptr;
+                                      call.method.classID, call.method.methodID, name))
+                                : nullptr;
     call.method.env->DeleteLocalRef(name);
-    if (!call.ok() || !entries) return false;
+    if (!call.ok() || !entries)
+        return false;
     jsize count = call.method.env->GetArrayLength(entries);
     bool valid = count % 4 == 0;
     for (jsize i = 0; valid && i < count; i += 4) {
@@ -90,7 +111,8 @@ bool TVPListDocuments(const std::string &path,
             fields[j] = call.string(field);
             call.method.env->DeleteLocalRef(field);
         }
-        if (!(valid = call.ok())) break;
+        if (!(valid = call.ok()))
+            break;
         tTVPLocalFileInfo info;
         info.NativeName = fields[0].c_str();
         info.Mode = fields[1] == "d" ? S_IFDIR : S_IFREG;
@@ -98,7 +120,9 @@ bool TVPListDocuments(const std::string &path,
         info.AccessTime = info.ModifyTime = info.CreationTime = strtoll(fields[3].c_str(), nullptr, 10);
         ttstr normalized(fields[0]);
         tjs_char *chars = normalized.Independ();
-        for (; *chars; ++chars) if (*chars >= 'A' && *chars <= 'Z') *chars += 'a' - 'A';
+        for (; *chars; ++chars)
+            if (*chars >= 'A' && *chars <= 'Z')
+                *chars += 'a' - 'A';
         callback(normalized, &info);
     }
     call.method.env->DeleteLocalRef(entries);
@@ -108,8 +132,10 @@ bool TVPListDocuments(const std::string &path,
 std::vector<std::string> TVPDocumentRoots() {
     std::vector<std::string> result;
     Call call("DocumentRoots", "()[Ljava/lang/String;");
-    if (!call.valid) return result;
-    jobjectArray roots = static_cast<jobjectArray>(call.method.env->CallStaticObjectMethod(call.method.classID, call.method.methodID));
+    if (!call.valid)
+        return result;
+    jobjectArray roots = static_cast<jobjectArray>(
+        call.method.env->CallStaticObjectMethod(call.method.classID, call.method.methodID));
     if (call.ok() && roots) {
         jsize count = call.method.env->GetArrayLength(roots);
         for (jsize i = 0; i < count; ++i) {

@@ -13,6 +13,8 @@
 #include "UtilStreams.h"
 #include "SafeArchivePath.h"
 #include "StartOnceWorker.h"
+#include <memory>
+#include <exception>
 #ifdef __ANDROID__
 #include "android/AndroidStorage.h"
 #endif
@@ -480,10 +482,14 @@ FILE *TVPOpenArchiveDestination(const std::string &root, const std::string &entr
     int fd = TVPArchivePath::OpenFile(root, entry);
 #ifdef __ANDROID__
     if (fd < 0) {
+        const int failure = errno;
+        if (failure != EACCES && failure != EPERM && failure != EROFS && failure != ENOENT)
+            return nullptr; // Never bypass a rejected symlink or unsafe file type.
         tTVP_stat info;
         // Only a document tree may use the provider fallback; never retry an
         // unsafe local path through an unchecked fopen or mkdir operation.
-        if (!TVPStatDocumentFile(root, info)) return nullptr;
+        if (!TVPStatDocumentFile(root, info) &&
+            (!TVPCreateFolders(ttstr(root)) || !TVPStatDocumentFile(root, info))) return nullptr;
         std::string path = root;
         if (!path.empty() && path.back() == '/') path.pop_back();
         for (size_t i = 0; i + 1 < parts.size(); ++i) {
@@ -547,23 +553,25 @@ public:
 			std::string filename = pTVPArc->GetName(index).AsStdString();
 			if (filename.size() > 600) continue;
 			std::string fullpath = OutPath + filename;
-			FILE *fp = TVPOpenArchiveDestination(OutPath, filename);
+			std::unique_ptr<FILE, int(*)(FILE*)> output(TVPOpenArchiveDestination(OutPath, filename), fclose);
+            FILE *fp = output.get();
 			if (!fp) {
 				_callbacks->FuncOnError(ARCHIVE_FAILED, "Cannot open output file");
 				break;
 			}
-			tTJSBinaryStream *str = pTVPArc->CreateStreamByIndex(index);
+			std::unique_ptr<tTJSBinaryStream> str(pTVPArc->CreateStreamByIndex(index));
 			if (!str) {
 				_callbacks->FuncOnError(ARCHIVE_FAILED, "Cannot open archive stream");
-				fclose(fp);
 				break;
 			}
 			_callbacks->FuncOnNewFile(index, filename.c_str(), str->GetSize());
+            bool writeFailed = false;
 			while (!StopRequired) {
 				tjs_uint readed = str->Read(&buffer.front(), buffer.size());
 				if (readed == 0) break;
 				if (readed != fwrite(&buffer.front(), 1, readed, fp)) {
 					_callbacks->FuncOnError(ARCHIVE_FAILED, "Fail to write file.\nPlease check the disk space.");
+                    writeFailed = true;
 					break;
 				}
 				file_size += readed;
@@ -572,8 +580,11 @@ public:
 				if (readed < buffer.size())
 					break;
 			}
-			delete str;
-			fclose(fp);
+            if (fclose(output.release()) != 0) {
+                _callbacks->FuncOnError(ARCHIVE_FAILED, "Cannot finish writing archive entry");
+                break;
+            }
+            if (writeFailed) break;
 		}
 		pTVPArc->Release();
 		pTVPArc = nullptr;
@@ -693,9 +704,17 @@ public:
 				filename = sfilename;
 			} else {
 				const wchar_t* wfilename = archive_entry_pathname_w(entry);
+				if (!wfilename) {
+                    _callbacks->FuncOnError(ARCHIVE_FAILED, "Archive entry has no filename");
+                    break;
+                }
 				std::wstring_convert<std::codecvt_utf8<wchar_t> > cvt;
 				filename = cvt.to_bytes(wfilename);
 			}
+            if (filename.empty()) {
+                _callbacks->FuncOnError(ARCHIVE_FAILED, "Archive entry has an empty filename");
+                break;
+            }
 			if (filename.back() == '/' || filename.back() == '\\') {
 				// skip folder
 				continue;
@@ -732,7 +751,10 @@ public:
 				total_size += size;
 				_callbacks->FuncOnProgress(total_size, file_size);
 			}
-			fclose(fp);
+            if (fclose(fp) != 0 && r >= ARCHIVE_OK) {
+                r = ARCHIVE_FAILED;
+                errmsg = "Cannot finish writing archive entry";
+            }
 			if (r < ARCHIVE_OK)
 				_callbacks->FuncOnError(r, errmsg);
 			if (r < ARCHIVE_WARN)
@@ -1029,15 +1051,25 @@ void tTVPUnpackArchive::Stop()
 
 void tTVPUnpackArchive::Close()
 {
+    if (ArcThread) { delete ArcThread; ArcThread = nullptr; }
 	if (_impl) delete _impl;
 	_impl = nullptr;
 }
 
 void tTVPUnpackArchive::Process()
 {
-	if (_impl->StopRequired)
-		return;
-	_impl->ExtractTo(OutPath);
+    if (_impl->StopRequired) return;
+    try {
+        _impl->ExtractTo(OutPath);
+        return;
+    } catch (const eTJSError &error) {
+        if (FuncOnError) FuncOnError(ARCHIVE_FATAL, error.GetMessage().AsStdString().c_str());
+    } catch (const std::exception &error) {
+        if (FuncOnError) FuncOnError(ARCHIVE_FATAL, error.what());
+    } catch (...) {
+        if (FuncOnError) FuncOnError(ARCHIVE_FATAL, "Cannot extract archive");
+    }
+    if (FuncOnEnded) FuncOnEnded();
 }
 
 tTVPUnpackArchive::tTVPUnpackArchive()
@@ -1046,5 +1078,5 @@ tTVPUnpackArchive::tTVPUnpackArchive()
 
 tTVPUnpackArchive::~tTVPUnpackArchive()
 {
-	if (ArcThread) delete ArcThread;
+    Close();
 }

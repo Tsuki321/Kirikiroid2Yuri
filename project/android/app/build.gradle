@@ -79,7 +79,8 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release.storeFile.exists() ? signingConfigs.release : null
+            def releaseKey = signingConfigs.release
+            signingConfig = releaseKey.storeFile.exists() && releaseKey.keyAlias && releaseKey.storePassword && releaseKey.keyPassword ? releaseKey : null
         }
 
         debug {

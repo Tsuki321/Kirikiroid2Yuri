@@ -573,11 +573,12 @@ void TVPBaseFileSelectorForm::onUnpackClicked(cocos2d::Ref *owner)
 			});
 		}
 		void OnError(int err, const char *msg) {
-			Director::getInstance()->getScheduler()->performFunctionInCocosThread([this, err, msg] {
+            const std::string message = msg ? msg : "Cannot extract archive";
+			Director::getInstance()->getScheduler()->performFunctionInCocosThread([err, message] {
 				char buf[64];
 				sprintf(buf, "Error %d\n", err);
 				ttstr strmsg(buf);
-				strmsg += msg;
+				strmsg += message;
 				TVPShowSimpleMessageBox(strmsg, TJS_W("Fail to unpack archive"));
 			});
 		}

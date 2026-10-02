@@ -8,11 +8,16 @@ class TVPStartOnceWorker {
     std::function<void()> work;
     std::mutex mutex;
     std::thread thread;
-public:
+
+  public:
     explicit TVPStartOnceWorker(std::function<void()> task) : work(std::move(task)) {}
-    ~TVPStartOnceWorker() { if (thread.joinable()) thread.join(); }
+    ~TVPStartOnceWorker() {
+        if (thread.joinable())
+            thread.join();
+    }
     void Start() {
         std::lock_guard<std::mutex> lock(mutex);
-        if (!thread.joinable()) thread = std::thread(work);
+        if (!thread.joinable())
+            thread = std::thread(work);
     }
 };

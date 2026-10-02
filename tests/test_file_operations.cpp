@@ -8,7 +8,7 @@
 #include <iterator>
 
 class Files : public ::testing::Test {
-protected:
+  protected:
     std::string root;
     void SetUp() override {
         char path[] = "/tmp/krkr-files-XXXXXX";
@@ -17,7 +17,10 @@ protected:
         root = result;
     }
     static int Remove(const char *path, const struct stat *, int, struct FTW *) { return remove(path); }
-    void TearDown() override { if (!root.empty()) nftw(root.c_str(), Remove, 16, FTW_DEPTH | FTW_PHYS); }
+    void TearDown() override {
+        if (!root.empty())
+            nftw(root.c_str(), Remove, 16, FTW_DEPTH | FTW_PHYS);
+    }
     std::string ReadFile(const std::string &name) {
         std::ifstream stream(name, std::ios::binary);
         return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
@@ -103,8 +106,9 @@ TEST_F(Files, ArchiveExtractsNestedAndUnicodeNames) {
 }
 
 TEST_F(Files, ArchiveRejectsTraversalAbsolutePathsAndNul) {
-    const std::string bad[] = {"../save", "a/../../save", "/tmp/save", "C:\\save", "\\\\host\\save",
-        "a\\..\\save", "a//save", "./save", "", std::string("safe\0../save", 13)};
+    const std::string bad[] = {
+        "../save",     "a/../../save", "/tmp/save", "C:\\save", "\\\\host\\save",
+        "a\\..\\save", "a//save",      "./save",    "",         std::string("safe\0../save", 13)};
     for (const auto &name : bad) {
         EXPECT_LT(TVPArchivePath::OpenFile(root + "/game", name), 0) << name;
     }
@@ -136,7 +140,8 @@ TEST(ArchiveWorker, ConcurrentStartRunsExactlyOnceAndJoins) {
             TVPStartOnceWorker worker([&] { ++calls; });
             std::thread first([&] { worker.Start(); });
             std::thread second([&] { worker.Start(); });
-            first.join(); second.join();
+            first.join();
+            second.join();
         }
         ASSERT_EQ(1, calls.load()) << iteration;
     }

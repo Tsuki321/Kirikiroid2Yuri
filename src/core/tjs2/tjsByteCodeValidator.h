@@ -5,15 +5,20 @@
 #include <cstring>
 #include <vector>
 
-namespace TJS { namespace ByteCode {
+namespace TJS {
+namespace ByteCode {
 static const size_t MaximumFileSize = 256u * 1024u * 1024u;
 struct Invalid {};
-inline void Require(bool condition) { if (!condition) throw Invalid(); }
+inline void Require(bool condition) {
+    if (!condition)
+        throw Invalid();
+}
 
 class Reader {
     const uint8_t *bytes;
     size_t length, position;
-public:
+
+  public:
     Reader(const uint8_t *data, size_t size) : bytes(data), length(size), position(0) {}
     size_t Remaining() const { return length - position; }
     const uint8_t *Take(size_t size) {
@@ -22,13 +27,20 @@ public:
         position += size;
         return result;
     }
-    uint16_t U16() { const uint8_t *p = Take(2); return uint16_t(p[0]) | (uint16_t(p[1]) << 8); }
+    uint16_t U16() {
+        const uint8_t *p = Take(2);
+        return uint16_t(p[0]) | (uint16_t(p[1]) << 8);
+    }
     uint32_t U32() {
         const uint8_t *p = Take(4);
         return uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
     }
     int32_t I32() { return static_cast<int32_t>(U32()); }
-    size_t Count(size_t stride) { size_t count = U32(); Require(count <= Remaining() / stride); return count; }
+    size_t Count(size_t stride) {
+        size_t count = U32();
+        Require(count <= Remaining() / stride);
+        return count;
+    }
     void Align4(size_t size) { Take((4 - (size & 3)) & 3); }
     Reader Part(size_t size) { return Reader(Take(size), size); }
     void End() const { Require(Remaining() == 0); }
@@ -75,48 +87,154 @@ inline void Instructions(Object &object) {
         size_t count = 0;
         if (op >= VM_LOR && op <= VM_MULP) {
             int variant = (op - VM_LOR) % 4;
-            reg(1); reg(2);
-            if (variant == 0) count = 3;
-            else if (variant == 3) { reg(3); count = 4; }
-            else { if (variant == 1) data(3); else reg(3); reg(4); count = 5; }
+            reg(1);
+            reg(2);
+            if (variant == 0)
+                count = 3;
+            else if (variant == 3) {
+                reg(3);
+                count = 4;
+            } else {
+                if (variant == 1)
+                    data(3);
+                else
+                    reg(3);
+                reg(4);
+                count = 5;
+            }
         } else if (op >= VM_INC && op <= VM_DECP) {
             int variant = (op - VM_INC) % 4;
             reg(1);
-            if (variant == 0) count = 2;
-            else { reg(2); count = variant == 3 ? 3 : 4; if (variant == 1) data(3); if (variant == 2) reg(3); }
+            if (variant == 0)
+                count = 2;
+            else {
+                reg(2);
+                count = variant == 3 ? 3 : 4;
+                if (variant == 1)
+                    data(3);
+                if (variant == 2)
+                    reg(3);
+            }
         } else {
             switch (op) {
-            case VM_NOP: case VM_NF: case VM_RET: case VM_EXTRY: case VM_REGMEMBER: case VM_DEBUGGER:
-                count = 1; break;
-            case VM_CONST: reg(1); data(2); count = 3; break;
-            case VM_CP: case VM_CEQ: case VM_CDEQ: case VM_CLT: case VM_CGT: case VM_CHKINS:
-            case VM_SETP: case VM_GETP: case VM_CHGTHIS: case VM_ADDCI:
-                reg(1); reg(2); count = 3; break;
-            case VM_CL: case VM_TT: case VM_TF: case VM_SETF: case VM_SETNF: case VM_LNOT:
-            case VM_BNOT: case VM_TYPEOF: case VM_EVAL: case VM_EEXP: case VM_ASC: case VM_CHR:
-            case VM_NUM: case VM_CHS: case VM_INV: case VM_CHKINV: case VM_INT: case VM_REAL:
-            case VM_STR: case VM_OCTET: case VM_SRV: case VM_THROW: case VM_GLOBAL:
-                reg(1); count = 2; break;
+            case VM_NOP:
+            case VM_NF:
+            case VM_RET:
+            case VM_EXTRY:
+            case VM_REGMEMBER:
+            case VM_DEBUGGER:
+                count = 1;
+                break;
+            case VM_CONST:
+                reg(1);
+                data(2);
+                count = 3;
+                break;
+            case VM_CP:
+            case VM_CEQ:
+            case VM_CDEQ:
+            case VM_CLT:
+            case VM_CGT:
+            case VM_CHKINS:
+            case VM_SETP:
+            case VM_GETP:
+            case VM_CHGTHIS:
+            case VM_ADDCI:
+                reg(1);
+                reg(2);
+                count = 3;
+                break;
+            case VM_CL:
+            case VM_TT:
+            case VM_TF:
+            case VM_SETF:
+            case VM_SETNF:
+            case VM_LNOT:
+            case VM_BNOT:
+            case VM_TYPEOF:
+            case VM_EVAL:
+            case VM_EEXP:
+            case VM_ASC:
+            case VM_CHR:
+            case VM_NUM:
+            case VM_CHS:
+            case VM_INV:
+            case VM_CHKINV:
+            case VM_INT:
+            case VM_REAL:
+            case VM_STR:
+            case VM_OCTET:
+            case VM_SRV:
+            case VM_THROW:
+            case VM_GLOBAL:
+                reg(1);
+                count = 2;
+                break;
             case VM_CCL:
-                reg(1); available(3);
-                Require(code[pc + 2] >= 0 && int64_t(code[pc + 1]) + code[pc + 2] <= int64_t(object.maxRegister) + 1);
-                count = 3; break;
-            case VM_JF: case VM_JNF: case VM_JMP: jump(1); count = 2; break;
-            case VM_ENTRY: jump(1); reg(2); count = 3; break;
-            case VM_GPD: case VM_GPDS: case VM_DELD: case VM_TYPEOFD:
-                reg(1); reg(2); data(3); count = 4; break;
-            case VM_SPD: case VM_SPDE: case VM_SPDEH: case VM_SPDS:
-                reg(1); data(2); reg(3); count = 4; break;
-            case VM_GPI: case VM_GPIS: case VM_SPI: case VM_SPIE: case VM_SPIS: case VM_DELI: case VM_TYPEOFI:
-                reg(1); reg(2); reg(3); count = 4; break;
-            case VM_CALL: case VM_CALLD: case VM_CALLI: case VM_NEW: {
-                reg(1); reg(2);
+                reg(1);
+                available(3);
+                Require(code[pc + 2] >= 0 &&
+                        int64_t(code[pc + 1]) + code[pc + 2] <= int64_t(object.maxRegister) + 1);
+                count = 3;
+                break;
+            case VM_JF:
+            case VM_JNF:
+            case VM_JMP:
+                jump(1);
+                count = 2;
+                break;
+            case VM_ENTRY:
+                jump(1);
+                reg(2);
+                count = 3;
+                break;
+            case VM_GPD:
+            case VM_GPDS:
+            case VM_DELD:
+            case VM_TYPEOFD:
+                reg(1);
+                reg(2);
+                data(3);
+                count = 4;
+                break;
+            case VM_SPD:
+            case VM_SPDE:
+            case VM_SPDEH:
+            case VM_SPDS:
+                reg(1);
+                data(2);
+                reg(3);
+                count = 4;
+                break;
+            case VM_GPI:
+            case VM_GPIS:
+            case VM_SPI:
+            case VM_SPIE:
+            case VM_SPIS:
+            case VM_DELI:
+            case VM_TYPEOFI:
+                reg(1);
+                reg(2);
+                reg(3);
+                count = 4;
+                break;
+            case VM_CALL:
+            case VM_CALLD:
+            case VM_CALLI:
+            case VM_NEW: {
+                reg(1);
+                reg(2);
                 size_t start = (op == VM_CALLD || op == VM_CALLI) ? 5 : 4;
-                if (op == VM_CALLD) data(3);
-                if (op == VM_CALLI) reg(3);
+                if (op == VM_CALLD)
+                    data(3);
+                if (op == VM_CALLI)
+                    reg(3);
                 available(start);
                 int32_t arguments = code[pc + start - 1];
-                if (arguments == -1) { count = start; break; }
+                if (arguments == -1) {
+                    count = start;
+                    break;
+                }
                 if (arguments == -2) {
                     available(++start);
                     arguments = code[pc + start - 1];
@@ -125,27 +243,32 @@ inline void Instructions(Object &object) {
                     for (int32_t i = 0; i < arguments; ++i) {
                         int32_t type = code[pc + start + size_t(i) * 2];
                         Require(type >= 0 && type <= 2);
-                        if (type != 2) reg(start + size_t(i) * 2 + 1);
+                        if (type != 2)
+                            reg(start + size_t(i) * 2 + 1);
                     }
                 } else {
                     Require(arguments >= 0 && size_t(arguments) <= total - pc - start);
                     count = start + size_t(arguments);
-                    for (size_t i = start; i < count; ++i) reg(i);
+                    for (size_t i = start; i < count; ++i)
+                        reg(i);
                 }
                 break;
             }
-            default: throw Invalid();
+            default:
+                throw Invalid();
             }
         }
         available(count);
         pc += count;
     }
-    for (size_t destination : jumps) Require(object.boundaries[destination] != 0);
+    for (size_t destination : jumps)
+        Require(object.boundaries[destination] != 0);
     Require(total == 0 || last == VM_RET || last == VM_JMP || last == VM_THROW);
 }
 
 inline bool Validate(const uint8_t *bytes, size_t size) {
-    if (!bytes || size < 20 || size > MaximumFileSize) return false;
+    if (!bytes || size < 20 || size > MaximumFileSize)
+        return false;
     try {
         Reader file(bytes, size);
         Require(std::memcmp(file.Take(8), "TJS2100", 8) == 0);
@@ -186,7 +309,7 @@ inline bool Validate(const uint8_t *bytes, size_t size) {
         std::vector<Object> parsed(objectCount);
         for (size_t i = 0; i < objectCount; ++i) {
             Require(objects.U32() == 0x32534a54u); // TJS2
-            size_t objectSize = objects.U32(); // Per-object size excludes its header.
+            size_t objectSize = objects.U32();     // Per-object size excludes its header.
             Reader object = objects.Part(objectSize);
             Object &info = parsed[i];
             info.parent = object.I32();
@@ -201,23 +324,30 @@ inline bool Validate(const uint8_t *bytes, size_t size) {
             info.minRegister = -variables - reserved;
             info.maxRegister = frames;
             int32_t arguments = object.I32(), unnamed = object.I32(), collapse = object.I32();
-            Require(arguments >= 0 && arguments <= variables && unnamed >= -1 && unnamed <= variables && collapse >= -1 && collapse <= variables);
-            info.setter = object.I32(); info.getter = object.I32(); info.superGetter = object.I32();
-            Require(Reference(info.setter, objectCount) && Reference(info.getter, objectCount) && Reference(info.superGetter, objectCount));
+            Require(arguments >= 0 && arguments <= variables && unnamed >= -1 && unnamed <= variables &&
+                    collapse >= -1 && collapse <= variables);
+            info.setter = object.I32();
+            info.getter = object.I32();
+            info.superGetter = object.I32();
+            Require(Reference(info.setter, objectCount) && Reference(info.getter, objectCount) &&
+                    Reference(info.superGetter, objectCount));
             size_t debug = object.Count(8);
             object.Take(debug * 8);
             size_t instructions = object.Count(2);
             info.code.reserve(instructions);
-            for (size_t j = 0; j < instructions; ++j) info.code.push_back(static_cast<int16_t>(object.U16()));
+            for (size_t j = 0; j < instructions; ++j)
+                info.code.push_back(static_cast<int16_t>(object.U16()));
             object.Align4(instructions * 2);
             info.constants = object.Count(4);
             for (size_t j = 0; j < info.constants; ++j) {
                 unsigned type = object.U16(), index = object.U16();
                 Require(type <= 10);
-                if (type > 1) Require(index < pools[type]);
+                if (type > 1)
+                    Require(index < pools[type]);
             }
             size_t pointers = object.Count(4);
-            for (size_t j = 0; j < pointers; ++j) info.superPointers.push_back(object.I32());
+            for (size_t j = 0; j < pointers; ++j)
+                info.superPointers.push_back(object.I32());
             size_t properties = object.Count(8);
             Require(properties == 0 || info.parent >= 0);
             for (size_t j = 0; j < properties; ++j) {
@@ -232,10 +362,16 @@ inline bool Validate(const uint8_t *bytes, size_t size) {
         std::vector<uint8_t> state(objectCount, 0);
         for (size_t i = 0; i < objectCount; ++i) {
             int32_t node = static_cast<int32_t>(i);
-            while (node >= 0 && state[node] == 0) { state[node] = 1; node = parsed[node].parent; }
+            while (node >= 0 && state[node] == 0) {
+                state[node] = 1;
+                node = parsed[node].parent;
+            }
             Require(node < 0 || state[node] != 1);
             node = static_cast<int32_t>(i);
-            while (node >= 0 && state[node] == 1) { state[node] = 2; node = parsed[node].parent; }
+            while (node >= 0 && state[node] == 1) {
+                state[node] = 2;
+                node = parsed[node].parent;
+            }
             if (!parsed[i].superPointers.empty()) {
                 Require(parsed[i].superGetter >= 0);
                 const auto &boundaries = parsed[parsed[i].superGetter].boundaries;
@@ -244,6 +380,9 @@ inline bool Validate(const uint8_t *bytes, size_t size) {
             }
         }
         return true;
-    } catch (const Invalid &) { return false; }
+    } catch (const Invalid &) {
+        return false;
+    }
 }
-} }
+} // namespace ByteCode
+} // namespace TJS
