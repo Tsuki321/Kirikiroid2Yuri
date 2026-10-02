@@ -13,6 +13,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.database.Cursor;
 import android.net.Uri;
@@ -300,14 +301,59 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 
 	static public KR2Activity sInstance;
 	static public KR2Activity GetInstance() {return sInstance;}
+
+    private static boolean isUnderDirectory(String path, File directory) throws IOException {
+        if (directory == null) return false;
+        String root = directory.getCanonicalPath();
+        return path.equals(root) || path.startsWith(root + File.separator);
+    }
+
+    static boolean needsLegacyStoragePermissionForStartup(Context context, String path) {
+        if (path == null || path.length() == 0) return true;
+        try {
+            if (path.startsWith("file:")) {
+                Uri uri = Uri.parse(path);
+                String authority = uri.getAuthority();
+                if (authority != null && authority.length() != 0 && !authority.equals(".")) return true;
+                path = uri.getPath();
+                if (path == null) return true;
+            }
+            String canonical = new File(path).getCanonicalPath();
+            // Document mounts use their explicit URI grants; app directories
+            // are accessible without broad external-storage permissions.
+            if (canonical.equals("/documents") || canonical.startsWith("/documents/")) return false;
+            if (isUnderDirectory(canonical, new File(context.getApplicationInfo().dataDir))) return false;
+            for (File directory : context.getExternalFilesDirs(null))
+                if (isUnderDirectory(canonical, directory)) return false;
+            for (File directory : context.getExternalCacheDirs())
+                if (isUnderDirectory(canonical, directory)) return false;
+        } catch (IOException | IllegalArgumentException e) {
+            Log.w("Krkr2", "Cannot classify startup storage", e);
+        }
+        return true;
+    }
+
+    @Override
+    protected void onLoadNativeLibraries() {
+        super.onLoadNativeLibraries();
+        // Cocos calls this hook before creating its renderer and GL thread.
+        // Publish the intent now so the first frame cannot consume empty or
+        // partially written native launch arguments.
+        Intent launchIntent = getIntent();
+        nativeSetStartupArgs(launchIntent == null ? null : launchIntent.getStringExtra("startupPath"),
+                launchIntent == null ? null : launchIntent.getStringArrayExtra("args"));
+    }
     
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		sInstance = this;
-        Sp = PreferenceManager.getDefaultSharedPreferences(this);
+		Sp = PreferenceManager.getDefaultSharedPreferences(this);
 		super.onCreate(savedInstanceState);
 	
-		if (Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP) {
+		Intent launchIntent = getIntent();
+		boolean needsLegacyStorage = needsLegacyStoragePermissionForStartup(this,
+				launchIntent == null ? null : launchIntent.getStringExtra("startupPath"));
+		if (needsLegacyStorage && Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP) {
 			for(String path : getExtSdCardPaths(this)) {
 		        if (!isWritableNormalOrSaf(path)) {
 		            guideDialogForLEXA(path);
@@ -315,24 +361,12 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 			}
 		}
 		
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+		if (needsLegacyStorage && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) {
             requestExternalWrite();
         }
 		initDump(this.getFilesDir().getAbsolutePath() + "/dump");
-
-		// Forward launch intent extras to the engine. Recognized extras:
-		//   "startupPath" : String  -> path to a .xp3 archive or a bootable folder
-		//   "args"        : String[] -> per-game options, each "-key=value" or "-flag"
-		// These mirror Win32 argv[1] (startup) and argv[2..] (options); the native
-		// side stashes them and TVPCheckStartupArg consumes them on the cocos thread.
-		Intent launchIntent = getIntent();
-		if (launchIntent != null) {
-			String startupPath = launchIntent.getStringExtra("startupPath");
-			String[] args = launchIntent.getStringArrayExtra("args");
-			if (startupPath != null || args != null) {
-				nativeSetStartupArgs(startupPath, args);
-			}
-		}
 	}
 	
 	@Override

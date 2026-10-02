@@ -104,6 +104,30 @@ public class StorageAccessTest {
         int index = 4 + (15 - patch[1]) * patch[2] + (15 - patch[0]);
         assertEquals(0xff336699, patch[index]);
     }
+    @Test public void fStartupPermissionScopeMatchesStorageBoundaries() {
+        assertFalse(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                new File(context.getFilesDir(), "game").getPath()));
+        assertFalse(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                new File(context.getCacheDir(), "game").getPath()));
+        assertFalse(KR2Activity.needsLegacyStoragePermissionForStartup(context, documents + "/game"));
+        assertFalse(KR2Activity.needsLegacyStoragePermissionForStartup(context, "file://." + documents + "/game"));
+        assertFalse(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                new File(context.getFilesDir(), "game").toURI().toString()));
+        for (File directory : context.getExternalFilesDirs(null))
+            if (directory != null) assertFalse(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                    new File(directory, "game").getPath()));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context, null));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context, "/storage/emulated/0/game"));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context, "/documents-sibling/game"));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                "file://remote" + context.getFilesDir().getPath() + "/game"));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                context.getApplicationInfo().dataDir + "-sibling/game"));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                new File(context.getFilesDir(), "../../outside").getPath()));
+        assertTrue(KR2Activity.needsLegacyStoragePermissionForStartup(context,
+                documents + "/../../storage/emulated/0/game"));
+    }
     @Test public void zPrepareEngineFixturesForProcessRestart() throws Exception {
         Context tests = InstrumentationRegistry.getInstrumentation().getContext();
         String script = read(tests.getAssets().open("engine/startup.tjs"));

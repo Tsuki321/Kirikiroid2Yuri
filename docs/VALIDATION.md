@@ -12,7 +12,7 @@ these changes run in GitHub Actions.
 | Address/undefined-behavior sanitizers | Host tests, including 20,000 deterministic bytecode mutations and truncated input prefixes; sanitizer findings fail the test |
 | Optimized TJS runtime | Production interpreter compiled with `-O2`: empty-string conversion and serialization, closures across array growth, inheritance, exception-stack recovery, garbage collection with nested active frames and reentry, aligned hash storage, and bounded string formatting |
 | Offline package inspector | Bounded XP3 metadata inspection, protected/obscured entry reporting, and checks that archive member payloads are never read |
-| Android instrumentation | Existing-directory creation, write failures, local replacement, real persisted document grants, Unicode/case handling, read/write/list/rename/delete, subtree boundaries |
+| Android instrumentation | Existing-directory creation, write failures, local replacement, real persisted document grants, Unicode/case handling, read/write/list/rename/delete, subtree and startup-permission boundaries |
 | Native TJS fixtures | Text/binary/compressed dictionary and empty-string serialization, literal-only loading, bytecode compilation/loading, malformed bytecode, missing/repeated plugins, actual text/shape/image pixels, alpha endpoints, transforms, window controls, valid and malformed XP3 archives through local and document-tree storage |
 | Media fixtures | Generated PCM audio and MPEG-4 video, metadata, playback status/rate, pause/resume and stop frames |
 | Android lifecycle | Backgrounding and returning to the existing activity |
@@ -63,8 +63,9 @@ Do not simply update the digest to bypass an input mismatch.
 - This remains an Android ARM64 Kirikiri/TJS runtime. Desktop ports and the SDL
   rendering migration are separate work.
 - The target SDK remains 29. Document-tree storage works independently of legacy
-  path access; raising the target SDK and replacing the remaining legacy permission
-  UI requires its own Android migration and device tests.
+  path access. App-private and document-mount startup paths do not request legacy
+  storage permission; raising the target SDK and replacing the remaining legacy
+  file-browser permission UI requires its own Android migration and device tests.
 - Document providers must supply seekable descriptors for engine random access.
   Providers that supply only streams are not yet supported by this bridge.
 - `layerExDraw` implements text, metrics, paths/curves, transforms, solid and linear

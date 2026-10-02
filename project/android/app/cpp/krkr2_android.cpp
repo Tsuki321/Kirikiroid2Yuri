@@ -20,9 +20,8 @@
 //std::string Android_GetDumpStoragePath();
 
 // Stashed Android launch arguments, populated by nativeSetStartupArgs (called
-// from KR2Activity.onCreate via intent extras) and consumed later by
-// TVPCheckStartupArg on the cocos thread. Plain data, safe to write from JNI
-// before the engine is fully up.
+// from KR2Activity.onLoadNativeLibraries via intent extras, before the GL
+// thread exists) and consumed later by TVPCheckStartupArg on that thread.
 std::string g_AndroidStartupPath;
 std::vector<std::string> g_AndroidStartupArgs;
 
@@ -305,6 +304,8 @@ extern "C" {
 	}
 
 	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeSetStartupArgs(JNIEnv* env, jclass cls, jstring startupPath, jobjectArray args) {
+		g_AndroidStartupPath.clear();
+		g_AndroidStartupArgs.clear();
 		const char* pszPath = startupPath ? env->GetStringUTFChars(startupPath, NULL) : nullptr;
 		if (pszPath) {
 			g_AndroidStartupPath = pszPath;
