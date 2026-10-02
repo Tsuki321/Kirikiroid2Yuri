@@ -13,6 +13,7 @@
 #include "tjsCommHead.h"
 #include <errno.h>
 #include <clocale>
+#include <cmath>
 #include <algorithm>
 #include <ctype.h>
 #include <limits.h>
