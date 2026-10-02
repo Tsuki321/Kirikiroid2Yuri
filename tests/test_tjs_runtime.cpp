@@ -186,6 +186,25 @@ TEST_F(TJSRuntime, GarbageCollectionPreservesNestedActiveFrames) {
     EXPECT_EQ(528, Integer(TJS_W("total")));
 }
 
+TEST(TJSAllocator, NullAndEmptyAllocationsCanBeReleased) {
+    TJS_free(nullptr);
+    TJS_free(TJS_malloc(0));
+}
+
+TEST(TJSAllocator, GrowthPreservesBytesAndOverflowPreservesTheOriginalAllocation) {
+    auto data = static_cast<unsigned char *>(TJS_realloc(nullptr, 16));
+    ASSERT_NE(nullptr, data);
+    for (unsigned char i = 0; i < 16; ++i) data[i] = i;
+    auto grown = static_cast<unsigned char *>(TJS_realloc(data, 64));
+    if (!grown) TJS_free(data);
+    ASSERT_NE(nullptr, grown);
+    for (unsigned char i = 0; i < 16; ++i) EXPECT_EQ(i, grown[i]);
+    EXPECT_EQ(nullptr, TJS_malloc(static_cast<size_t>(-1)));
+    EXPECT_EQ(nullptr, TJS_realloc(grown, static_cast<size_t>(-1)));
+    for (unsigned char i = 0; i < 16; ++i) EXPECT_EQ(i, grown[i]);
+    TJS_free(grown);
+}
+
 TEST(TJSFormatting, MixedArgumentsAndFloatingPointRounding) {
     tjs_char buffer[128];
     const Text expected = TJS_W("code=-7 text=hello value=2.38 hex=001a char=Z");

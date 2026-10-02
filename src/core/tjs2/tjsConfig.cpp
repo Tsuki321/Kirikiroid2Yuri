@@ -709,6 +709,7 @@ tjs_char * TJS_strchr (
 
 void * TJS_malloc(size_t len)
 {
+	if (len > SIZE_MAX - sizeof(size_t)) return nullptr;
 	char *ret = (char*)malloc(len+sizeof(size_t));
 	if (!ret) return nullptr;
 	*(size_t*)ret = len; // embed size
@@ -730,7 +731,7 @@ void * TJS_realloc(void* buf, size_t len)
 
 void TJS_free(void *buf)
 {
-	free((char*)buf - sizeof(size_t));
+	if (buf) free((char*)buf - sizeof(size_t));
 }
 
 tjs_char *TJS_strrchr(const tjs_char *s, int c)
