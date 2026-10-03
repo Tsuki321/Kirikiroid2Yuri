@@ -51,7 +51,9 @@ jobs:
         # The Python inspection tests also assert that member payloads are never read.
         run: |
           sudo apt-get update && sudo apt-get install -y libonig-dev
+          python3 -m pip install pycryptodome==3.23.0
           python3 -B -m unittest discover -s tests -p 'test_*.py' -v
+          python3 script/create_xp3_fixtures.py build_test_fixtures
           cmake -B build_test -DKRKR2_BUILD_TESTS=ON -DKRKR2_TEST_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
       - name: Build tests
         run: cmake --build build_test -j2

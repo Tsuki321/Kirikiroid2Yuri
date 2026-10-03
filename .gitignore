@@ -2,6 +2,11 @@
 assets/**
 build/**
 build_*/**
+# Local Hxv4 companions contain game-specific lookup and decryption data.
+*.hxidx
+*.hxidx.tmp
+hxv4-report.json
+__pycache__/
 thirdparty/build/**
 thirdparty/port/**
 .vscode/settings.json

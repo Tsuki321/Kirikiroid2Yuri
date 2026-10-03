@@ -75,6 +75,9 @@ private:
 public:
 	tTJSBinaryStream * CreateStream(const ttstr & name);
 	bool IsExistent(const ttstr & name);
+	// Formats with hashed names can resolve names absent from enumeration.
+	virtual bool FindHashedStorage(const ttstr &name, tjs_uint &index) { return false; }
+	virtual bool HasHashedNames() const { return false; }
 
 	tjs_int GetFirstIndexStartsWith(const ttstr & prefix);
 		// returns first index which have 'prefix' at start of the name.

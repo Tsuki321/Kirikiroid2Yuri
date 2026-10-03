@@ -21,10 +21,35 @@ try {
     for (var i = 0; i < ciValid.count; ++i)
         ciCheck(ciRead(ciValid[i]) == ciExpected, ciValid[i] + " loads correctly");
     ciCheck(ciRead("valid-empty-file") == "", "empty archive member loads correctly");
+    var ciHx = ["raw", "compressed", "multisegment", "chained"];
+    for (var i = 0; i < ciHx.count; ++i) {
+        ciCheck(ciRead("hxv4-" + ciHx[i]) == ciExpected, "Hxv4 " + ciHx[i] + " decrypts correctly");
+        var hxLines = [];
+        hxLines.load(ciStorage + "hxv4-" + ciHx[i] + ".xp3>NESTED/DYNAMIC.TXT");
+        ciCheck(hxLines.join("\n") == "hashed lookup OK", "Hxv4 " + ciHx[i] + " resolves normalized dynamic names");
+    }
+    Scripts.execStorage(ciStorage + "hxv4-startup.xp3>startup.tjs");
+    ciCheck(global.hxFixtureExecuted == "hx startup OK", "Hxv4 decoded synthetic startup executes");
+    Storages.addAutoPath(ciStorage + "priority.xp3>");
+    Storages.addAutoPath(ciStorage + "hxv4-raw.xp3>nested/");
+    var hxAuto = [];
+    hxAuto.load("dynamic.txt");
+    ciCheck(hxAuto.join("\n") == "hashed lookup OK", "Hxv4 dynamic names resolve through auto paths");
+    Storages.addAutoPath(ciStorage + "hxv4-patch.xp3>nested/");
+    hxAuto.load("dynamic.txt");
+    ciCheck(hxAuto.join("\n") == "hashed patch OK", "later Hxv4 auto path takes priority");
+    Storages.removeAutoPath(ciStorage + "priority.xp3>");
+    Storages.addAutoPath(ciStorage + "priority.xp3>");
+    hxAuto.load("dynamic.txt");
+    ciCheck(hxAuto.join("\n") == "ordinary priority OK", "later ordinary archive takes priority over Hxv4");
+    Storages.removeAutoPath(ciStorage + "priority.xp3>");
+    Storages.removeAutoPath(ciStorage + "hxv4-patch.xp3>nested/");
+    Storages.removeAutoPath(ciStorage + "hxv4-raw.xp3>nested/");
     var ciInvalid = ["bad-chunk-header", "bad-chunk-length", "bad-info", "bad-name",
         "bad-segment-range", "bad-segment-size", "bad-segment-method", "bad-index-pointer",
         "bad-index-size", "bad-compressed-size", "bad-compressed-index", "bad-index-cycle",
-        "bad-index-tail", "bad-index-count", "unsupported-names"];
+        "bad-index-tail", "bad-index-count", "unsupported-names", "hxv4-missing",
+        "hxv4-truncated", "hxv4-mismatched", "hxv4-corrupt"];
     for (var i = 0; i < ciInvalid.count; ++i) {
         var ciError = void;
         try { ciRead(ciInvalid[i]); } catch (error) { ciError = ciErrorText(error); }

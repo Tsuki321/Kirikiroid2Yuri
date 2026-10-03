@@ -6,6 +6,8 @@ from pathlib import Path
 import struct
 import zlib
 
+from hxv4 import Filter, companion, companion_file, lookup_hash
+
 MAGIC = b"XP3\r\n \n\x1a\x8bg\x01"
 TEXT = b"\xff\xfe" + "archive fixture OK 日本語".encode("utf-16le")
 
@@ -74,6 +76,61 @@ def fixtures():
     chain = b"".join(b"\x80" + struct.pack("<QQ", 0, 19 + (i + 1) * 17) for i in range(1024))
     result["bad-index-count.xp3"] = header + chain + b"\0" + struct.pack("<Q", 0)
     result["unsupported-names.xp3"] = container(chunk(b"Hxv4", b"synthetic") + file_index())
+    result.update(hxv4_fixtures())
+    return result
+
+
+def hxv4_fixtures():
+    """The encrypted table is synthetic opaque bytes; the reader needs only
+    its fingerprint. Actual authenticated table decoding is tested separately.
+    Each filter uses deliberate header, split and correction-byte overlaps.
+    """
+    import hashlib
+    result = {}
+    filters = [Filter(True, 23, (4 << 48) | (12 << 32) | 0x341256,
+                      (27 << 48) | (41 << 32) | 0x789abc, bytes(range(16))),
+               Filter(True, 1, 0, (16 << 48) | (16 << 32) | 0x432100, bytes(reversed(range(16))))]
+    for kind in ('raw', 'compressed', 'multisegment', 'chained', 'startup', 'patch'):
+        payload = bytearray()
+        index_files, companion_files = [], []
+        first = 36 if kind == 'chained' else 19
+        specs = [('hello.txt', TEXT), ('nested/dynamic.txt', b'\xff\xfe' + 'hashed lookup OK'.encode('utf-16le'))]
+        if kind == 'patch':
+            specs[1] = ('nested/dynamic.txt', b'\xff\xfe' + 'hashed patch OK'.encode('utf-16le'))
+        if kind == 'startup':
+            specs = [('startup.tjs', b'global.hxFixtureExecuted = "hx startup OK";')]
+        for i, (name, plain) in enumerate(specs):
+            filter = filters[i]
+            encrypted = filter.apply(plain)
+            pieces = [encrypted[:9], encrypted[9:29], encrypted[29:]] if kind == 'multisegment' else [encrypted]
+            segments = []
+            for j, piece in enumerate(pieces):
+                method = int(kind == 'compressed' or (kind == 'multisegment' and j == 1))
+                stored = zlib.compress(piece) if method else piece
+                segments.append((method, first + len(payload), len(piece), len(stored)))
+                payload.extend(stored)
+            index_files.append(file_index(plain, segments, chr(0x5000 + i + 1)))
+            entry = {'flags': 0x80000000, 'size': len(plain), 'packed': sum(s[3] for s in segments),
+                     'segments': segments, 'adler': zlib.adler32(plain)}
+            # The second file deliberately lacks its real name in enumeration.
+            exported = name if i == 0 else '__hxv4_2'
+            companion_files.append(companion_file(entry, exported, lookup_hash(name), filter))
+        table = b'synthetic Hxv4 table and tag; no game data'
+        descriptor = struct.pack('<QIH', first + len(payload), len(table), 0)
+        original_index = chunk(b'Hxv4', descriptor) + b''.join(index_files)
+        archive = container(original_index, bytes(payload) + table, compressed=True, chained=kind == 'chained')
+        metadata = {'size': len(archive), 'binding': hashlib.blake2s(original_index + table).digest()}
+        sidecar = companion(metadata, companion_files)
+        prefix = 'hxv4-' + kind + '.xp3'
+        result[prefix], result[prefix + '.hxidx'] = archive, sidecar
+    priority = b'\xff\xfe' + 'ordinary priority OK'.encode('utf-16le')
+    result['priority.xp3'] = container(file_index(priority, name='dynamic.txt'), priority)
+    base, good = result['hxv4-raw.xp3'], result['hxv4-raw.xp3.hxidx']
+    result['hxv4-missing.xp3'] = base
+    for kind, value in [('truncated', good[:60]), ('mismatched', good[:16] + bytes(32) + good[48:]),
+                        ('corrupt', good[:-1] + bytes([good[-1] ^ 1]))]:
+        result['hxv4-' + kind + '.xp3'] = base
+        result['hxv4-' + kind + '.xp3.hxidx'] = value
     return result
 
 
@@ -85,7 +142,7 @@ def main():
     archives = fixtures()
     for name, data in archives.items():
         (args.output / name).write_bytes(data)
-    print(f"Generated {len(archives)} synthetic XP3 archives in {args.output}")
+    print(f"Generated {len(archives)} synthetic archive and companion files in {args.output}")
 
 
 if __name__ == "__main__":

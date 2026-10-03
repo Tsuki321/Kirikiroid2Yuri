@@ -14,6 +14,8 @@
 
 
 #include "StorageIntf.h"
+#include "Hxv4Index.h"
+#include <map>
 
 
 
@@ -99,6 +101,8 @@ public:
 	{
 		ttstr Name;
 		tjs_uint32 FileHash;
+		TVPHxv4::Filter HxFilter;
+		TVPHxv4::Lookup HxLookup = {};
 		tjs_uint64 OrgSize; // original ( uncompressed ) size
 		tjs_uint64 ArcSize; // in-archive size
 		std::vector<tTVPXP3ArchiveSegment> Segments;
@@ -111,6 +115,9 @@ public:
 	tjs_int Count = 0;
 
 	std::vector<tArchiveItem> ItemVector;
+	bool HxEnabled = false;
+	std::u16string HxMedia;
+	std::map<TVPHxv4::Lookup, tjs_uint> HxNames;
 	void Init(tTJSBinaryStream *st, tjs_int64 offset, bool normalizeName = true);
 
 public:
@@ -128,6 +135,9 @@ public:
 	const ttstr & GetName() const { return ArchiveName; }
 
 	tTJSBinaryStream * CreateStreamByIndex(tjs_uint idx);
+	bool HasHashedNames() const override { return HxEnabled; }
+	bool FindHashedStorage(const ttstr &name, tjs_uint &index) override;
+	const TVPHxv4::Filter &GetHxFilter(tjs_uint idx) const { return ItemVector[idx].HxFilter; }
 
 private:
 	static bool FindChunk(const tjs_uint8 *data, const tjs_uint8 * name,

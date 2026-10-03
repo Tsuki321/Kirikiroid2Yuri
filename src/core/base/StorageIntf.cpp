@@ -669,10 +669,12 @@ tTJSBinaryStream * tTVPArchive::CreateStream(const ttstr & name)
 	}
 
 	tjs_uint *p = Hash.Find(name);
-	if(!p) TVPThrowExceptionMessage(TVPStorageInArchiveNotFound,
+	if(p) return CreateStreamByIndex(*p);
+	tjs_uint index;
+	if(FindHashedStorage(name, index)) return CreateStreamByIndex(index);
+	TVPThrowExceptionMessage(TVPStorageInArchiveNotFound,
 		name, ArchiveName);
-
-	return CreateStreamByIndex(*p);
+	return nullptr;
 }
 //---------------------------------------------------------------------------
 bool tTVPArchive::IsExistent(const ttstr & name)
@@ -685,7 +687,8 @@ bool tTVPArchive::IsExistent(const ttstr & name)
 		AddToHash();
 	}
 
-	return Hash.Find(name) != NULL;
+	tjs_uint index;
+	return Hash.Find(name) != NULL || FindHashedStorage(name, index);
 }
 //---------------------------------------------------------------------------
 tjs_int tTVPArchive::GetFirstIndexStartsWith(const ttstr & prefix)
@@ -1187,6 +1190,35 @@ ttstr TVPGetPlacedPath(const ttstr & name)
 
 	TVPRebuildAutoPathTable(); // ensure auto path table
 	ttstr *result = TVPAutoPathTable.Find(storagename);
+	// A hashed archive cannot enumerate every original filename. Walk paths in
+	// the same priority order as the ordinary table, stopping at its winner, so
+	// a later patch with an unresolved name still overrides an earlier file.
+	for(auto it = TVPAutoPathList.rbegin(); it != TVPAutoPathList.rend(); ++it)
+	{
+		if(result && *it == *result) break;
+		const tjs_char *separator = TJS_strchr(it->c_str(), TVPArchiveDelimiter);
+		if(!separator) continue;
+		ttstr arcname(*it, static_cast<int>(separator - it->c_str()));
+		tTVPArchive *arc = TVPArchiveCache.Get(arcname);
+		bool exists = false;
+		try
+		{
+			if(arc->HasHashedNames())
+			{
+				ttstr member = ttstr(separator + 1) + storagename;
+				tTVPArchive::NormalizeInArchiveStorageName(member);
+				exists = arc->IsExistent(member);
+			}
+		}
+		catch(...) { arc->Release(); throw; }
+		arc->Release();
+		if(exists)
+		{
+			ttstr placed = *it + storagename;
+			TVPAutoPathCache.Add(name, placed);
+			return placed;
+		}
+	}
 	if(result)
 	{
 		// found in table

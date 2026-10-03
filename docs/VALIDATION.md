@@ -1,5 +1,9 @@
 # Runtime fixes and validation
 
+Hxv4 companion preparation and reader coverage are described in [HXV4.md](HXV4.md).
+Game files, recovered keys, and companions are excluded from CI; its Hxv4 inputs
+are synthetic.
+
 The runtime fixes cover storage failures, archive extraction, bytecode loading,
 plugin diagnostics, drawing, and movie controls. Builds and execution checks for
 these changes run in GitHub Actions.

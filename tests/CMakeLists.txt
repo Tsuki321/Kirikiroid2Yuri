@@ -56,6 +56,13 @@ target_include_directories(test_xp3_index PRIVATE ${SRC_ROOT}/core/base)
 target_link_libraries(test_xp3_index PRIVATE gtest_main)
 gtest_discover_tests(test_xp3_index PROPERTIES TIMEOUT 30)
 
+find_package(ZLIB REQUIRED)
+add_executable(test_hxv4 test_hxv4.cpp)
+target_include_directories(test_hxv4 PRIVATE ${SRC_ROOT}/core/base)
+target_compile_definitions(test_hxv4 PRIVATE HXV4_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/build_test_fixtures")
+target_link_libraries(test_hxv4 PRIVATE gtest_main ZLIB::ZLIB)
+gtest_discover_tests(test_hxv4 PROPERTIES TIMEOUT 30)
+
 add_executable(test_alpha_blend test_alpha_blend.cpp)
 target_include_directories(test_alpha_blend PRIVATE ${SRC_ROOT}/core/tjs2 ${SRC_ROOT}/core/visual)
 target_link_libraries(test_alpha_blend PRIVATE gtest_main)
