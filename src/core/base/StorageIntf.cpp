@@ -975,6 +975,7 @@ extern ttstr TVPChopStorageExt(const ttstr & name)
 //---------------------------------------------------------------------------
 #define TVP_AUTO_PATH_HASH_SIZE 1024
 std::vector<ttstr> TVPAutoPathList;
+static std::vector<std::pair<size_t, ttstr>> TVPHashedAutoPathList;
 tTJSHashCache<ttstr, ttstr> TVPAutoPathCache(TVP_DEFAULT_AUTOPATH_CACHE_NUM);
 tTJSHashTable<ttstr, ttstr, tTJSHashFunc<ttstr>, TVP_AUTO_PATH_HASH_SIZE>
 	TVPAutoPathTable;
@@ -984,6 +985,7 @@ static void TVPClearAutoPathCache()
 {
 	TVPAutoPathCache.Clear();
 	TVPAutoPathTable.Clear();
+	TVPHashedAutoPathList.clear();
 	AutoPathTableInit = false;
 }
 //---------------------------------------------------------------------------
@@ -1045,6 +1047,7 @@ static tjs_uint TVPRebuildAutoPathTable()
 	tTJSCriticalSectionHolder cs_holder(TVPCreateStreamCS);
 
 	TVPAutoPathTable.Clear();
+	TVPHashedAutoPathList.clear();
 
 	tjs_uint64 tick = TVPGetTickCount();
  	TVPAddLog( (const tjs_char*)TVPInfoRebuildingAutoPath );
@@ -1072,6 +1075,8 @@ static tjs_uint TVPRebuildAutoPathTable()
 
 			try
 			{
+				if(arc->HasHashedNames())
+					TVPHashedAutoPathList.emplace_back(static_cast<size_t>(it - TVPAutoPathList.begin()), path);
 				tjs_uint storagecount = arc->GetCount();
 
 				// get first index which the item has 'in_arc_name' as its start
@@ -1193,12 +1198,16 @@ ttstr TVPGetPlacedPath(const ttstr & name)
 	// A hashed archive cannot enumerate every original filename. Walk paths in
 	// the same priority order as the ordinary table, stopping at its winner, so
 	// a later patch with an unresolved name still overrides an earlier file.
-	for(auto it = TVPAutoPathList.rbegin(); it != TVPAutoPathList.rend(); ++it)
+	size_t priority = 0;
+	if(result && !TVPHashedAutoPathList.empty())
+		priority = static_cast<size_t>(std::find(TVPAutoPathList.begin(), TVPAutoPathList.end(), *result) - TVPAutoPathList.begin());
+	for(auto it = TVPHashedAutoPathList.rbegin(); it != TVPHashedAutoPathList.rend(); ++it)
 	{
-		if(result && *it == *result) break;
-		const tjs_char *separator = TJS_strchr(it->c_str(), TVPArchiveDelimiter);
+		if(result && it->first <= priority) break;
+		const ttstr &path = it->second;
+		const tjs_char *separator = TJS_strchr(path.c_str(), TVPArchiveDelimiter);
 		if(!separator) continue;
-		ttstr arcname(*it, static_cast<int>(separator - it->c_str()));
+		ttstr arcname(path, static_cast<int>(separator - path.c_str()));
 		tTVPArchive *arc = TVPArchiveCache.Get(arcname);
 		bool exists = false;
 		try
@@ -1214,7 +1223,7 @@ ttstr TVPGetPlacedPath(const ttstr & name)
 		arc->Release();
 		if(exists)
 		{
-			ttstr placed = *it + storagename;
+			ttstr placed = path + storagename;
 			TVPAutoPathCache.Add(name, placed);
 			return placed;
 		}
