@@ -931,24 +931,10 @@ void TVPExecuteStartupScript()
             ttstr place(TVPSearchPlacedPath(TVPStartupScriptName));
             TVPAddLog(TJS_W("(info) Loading startup script : ") + place);
 			TVPStartupSuccess = false;
-            try {
-                iTJSTextReadStream * stream = TVPCreateTextStreamForRead(place, "");
-                stream->Destruct();
-                TVPExecuteStorage(TVPStartupScriptName);
-				TVPStartupSuccess = true;
-            }
-            catch (...)
-            {
-				if (!TVPIsExistentStorage(TJS_W("System/Initialize.tjs"))) {
-					throw;
-				}
-            }
-			if (TVPStartupSuccess) {
-            } else {
-                // try direct execute initialize.tjs to compatible for some patch
-                TVPExecuteStorage(TJS_W("System/Initialize.tjs"));
-				TVPStartupSuccess = true;
-            }
+			// ExecuteStorage accepts bytecode as well as encoded text. Preserve
+			// the original failure instead of re-entering framework initialization.
+			TVPExecuteStorage(TVPStartupScriptName);
+			TVPStartupSuccess = true;
 			TVPAddLog(TJS_W("(info) Startup script ended."));
 			try {
 				ttstr patch = TVPGetAppPath() + "AfterStartup.tjs";

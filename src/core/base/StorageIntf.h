@@ -232,6 +232,11 @@ TJS_EXP_FUNC_DEF(bool, TVPIsExistentStorageNoSearchNoNormalize, (const ttstr &na
 
 TJS_EXP_FUNC_DEF(ttstr, TVPNormalizeStorageName, (const ttstr & name));
 
+// Immediate children, including virtual archive directories. Names are
+// relative; directory names end in '/'.
+std::vector<ttstr> TVPGetStorageDirectoryNames(const ttstr &name);
+bool TVPIsExistentStorageDirectory(const ttstr &name);
+
 TJS_EXP_FUNC_DEF(void, TVPSetCurrentDirectory, (const ttstr & name));
 	// set system current directory.
 	// directory must end with path delimiter '/',

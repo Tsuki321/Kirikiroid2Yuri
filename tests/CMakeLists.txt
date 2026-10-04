@@ -68,6 +68,11 @@ target_include_directories(test_alpha_blend PRIVATE ${SRC_ROOT}/core/tjs2 ${SRC_
 target_link_libraries(test_alpha_blend PRIVATE gtest_main)
 gtest_discover_tests(test_alpha_blend)
 
+add_executable(test_image_effects test_image_effects.cpp)
+target_include_directories(test_image_effects PRIVATE ${SRC_ROOT}/plugins)
+target_link_libraries(test_image_effects PRIVATE gtest_main)
+gtest_discover_tests(test_image_effects)
+
 # Exercise the actual interpreter with release optimization and sanitizers.
 # Android's ARM translation layer cannot always unwind a native crash, so these
 # tests provide source-level diagnostics for the same script/native operations.

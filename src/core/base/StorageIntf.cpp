@@ -13,7 +13,11 @@
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
+#include <set>
+#include <sys/stat.h>
 #include "StorageIntf.h"
+#include "StorageImpl.h"
+#include "Platform.h"
 #include "tjsUtils.h"
 #include "MsgIntf.h"
 #include "EventIntf.h"
@@ -790,6 +794,66 @@ private:
 static void TVPClearArchiveCache() { TVPArchiveCache.Clear(); }
 static tTVPAtExit TVPClearArchiveCacheAtExit
 	(TVP_ATEXIT_PRI_SHUTDOWN, TVPClearArchiveCache);
+
+std::vector<ttstr> TVPGetStorageDirectoryNames(const ttstr &directory)
+{
+	ttstr name = TVPNormalizeStorageName(directory);
+	if(name.GetLastChar() != TJS_W('/') && name.GetLastChar() != TVPArchiveDelimiter)
+		name += TJS_W('/');
+	std::set<ttstr> children;
+	const tjs_char *delimiter = TJS_strchr(name.c_str(), TVPArchiveDelimiter);
+	if(delimiter)
+	{
+		tTJSCriticalSectionHolder lock(TVPCreateStreamCS);
+		ttstr archiveName(name, static_cast<tjs_int>(delimiter - name.c_str()));
+		if(!TVPIsExistentStorageNoSearch(archiveName)) return {};
+		std::unique_ptr<tTVPArchive, void(*)(tTVPArchive *)> archive(
+			TVPArchiveCache.Get(archiveName), [](tTVPArchive *p) { p->Release(); });
+		ttstr prefix(delimiter + 1);
+		tTVPArchive::NormalizeInArchiveStorageName(prefix);
+		for(tjs_int i = archive->GetFirstIndexStartsWith(prefix);
+			i >= 0 && i < static_cast<tjs_int>(archive->GetCount()); ++i)
+		{
+			const ttstr &entry = archive->GetName(i);
+			if(!entry.StartsWith(prefix)) break;
+			const tjs_char *relative = entry.c_str() + prefix.GetLen();
+			if(!*relative) continue;
+			const tjs_char *slash = TJS_strchr(relative, TJS_W('/'));
+			children.insert(slash ? ttstr(relative, static_cast<tjs_int>(slash-relative+1)) : ttstr(relative));
+		}
+	}
+	else
+	{
+		TVPGetLocalName(name);
+		TVPGetLocalFileListAt(name, [&children](const ttstr &entry, tTVPLocalFileInfo *info) {
+			if((info->Mode & S_IFMT) == S_IFDIR) children.insert(entry + TJS_W('/'));
+			else if((info->Mode & S_IFMT) == S_IFREG) children.insert(entry);
+		});
+	}
+	return {children.begin(), children.end()};
+}
+
+bool TVPIsExistentStorageDirectory(const ttstr &directory)
+{
+	ttstr name = TVPNormalizeStorageName(directory);
+	const tjs_char *delimiter = TJS_strchr(name.c_str(), TVPArchiveDelimiter);
+	if(delimiter)
+	{
+		if(!delimiter[1])
+		{
+			tTJSCriticalSectionHolder lock(TVPCreateStreamCS);
+			ttstr archiveName(name, static_cast<tjs_int>(delimiter-name.c_str()));
+			if(!TVPIsExistentStorageNoSearch(archiveName)) return false;
+			std::unique_ptr<tTVPArchive, void(*)(tTVPArchive *)> archive(
+				TVPArchiveCache.Get(archiveName), [](tTVPArchive *p) { p->Release(); });
+			return true;
+		}
+		return !TVPGetStorageDirectoryNames(name).empty();
+	}
+	TVPGetLocalName(name);
+	tTVP_stat info;
+	return TVP_stat(name.c_str(), info) && (info.st_mode & S_IFMT) == S_IFDIR;
+}
 //---------------------------------------------------------------------------
 
 

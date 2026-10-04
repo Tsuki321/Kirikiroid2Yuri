@@ -25,24 +25,20 @@ class tGetDirListFunction : public tTJSDispatch
 
 		ttstr dir(*param[0]);
 
-		if(dir.GetLastChar() != TJS_W('/'))
+		if(dir.GetLastChar() != TJS_W('/') && dir.GetLastChar() != TVPArchiveDelimiter)
 			TVPThrowExceptionMessage(TJS_W("'/' must be specified at the end of given directory name."));
 
 		// OSネイティブな表現に変換
 		dir = TVPNormalizeStorageName(dir);
 
 		// Array クラスのオブジェクトを作成
-		iTJSDispatch2 * array = TJSCreateArrayObject();
 		if (!result) return TJS_S_OK;
+		iTJSDispatch2 * array = TJSCreateArrayObject();
 		try {
 			tTJSArrayNI* ni;
 			array->NativeInstanceSupport(TJS_NIS_GETINSTANCE, TJSGetArrayClassID(), (iTJSNativeInstance**)&ni);
-			TVPGetLocalName(dir);
-			TVPGetLocalFileListAt(dir, [ni](const ttstr &name, tTVPLocalFileInfo* s) {
-				if (s->Mode & (S_IFREG | S_IFDIR)) {
-					ni->Items.emplace_back(name);
-				}
-			});
+			for(const ttstr &name : TVPGetStorageDirectoryNames(dir))
+				ni->Items.emplace_back(name);
 			*result = tTJSVariant(array, array);
 			array->Release();
 		}
