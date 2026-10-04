@@ -90,6 +90,16 @@ bool TVPStatDocumentFile(const std::string &path, tTVP_stat &info) {
     return valid;
 }
 
+bool TVPRemoveDocument(const std::string &path, bool directory) {
+    Call call("RemoveDocument", "(Ljava/lang/String;Z)Z");
+    if (!call.valid) return false;
+    jstring name = call.string(path);
+    bool removed = name && call.method.env->CallStaticBooleanMethod(
+        call.method.classID, call.method.methodID, name, static_cast<jboolean>(directory));
+    call.method.env->DeleteLocalRef(name);
+    return call.ok() && removed;
+}
+
 bool TVPListDocuments(const std::string &path,
                       const std::function<void(const ttstr &, tTVPLocalFileInfo *)> &callback) {
     Call call("ListDocuments", "(Ljava/lang/String;)[Ljava/lang/String;");

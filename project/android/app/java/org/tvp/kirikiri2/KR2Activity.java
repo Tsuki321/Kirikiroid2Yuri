@@ -1007,6 +1007,10 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     static public boolean DeleteFile(String path) {
         return StorageAccess.delete(sInstance, path);
     }
+
+    static public boolean RemoveDocument(String path, boolean directory) {
+        return StorageAccess.removeDocument(sInstance, path, directory);
+    }
     
 	public static OutputStream getOutputStream(@NonNull final File target,Context context,long s)throws Exception {
 	    OutputStream outStream = null;

@@ -95,6 +95,19 @@ public class StorageAccessTest {
         assertEquals(-1, StorageAccess.open(context, documents + "/../not-granted.txt", 1));
         assertNull(StorageAccess.list(context, "/documents/not-granted"));
     }
+    @Test public void dRemoveDocumentChecksTypeAndDirectoryContents() {
+        String folder = documents + "/remove-directory", file = folder + "/日本語.txt";
+        write(file, "preserve until explicitly removed");
+        assertFalse(StorageAccess.removeDocument(context, folder, true));
+        assertFalse(StorageAccess.removeDocument(context, folder, false));
+        assertFalse(StorageAccess.removeDocument(context, file, true));
+        assertNotNull(StorageAccess.stat(context, file));
+        assertTrue(StorageAccess.removeDocument(context, file, false));
+        assertFalse(StorageAccess.removeDocument(context, file, false));
+        assertTrue(StorageAccess.removeDocument(context, folder, true));
+        assertNull(StorageAccess.stat(context, folder));
+        assertFalse(StorageAccess.removeDocument(context, "/documents/not-granted/file.txt", false));
+    }
     @Test public void eRasterizerProducesArgbPixels() {
         float[] rectangle = {0,10,10,1,40,10,1,40,30,1,10,30,3};
         int[] patch = LayerPainter.render(rectangle, new float[] {1,0,0,1,0,0},

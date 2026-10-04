@@ -200,6 +200,19 @@ TEST_F(TJSRuntime, TextRendererUnicodeVerticalAndOverflow) {
     EXPECT_EQ(1, Integer(TJS_W("c[0].vertical && c[0].x == 40 && c[1].y == 20 && c[2].x < c[0].x")));
 }
 
+TEST_F(TJSRuntime, TextRendererPublicFontPropertiesAndLanguageOptions) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.setDefault(%['fontSize'=>20,'chColor'=>0x123456]);"
+                 "r.face = 'serif'; r.bold = true; r.chColor = 0xabcdef; r.rubySize = 8;"
+                 "r.setOption(%['width_time_scale'=>true,'word_break'=>false]); r.timeScale = 20;"
+                 "r.render('[read]A\\\\xB'); var chars = r.getCharacters();"));
+    EXPECT_EQ(1, Integer(TJS_W("chars.count == 2 && chars[0].ruby[0].face == 'serif'")));
+    EXPECT_EQ(1, Integer(TJS_W("chars[0].bold && chars[0].color == 0xabcdef && chars[0].ruby[0].size == 8")));
+    EXPECT_EQ(1, Integer(TJS_W("chars[0].delay == 10 && r.renderDelay == 20")));
+    Script(TJS_W("r.resetFont(); r.render('C'); var last = r.getCharacters()[2];"));
+    EXPECT_EQ(1, Integer(TJS_W("last.face == 'user' && !last.bold && last.color == 0x123456")));
+}
+
 TEST_F(TJSRuntime, TextRendererRejectsMalformedAndRecursiveControls) {
     Script(TextRenderTestSource);
     Script(TJS_W("var r = new TextRenderBase(); var rejected = 0;"

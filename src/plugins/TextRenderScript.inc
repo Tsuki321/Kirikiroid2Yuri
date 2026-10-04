@@ -19,7 +19,8 @@ class TextRenderBase {
     function TextRenderBase() {
         _options = %["following" => "、。，．！？!?)]}」』】）］｝ーぁぃぅぇぉっゃゅょ",
                      "leading" => "([{「『【（［｛", "begin" => "「『（", "end" => "」』）",
-                     "wordbreak" => true, "kinsoku_max" => 1, "ignore_delay" => false];
+                     "wordbreak" => true, "kinsoku_max" => 1, "ignore_delay" => false,
+                     "width_time_scale" => false, "ignore_xr" => false];
         clear();
     }
     function _copy(value) {
@@ -53,18 +54,20 @@ class TextRenderBase {
         if (value === void) return;
         var keys = ["face", "size", "fontSize", "fontsize", "bigfontsize", "smallfontsize",
                     "lineSize", "lineSpacing", "pitch", "align", "valign", "rubySize", "rubyOffset",
-                    "color", "shadow", "shadowColor", "shadowDiff", "edge", "edgeColor", "bold", "italic"];
+                    "color", "shadow", "shadowColor", "shadowDiff", "edge", "edgeColor", "bold", "italic", "chColor"];
         var members = ["defaultFace", "defaultFontSize", "defaultFontSize", "defaultFontSize",
                     "defaultBigFontSize", "defaultSmallFontSize", "defaultLineSize", "defaultLineSpacing",
                     "defaultPitch", "defaultAlign", "defaultValign", "defaultRubySize", "defaultRubyOffset",
                     "defaultChColor", "defaultShadow", "defaultShadowColor", "defaultShadowDiff",
-                    "defaultEdge", "defaultEdgeColor", "defaultBold", "defaultItalic"];
+                    "defaultEdge", "defaultEdgeColor", "defaultBold", "defaultItalic", "defaultChColor"];
         for (var i = 0; i < keys.count; ++i)
             if (value[keys[i]] !== void) this[members[i]] = value[keys[i]];
         _state = _font();
     }
     function setOption(value) {
-        _merge(_options, value, ["following", "leading", "begin", "end", "wordbreak", "kinsoku_max", "ignore_delay"]);
+        _merge(_options, value, ["following", "leading", "begin", "end", "wordbreak", "kinsoku_max",
+                                "ignore_delay", "width_time_scale", "ignore_xr"]);
+        if (value !== void && value.word_break !== void) _options.wordbreak = !!value.word_break;
         if (value !== void && value.vertical !== void) vertical = !!value.vertical;
         _dirty = true;
     }
@@ -84,6 +87,20 @@ class TextRenderBase {
         (TextRenderBase.setFont incontextof this)(defaults);
     }
     function resetStyle() { setStyle(_font()); }
+    property bold { getter() { return _state.bold; } setter(value) { _state.bold = !!value; } }
+    property italic { getter() { return _state.italic; } setter(value) { _state.italic = !!value; } }
+    property face { getter() { return _state.face; } setter(value) { _state.face = "" + value; } }
+    property fontSize { getter() { return _state.size; } setter(value) { _state.size = _finite(value, 4096); } }
+    property chColor { getter() { return _state.color; } setter(value) { _state.color = int value; } }
+    property rubySize { getter() { return _state.rubySize; } setter(value) { _state.rubySize = _finite(value, 4096); } }
+    property rubyOffset { getter() { return _state.rubyOffset; } setter(value) { _state.rubyOffset = _finite(value); } }
+    property shadow { getter() { return _state.shadow; } setter(value) { _state.shadow = !!value; } }
+    property shadowColor { getter() { return _state.shadowColor; } setter(value) { _state.shadowColor = int value; } }
+    property edge { getter() { return _state.edge; } setter(value) { _state.edge = !!value; } }
+    property edgeColor { getter() { return _state.edgeColor; } setter(value) { _state.edgeColor = int value; } }
+    property lineSpacing { getter() { return _state.lineSpacing; } setter(value) { _state.lineSpacing = _finite(value); } }
+    property pitch { getter() { return _state.pitch; } setter(value) { _state.pitch = _finite(value); } }
+    property lineSize { getter() { return _state.lineSize; } setter(value) { _state.lineSize = _finite(value); } }
     function setRenderSize(width, height = 0) {
         _width = Math.max(0, _finite(width)); _height = Math.max(0, _finite(height)); _dirty = true;
     }
@@ -102,8 +119,8 @@ class TextRenderBase {
     function _size() {
         return Math.max(1, Math.min(4096, _finite(_state.size, 4096) * _finite(fontScale, 100)));
     }
-    function _measure(text, size) {
-        onFontChange(_state);
+    function _measure(text, size, style = void) {
+        onFontChange(style === void ? _state : style);
         var width = onGetTextWidth(text, size);
         return Math.max(0, _finite(width === void ? text.length * size * 0.5 : width));
     }
@@ -160,6 +177,7 @@ class TextRenderBase {
         ch.line = _lines.count; ch.inline = _pen; ch.block = _block;
         ch.link = _link == "" ? void : _link; ch.linkName = ch.link; ch.ruby = void;
         ch.duration = _absoluteSpeed ? _speed / Math.max(0.000001, +timeScale) : _speed;
+        if (_options.width_time_scale && !_absoluteSpeed) ch.duration *= advance / size;
         _clock += Math.max(0, _finite(ch.duration));
         ch.delay = _clock;
         _chars.add(ch);
@@ -194,7 +212,8 @@ class TextRenderBase {
                 c = text[i++];
                 if (c == "n") _break(true);
                 else if (c == "i") _indent = _pen;
-                else if (c == "r") _indent = 0;
+                else if (c == "r") { if (!_options.ignore_xr) _indent = 0; }
+                else if (c == "x") {}
                 else if (c == "k") _keys.add(%["pos" => _chars.count, "time" => _clock]);
                 else if (c == "x") {}
                 else if (c == "t") _pen = (int (_pen / (_size() * 4)) + 1) * _size() * 4;
@@ -271,7 +290,7 @@ class TextRenderBase {
                 if (count < 1 || count > 10000) throw "TextRenderBase: invalid ruby character count";
                 _rubies.add(%["start" => _chars.count, "count" => count, "text" => ruby,
                               "size" => Math.max(1, _finite(_state.rubySize, 4096) * fontScale),
-                              "offset" => _finite(_state.rubyOffset)]);
+                              "offset" => _finite(_state.rubyOffset), "style" => _copy(_state)]);
                 continue;
             }
             if (c == "$" || c == "&") {
@@ -337,9 +356,9 @@ class TextRenderBase {
             var first = _chars[ruby.start], end = Math.min(_chars.count, ruby.start + ruby.count);
             while (end > ruby.start + 1 && _chars[end - 1].line != first.line) --end;
             var last = _chars[end - 1];
-            var width = _measure(ruby.text, ruby.size);
+            var width = _measure(ruby.text, ruby.size, ruby.style);
             var span = vertical ? last.y + last.height - first.y : last.x + last.width - first.x;
-            first.ruby = [%["text" => ruby.text, "size" => ruby.size,
+            first.ruby = [%["text" => ruby.text, "size" => ruby.size, "face" => ruby.style.face,
                 "x" => vertical ? first.width - ruby.offset : (span - width) / 2,
                 "y" => vertical ? (span - width) / 2 : -ruby.size + ruby.offset]];
             if (!vertical) renderTop = Math.min(renderTop, first.y - ruby.size + ruby.offset);

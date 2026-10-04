@@ -68,6 +68,9 @@ try {
     ciCheck(getDirList(ciDir).join(",") == "child/", "legacy getDirList shares directory semantics");
     var ciDirectoryText = ["portable storage"];
     ciDirectoryText.save(ciDir + "child/original.txt", "utf-8");
+    ciCheck(!Storages.removeDirectory(ciDir + "child/") && !Storages.deleteFile(ciDir + "child/"),
+        "file and directory removal preserve nonempty directories");
+    ciCheck(!Storages.removeDirectory(ciDir + "child/original.txt"), "directory removal rejects files");
     ciCheck(Storages.copyFile(ciDir + "child/original.txt", ciDir + "copy.txt", true), "copy a storage file");
     ciCheck(!Storages.copyFile(ciDir + "child/original.txt", ciDir + "copy.txt", true), "copy honors fail-if-exists");
     ciCheck(!Storages.copyFile(ciDir + "copy.txt", ciDir + "copy.txt"), "copy rejects identical source and destination");

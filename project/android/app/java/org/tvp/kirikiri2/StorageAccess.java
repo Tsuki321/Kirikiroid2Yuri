@@ -2,6 +2,7 @@ package org.tvp.kirikiri2;
 
 import android.content.Context;
 import android.content.UriPermission;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
 import android.os.ParcelFileDescriptor;
@@ -187,6 +188,24 @@ public final class StorageAccess {
             }
             return true;
         } catch (Exception e) { Log.w(TAG, "Cannot write document", e); return false; }
+    }
+
+    // Engine file and directory removal has unlink/rmdir semantics. The file
+    // browser's recursive delete operation below is deliberately separate.
+    public static boolean removeDocument(Context context, String path, boolean directory) {
+        try {
+            DocumentFile doc = resolve(context, path, false, directory);
+            if (doc == null || !doc.exists() || doc.isDirectory() != directory) return false;
+            if (directory) {
+                Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(
+                    doc.getUri(), DocumentsContract.getDocumentId(doc.getUri()));
+                try (Cursor cursor = context.getContentResolver().query(children,
+                        new String[] {DocumentsContract.Document.COLUMN_DOCUMENT_ID}, null, null, null)) {
+                    if (cursor == null || cursor.moveToFirst()) return false;
+                }
+            }
+            return doc.delete();
+        } catch (Exception e) { Log.w(TAG, "Cannot remove document", e); return false; }
     }
 
     private static boolean deleteLocal(File file) throws IOException {

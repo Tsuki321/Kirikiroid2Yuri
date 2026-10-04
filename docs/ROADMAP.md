@@ -15,6 +15,9 @@
 | windowEx | Virtual-window minimize, maximize and restore; other Windows APIs remain outside the Android implementation. |
 | layerExDraw / GdiPlus | Android raster backend for text, metrics, paths, transforms, basic brushes and images. Advanced modes report errors. See `VALIDATION.md`. |
 | layerEx base | In-tree (`LayerExBase.cpp`, `layerExBase.hpp`) |
+| layerExImage | Portable brightness/contrast, HSL effects, noise and Gaussian blur, with clipping and alpha preservation. |
+| textrender | Portable `TextRenderBase` layout, formatting, ruby, links and dialogue timing. Font and image callbacks use the framework's raster backend. |
+| fstat / dirlist | Directory enumeration and file operations for local storage, document trees and readable archive metadata. Empty-directory removal preserves contents. |
 
 ## Phase 2 — CX / XP3
 

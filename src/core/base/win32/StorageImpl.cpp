@@ -498,7 +498,12 @@ ttstr TVPGetTemporaryName()
 bool TVPRemoveFile(const ttstr &name)
 {
     tTJSNarrowStringHolder holder(name.c_str());
-    return !remove(holder);
+    if(!unlink(holder)) return true;
+#ifdef __ANDROID__
+    return TVPRemoveDocument(name.AsStdString(), false);
+#else
+    return false;
+#endif
 }
 //---------------------------------------------------------------------------
 
@@ -510,7 +515,12 @@ bool TVPRemoveFile(const ttstr &name)
 bool TVPRemoveFolder(const ttstr &name)
 {
     tTJSNarrowStringHolder holder(name.c_str());
-    return !unlink(holder);
+    if(!rmdir(holder)) return true;
+#ifdef __ANDROID__
+    return TVPRemoveDocument(name.AsStdString(), true);
+#else
+    return false;
+#endif
 }
 //---------------------------------------------------------------------------
 
