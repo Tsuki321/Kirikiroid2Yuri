@@ -83,6 +83,7 @@ try {
     ciCheck(Storages.removeDirectory(ciDir + "child/") && Storages.removeDirectory(ciDir), "remove empty storage directories");
     ciCheck(!Storages.isExistentDirectory(ciDir), "removed directories are absent");
     Plugins.link("layerExDraw.dll");
+    Plugins.link("layerExImage.dll");
     Plugins.link("windowEx.dll");
     var ciWindow = new Window();
     ciWindow.setSize(320, 240);
@@ -154,7 +155,6 @@ try {
     ciLayer.clear(0);
     ciLayer.drawImage(0, 0, ciImage);
     ciCheck((ciLayer.getMainPixel(15, 15) & 0xffffff) == 0x336699, "image drawing");
-    Plugins.link("layerExImage.dll");
     ciLayer.clear(0xff204060);
     ciLayer.setClip(10, 10, 4, 4);
     ciLayer.light(16, 0);
