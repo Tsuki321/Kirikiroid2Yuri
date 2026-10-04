@@ -25,7 +25,7 @@ class LayerImageEffects {
             for(int x = 0; x < width; ++x) pixels[size_t(y)*width+x] = TVP_REVRGB(row[left+x]);
         }
         try { operation(pixels, width, height); }
-        catch(const std::invalid_argument &error) { TVPThrowExceptionMessage(ttstr(error.what())); }
+        catch(const std::invalid_argument &error) { TVPThrowExceptionMessage(ttstr(error.what()).c_str()); }
         for(auto &pixel : pixels) pixel = TVP_REVRGB(pixel);
         const_cast<tTVPBaseTexture *>(bitmap)->Update(pixels.data(), width*4, left, top, width, height);
         layer->SetImageModified(true);

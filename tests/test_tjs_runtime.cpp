@@ -115,6 +115,86 @@ TEST_F(TJSRuntime, ArrayCreationNativeMethodsAndTextStreams) {
     EXPECT_EQ(1, Integer(TJS_W("b[0] == 'ENGINE_CI_STARTED' && b[1] == 'PASS'")));
 }
 
+static const tjs_char TextRenderTestSource[] =
+#include "../src/plugins/TextRenderScript.inc"
+;
+
+TEST_F(TJSRuntime, TextRendererWrapsAndKeepsInstancesIndependent) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.defaultFontSize = 20; r.defaultLineSpacing = 4;"
+                 "r.clear(); r.setRenderSize(30, 100); r.render('abcd'); var chars = r.getCharacters();"
+                 "var other = new TextRenderBase(); other.render('Z');"));
+    EXPECT_EQ(1, Integer(TJS_W("r.renderCount == 4 && r.renderLines == 2 && chars[3].y == 24")));
+    EXPECT_EQ(1, Integer(TJS_W("r.renderRight == 30 && r.renderBottom == 44 && !r.renderOver")));
+    EXPECT_EQ(1, Integer(TJS_W("r.renderText == 'abcd' && other.renderCount == 1")));
+    Script(TJS_W("r.done(); r.done(); r.render('abcde', 0, 1);"));
+    EXPECT_EQ(5, Integer(TJS_W("r.renderCount")));
+}
+
+TEST_F(TJSRuntime, TextRendererFormattingAndFontCallbacks) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.defaultFontSize = 20; r.clear();"
+                 "r.setRenderSize(500, 100); var calls = 0;"
+                 "r.onFontChange = function(info) { ++calls; };"
+                 "r.onGetTextWidth = function(text, size) { return size / 2 * text.length; };"
+                 "r.render('%b1A%b0%200;B#112233;C#;%rD'); var c = r.getCharacters();"));
+    EXPECT_EQ(1, Integer(TJS_W("calls >= 4 && c[0].bold && !c[1].bold")));
+    EXPECT_EQ(1, Integer(TJS_W("c[0].size == 20 && c[1].size == 40 && c[3].size == 20")));
+    EXPECT_EQ(1, Integer(TJS_W("c[2].color == 0x112233 && c[3].color == 0xffffff")));
+}
+
+TEST_F(TJSRuntime, TextRendererRubyExpansionAndInlineGraphics) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.defaultFontSize = 20; r.clear(); r.setRenderSize(500, 100);"
+                 "r.onEval = function(expr) { return 'Hi'; };"
+                 "r.onGetGraphSize = function(name) { return %['width'=>18, 'height'=>12]; };"
+                 "r.render('[ru,2]AB $name; &icon;'); var c = r.getCharacters();"));
+    EXPECT_EQ(7, Integer(TJS_W("r.renderCount")));
+    EXPECT_EQ(1, Integer(TJS_W("c[0].ruby[0].text == 'ru' && c[0].ruby[0].x == 5 && c[0].ruby[0].y == -12")));
+    EXPECT_EQ(1, Integer(TJS_W("c[6].graph && c[6].text == 'icon' && c[6].width == 18 && r.renderTop == -12")));
+}
+
+TEST_F(TJSRuntime, TextRendererLinksAndAlignment) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.defaultFontSize = 20; r.clear(); r.setRenderSize(100,100);"
+                 "r.render('%C%lmore;AB%l;C'); var c = r.getCharacters(); var boxes = r.getLinkRects('more');"));
+    EXPECT_EQ(1, Integer(TJS_W("c[0].x == 35 && boxes.count == 1 && boxes[0].width == 20")));
+    EXPECT_EQ(1, Integer(TJS_W("r.getLinkNames().join(',') == 'more' && r.getLinkCharacters('more').count == 2")));
+    EXPECT_EQ(1, Integer(TJS_W("r.isLinkContains('more', 36, 1) && r.getLinkOfPosition(36,1) == 'more'")));
+    EXPECT_EQ(1, Integer(TJS_W("r.getLinkOfPosition(90,1) === void && !r.contains(0,0)")));
+}
+
+TEST_F(TJSRuntime, TextRendererTimingAndKeyWaits) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.timeScale = 10; r.setRenderSize(500,100);"
+                 "r.render('A%w200;B\\\\k%t30;C');"));
+    EXPECT_EQ(80, Integer(TJS_W("r.renderDelay")));
+    EXPECT_EQ(1, Integer(TJS_W("r.calcShowCount(9) == 0 && r.calcShowCount(10) == 1 && r.calcShowCount(40) == 2 && r.calcShowCount(80) == 3")));
+    EXPECT_EQ(1, Integer(TJS_W("r.getKeyWait() == 2 && r.getKeyWait(3) == -1")));
+}
+
+TEST_F(TJSRuntime, TextRendererUnicodeVerticalAndOverflow) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); r.defaultFontSize = 20; r.clear(); r.setRenderSize(20,20);"
+                 "r.render('e\u0301\U0001f600'); var c = r.getCharacters();"));
+    EXPECT_EQ(2, Integer(TJS_W("r.renderCount")));
+    EXPECT_EQ(1, Integer(TJS_W("c[0].text.length == 2 && c[1].text.length == 2 && r.renderOver")));
+    Script(TJS_W("r.clear(); r.setOption(%['vertical'=>true]); r.setRenderSize(60,40); r.render('ABC'); c = r.getCharacters();"));
+    EXPECT_EQ(1, Integer(TJS_W("c[0].vertical && c[0].x == 40 && c[1].y == 20 && c[2].x < c[0].x")));
+}
+
+TEST_F(TJSRuntime, TextRendererRejectsMalformedAndRecursiveControls) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase(); var rejected = 0;"
+                 "try { r.render('%funterminated'); } catch (e) { ++rejected; }"
+                 "r.clear(); try { r.render('#invalid;'); } catch (e) { ++rejected; }"
+                 "r.clear(); r.onEval = function(expr) { return '$loop;'; };"
+                 "try { r.render('$loop;'); } catch (e) { ++rejected; }"
+                 "r.clear(); r.render('OK');"));
+    EXPECT_EQ(3, Integer(TJS_W("rejected")));
+    EXPECT_EQ(2, Integer(TJS_W("r.renderCount")));
+}
+
 TEST_F(TJSRuntime, EmptyStringsRemainValidWithOptimization) {
     ttstr empty;
     EXPECT_EQ(0, empty.GetLen());

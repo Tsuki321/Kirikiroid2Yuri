@@ -32,12 +32,13 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
 failures=0
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -eq 6
+test "$expected" -eq 8
 # adb shell reads stdin. Keep the manifest on another descriptor so starting
 # the first activity cannot consume the remaining fixture rows.
 while IFS=$'\t' read -r -u 3 name storage output; do
   executed=$((executed + 1))
   adb shell am force-stop com.yuri.kirikiri2
+  adb shell rm -f "$output/result.txt"
   if ! adb shell am start -W -n com.yuri.kirikiri2/.MainActivity --es startupPath "$storage"; then
     echo "Cannot start engine fixture: $name" >&2
     failures=$((failures + 1))
@@ -53,7 +54,12 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     if adb shell cat "$output/result.txt" > "test-results/android/$name-engine.raw" 2>/dev/null; then
       python3 tests/android/decode_result.py "test-results/android/$name-engine.raw" > "test-results/android/$name-engine.txt"
       cat "test-results/android/$name-engine.txt"
-      if grep -q ENGINE_CI_PASS "test-results/android/$name-engine.txt"; then passed=true; fi
+      if grep -q ENGINE_CI_PASS "test-results/android/$name-engine.txt"; then
+        passed=true
+        if [[ "$name" == compiled-* ]] && ! grep -q 'PASS cold compiled startup preserves bootstrap globals' "test-results/android/$name-engine.txt"; then
+          passed=false
+        fi
+      fi
       break
     fi
     if ! adb shell pidof com.yuri.kirikiri2 > "test-results/android/$name-pid.txt"; then

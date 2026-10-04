@@ -13,6 +13,8 @@ var ciOutput = "@@OUTPUT@@/";
 ciMessages.add("ENGINE_CI_STARTED");
 ciMessages.save(ciOutput + "started.txt");
 try {
+    if (typeof global.ciColdCompiledStartup != "undefined")
+        ciCheck(global.ciColdCompiledStartup === 1, "cold compiled startup preserves bootstrap globals");
     ciCheck("%d:%s".sprintf(42, "ok") == "42:ok", "formatted string arguments");
     var ciEmpty = "";
     ciCheck(ciEmpty.length == 0 && ciEmpty[0] == "" && (int ciEmpty) == 0
@@ -167,6 +169,30 @@ try {
     var ciNoisePixel = ciLayer.getMainPixel(11, 11);
     ciCheck((ciNoisePixel & 255) == ((ciNoisePixel >> 16) & 255), "white noise is grayscale");
     ciLayer.setClip();
+    Plugins.link("textrender.dll");
+    class CiTextLayout extends TextRenderBase {
+        function CiTextLayout() { super.TextRenderBase(); }
+        function onFontChange(info) { ciLayer.font.bold = info.bold; ciLayer.font.italic = info.italic; }
+        function onGetTextWidth(text, size) { ciLayer.font.height = size; return ciLayer.font.getTextWidth(text); }
+    }
+    var ciLayout = new CiTextLayout();
+    ciLayout.defaultFontSize = 20;
+    ciLayout.clear(); ciLayout.setRenderSize(280, 120);
+    ciLayout.render("%lcontinue;[read]A%b1B%b0%l; C");
+    var ciGlyphs = ciLayout.getCharacters();
+    ciCheck(ciGlyphs.count == 4 && ciGlyphs[0].cw > 0 && ciGlyphs[1].bold, "text layout uses Font callbacks and style controls");
+    ciCheck(ciGlyphs[0].ruby[0].text == "read" && ciLayout.renderTop < 0, "text ruby has separate drawing geometry");
+    var ciLinks = ciLayout.getLinkRects("continue");
+    ciCheck(ciLinks.count == 1 && ciLayout.isLinkContains("continue", ciLinks[0].left + 1, ciLinks[0].top + 1), "text link rectangles support hit testing");
+    ciLayer.clear(0xff202020);
+    for (var ciGlyph = 0; ciGlyph < ciGlyphs.count; ++ciGlyph) {
+        var ciCh = ciGlyphs[ciGlyph];
+        ciLayer.font.height = ciCh.size;
+        ciLayer.font.bold = ciCh.bold;
+        ciLayer.drawText(10 + ciCh.x, 30 + ciCh.y, ciCh.text, 0xffffff);
+    }
+    ciCheck(ciLayout.renderCount == 4 && ciLayout.renderRight > 0, "text layout can drive Layer drawing");
+    Scripts.compileStorage(ciStorage + "compiled-startup-source.tjs", ciStorage + "startup.tjs");
     ciWindow.minimize();
     ciCheck(!ciWindow.visible, "window minimize");
     ciWindow.restore();

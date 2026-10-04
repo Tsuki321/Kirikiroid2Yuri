@@ -145,6 +145,11 @@ public class StorageAccessTest {
             assertTrue(StorageAccess.mkdirs(context, output));
             write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
+            if (name.equals("local") || name.equals("documents")) {
+                write(storage + "/engine-body.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
+                write(storage + "/compiled-startup-source.tjs",
+                    "global.ciColdCompiledStartup = 1;\nScripts.execStorage('engine-body.tjs');\n");
+            }
             if (name.startsWith("movie")) {
                 try (InputStream input = tests.getAssets().open("engine/test.avi"); ByteArrayOutputStream movie = new ByteArrayOutputStream()) {
                     byte[] buffer = new byte[8192]; int size;
@@ -175,6 +180,8 @@ public class StorageAccessTest {
             write(storage + "/unsafe.txt", "(global.ciSideEffect = 1, %[]) ");
             write(storage + "/preprocessor.txt", "@set(ciSideEffect=1) (const) %[]");
             manifest.append(name).append('\t').append(storage).append('\t').append(output).append('\n');
+            if (name.equals("local") || name.equals("documents"))
+                manifest.append("compiled-").append(name).append('\t').append(storage).append('\t').append(output).append('\n');
         }
         write(new File(context.getFilesDir(), "engine-ci-cases.txt").getPath(), manifest.toString());
     }

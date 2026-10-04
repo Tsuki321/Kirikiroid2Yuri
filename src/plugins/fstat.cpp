@@ -149,7 +149,7 @@ public:
         } else {
             tTVP_stat info;
             if(!TVP_stat(localName(placed).c_str(), info))
-                TVPThrowExceptionMessage(TJS_W("Cannot stat storage: ") + ttstr(path));
+                TVPThrowExceptionMessage((ttstr(TJS_W("Cannot stat storage: ")) + path).c_str());
             if((info.st_mode & S_IFMT) != S_IFDIR)
                 set(object, TJS_W("size"), tTJSVariant(static_cast<tjs_int64>(info.st_size)));
             set(object, TJS_W("atime"), date(info.st_atime));
