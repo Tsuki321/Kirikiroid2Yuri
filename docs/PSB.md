@@ -30,7 +30,8 @@ produce errors. This is a data reader; it does not implement Emote animation.
 truncation, invalid text, shared/nested container expansion and 4,000 deterministic
 mutations. Android fixtures exercise TJS conversions, native object lifetimes,
 storage lookup, auto-path enumeration, read-only behavior and actual PNG/TLG
-pixels through both local and document storage. All compilation and Android
+pixels through local and document storage, including compressed XP3 members and
+synthetic Hxv4 companions with hashed resource names. All compilation and Android
 execution run in GitHub Actions.
 
 Format references: [FreeMote](https://github.com/UlyssesWu/FreeMote) and

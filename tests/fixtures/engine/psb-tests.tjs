@@ -43,4 +43,14 @@ ciThrows(function() { ["write"].save("psb://images.pimg/tile.png"); }, "PSB reso
 var ciPsbConstructor = new PSBFile(ciStorage + "scene.psb");
 ciCheck(ciPsbConstructor.root.scenes[0].label == "intro", "PSBFile constructor accepts a storage");
 invalidate ciPsbConstructor;
+foreach (var ciArchive in ["assets.xp3", "hxv4-assets.xp3"]) {
+    var ciArchivePsb = new PSBFile(ciStorage + ciArchive + ">scene.psb");
+    ciCheck(ciArchivePsb.root.scenes[0].label == "intro", "PSB scene reads through " + ciArchive);
+    ciArchivePsb.load(ciStorage + ciArchive + ">images.pimg");
+    var ciArchiveRoot = ciArchivePsb.root;
+    invalidate ciArchivePsb;
+    ciPsbLayer.loadImages("psb://images.pimg/0.tlg");
+    ciCheck(ciPsbLayer.getMainPixel(0, 0) == 0x204080 && ciArchiveRoot["tile.png"][0] == 137,
+        "PSB resources survive invalidation and random reads through " + ciArchive);
+}
 invalidate ciPsbLayer;

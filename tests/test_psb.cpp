@@ -84,6 +84,9 @@ TEST(PSB, TruncatedMetadataAndUnsupportedHeadersFail) {
 }
 
 TEST(PSB, BadTextAndResourceReferencesFail) {
+    auto zero = read(withValue({0x1d}));
+    ASSERT_EQ(Psb::Value::Real, zero.root.values[0].kind);
+    EXPECT_EQ(0.0, zero.root.values[0].real);
     const std::string unicode = u8"日本語 😀";
     for(const auto &invalid : std::vector<std::vector<uint8_t>>{
             {0xc0, 0x80}, {0xed, 0xa0, 0x80}, {0xf4, 0x90, 0x80, 0x80}, {0xe3, 0x28, 0x82}}) {

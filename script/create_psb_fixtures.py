@@ -137,6 +137,36 @@ def tlg():
     return b'TLG5.0\0raw\x1a' + b'\x04' + struct.pack('<4I', 1, 1, 1, len(data)) + data
 
 
+def archives(files):
+    from hashlib import blake2s
+    from create_xp3_fixtures import chunk, container, file_index
+    from hxv4 import Filter, companion, companion_file, lookup_hash
+    result = {}
+    for protected in (False, True):
+        payload, index, records = bytearray(), bytearray(), []
+        for i, (name, plain) in enumerate(files.items()):
+            cipher = Filter(True, 23, (4 << 48) | (12 << 32) | 0x341256,
+                            (27 << 48) | (41 << 32) | 0x789abc, bytes(range(16)))
+            encoded = zlib.compress(cipher.apply(plain) if protected else plain)
+            segments = [(1, 19 + len(payload), len(plain), len(encoded))]
+            payload.extend(encoded)
+            index.extend(file_index(plain, segments, chr(0x5001 + i) if protected else name))
+            entry = dict(flags=0x80000000, size=len(plain), packed=len(encoded),
+                         segments=segments, adler=zlib.adler32(plain))
+            records.append(companion_file(entry, name if i == 0 else '__hxv4_2', lookup_hash(name), cipher))
+        if protected:
+            table = b'Synthetic PSB archive binding; no game data'
+            index = chunk(b'Hxv4', struct.pack('<QIH', 19 + len(payload), len(table), 0)) + index
+            payload.extend(table)
+        archive = container(bytes(index), bytes(payload), compressed=True)
+        filename = 'hxv4-assets.xp3' if protected else 'assets.xp3'
+        result[filename] = archive
+        if protected:
+            result[filename + '.hxidx'] = companion(
+                dict(size=len(archive), binding=blake2s(index + table).digest()), records)
+    return result
+
+
 def create(directory):
     directory.mkdir(parents=True, exist_ok=True)
     scene = {'scenes': [{'label':'intro', 'text':'Synthetic dialogue', 'choices':['left', 'right']}],
@@ -148,8 +178,10 @@ def create(directory):
     images = {'width':2, 'height':2, 'layers':[{'name':'test', 'layer_id':0, 'width':2, 'height':2}],
               'tile.png':Resource(0), 'empty.bin':Resource(1), '0.tlg':Resource(2),
               'folder/tile.png':Resource(0), '日本語.png':Resource(0), 'emoji😀.png':Resource(0)}
-    (directory/'scene.psb').write_bytes(build(scene))
-    (directory/'images.pimg').write_bytes(build(images, [png(), b'', tlg()], version=2))
+    files = {'scene.psb': build(scene), 'images.pimg': build(images, [png(), b'', tlg()], version=2)}
+    files.update(archives(files))
+    for name, data in files.items():
+        (directory/name).write_bytes(data)
     invalid = bytearray(build(scene))
     struct.pack_into('<I', invalid, 36, 0xffffffff)
     (directory/'invalid.psb').write_bytes(invalid)
