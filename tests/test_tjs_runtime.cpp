@@ -170,7 +170,24 @@ TEST_F(TJSRuntime, TextRendererTimingAndKeyWaits) {
                  "r.render('A%w200;B\\\\k%t30;C');"));
     EXPECT_EQ(80, Integer(TJS_W("r.renderDelay")));
     EXPECT_EQ(1, Integer(TJS_W("r.calcShowCount(9) == 0 && r.calcShowCount(10) == 1 && r.calcShowCount(40) == 2 && r.calcShowCount(80) == 3")));
-    EXPECT_EQ(1, Integer(TJS_W("r.getKeyWait() == 2 && r.getKeyWait(3) == -1")));
+    Script(TJS_W("var waits = r.getKeyWait(), chars = r.getCharacters();"));
+    EXPECT_EQ(1, Integer(TJS_W("waits.count == 1 && waits[0].pos == 2 && waits[0].time == 40")));
+    EXPECT_EQ(0, Integer(TJS_W("r.getKeyWait(3).count")));
+    EXPECT_EQ(1, Integer(TJS_W("chars[0].delay == 10 && chars[1].delay == 40 && chars[2].delay == 80")));
+    Script(TJS_W("waits.shift();"));
+    EXPECT_EQ(1, Integer(TJS_W("r.getKeyWait().count")));
+}
+
+TEST_F(TJSRuntime, TextRendererStyleColorsAndSkipTiming) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("var r = new TextRenderBase();"
+                 "r.setFont(%['fontSize'=>20,'chColor'=>0x123456,'edge'=>true,'edgeColor'=>0,'shadow'=>false]);"
+                 "r.render('A'); var first = r.getCharacters()[0];"));
+    EXPECT_EQ(1, Integer(TJS_W("first.size == 20 && first.color == 0x123456 && first.edge === 0 && first.shadow === void")));
+    Script(TJS_W("r.clear(); r.timeScale = 10; r.setOption(%['ignore_delay'=>true]);"
+                 "r.render('%d300;A%t500;B\\\\k%a200;C'); var wait = r.getKeyWait()[0];"));
+    EXPECT_EQ(1, Integer(TJS_W("r.renderDelay == 30 && wait.pos == 2 && wait.time == 20")));
+    EXPECT_EQ(3, Integer(TJS_W("r.calcShowCount(30)")));
 }
 
 TEST_F(TJSRuntime, TextRendererUnicodeVerticalAndOverflow) {

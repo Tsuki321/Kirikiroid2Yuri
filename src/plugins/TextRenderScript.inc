@@ -19,7 +19,7 @@ class TextRenderBase {
     function TextRenderBase() {
         _options = %["following" => "、。，．！？!?)]}」』】）］｝ーぁぃぅぇぉっゃゅょ",
                      "leading" => "([{「『【（［｛", "begin" => "「『（", "end" => "」』）",
-                     "wordbreak" => true, "kinsoku_max" => 1];
+                     "wordbreak" => true, "kinsoku_max" => 1, "ignore_delay" => false];
         clear();
     }
     function _copy(value) {
@@ -64,13 +64,17 @@ class TextRenderBase {
         _state = _font();
     }
     function setOption(value) {
-        _merge(_options, value, ["following", "leading", "begin", "end", "wordbreak", "kinsoku_max"]);
+        _merge(_options, value, ["following", "leading", "begin", "end", "wordbreak", "kinsoku_max", "ignore_delay"]);
         if (value !== void && value.vertical !== void) vertical = !!value.vertical;
         _dirty = true;
     }
     function setFont(value) {
         _merge(_state, value, ["face", "size", "bold", "italic", "color", "rubySize", "rubyOffset",
                               "shadow", "shadowColor", "shadowDiff", "edge", "edgeColor"]);
+        if (value !== void) {
+            if (value.chColor !== void) _state.color = value.chColor;
+            if (value.fontSize !== void) _state.size = value.fontSize;
+        }
     }
     function setStyle(value) {
         _merge(_state, value, ["pitch", "lineSpacing", "lineSize", "align", "valign"]);
@@ -103,19 +107,20 @@ class TextRenderBase {
         var width = onGetTextWidth(text, size);
         return Math.max(0, _finite(width === void ? text.length * size * 0.5 : width));
     }
+    function _codeAt(text, index) { return #text.charAt(index); }
     function _cluster(text, start) {
-        var end = start + 1, c = text.charCodeAt(start);
+        var end = start + 1, c = _codeAt(text, start);
         if (c >= 0xd800 && c <= 0xdbff && end < text.length &&
-            text.charCodeAt(end) >= 0xdc00 && text.charCodeAt(end) <= 0xdfff) ++end;
+            _codeAt(text, end) >= 0xdc00 && _codeAt(text, end) <= 0xdfff) ++end;
         while (end < text.length) {
-            c = text.charCodeAt(end);
+            c = _codeAt(text, end);
             if ((c >= 0x300 && c <= 0x36f) || (c >= 0xfe00 && c <= 0xfe0f) ||
                 (c >= 0x1ab0 && c <= 0x1aff) || (c >= 0x1dc0 && c <= 0x1dff)) ++end;
             else if (c == 0x200d && end + 1 < text.length) {
                 end += 2;
-                c = text.charCodeAt(end - 1);
+                c = _codeAt(text, end - 1);
                 if (c >= 0xd800 && c <= 0xdbff && end < text.length &&
-                    text.charCodeAt(end) >= 0xdc00 && text.charCodeAt(end) <= 0xdfff) ++end;
+                    _codeAt(text, end) >= 0xdc00 && _codeAt(text, end) <= 0xdfff) ++end;
             } else break;
         }
         return text.substr(start, end - start);
@@ -148,11 +153,15 @@ class TextRenderBase {
         if (limit > 0 && _pen > _indent && _pen + advance + reserve > limit + allowance) _break();
         var ch = _copy(_state);
         ch.size = size; ch.text = text; ch.graph = graph; ch.vertical = vertical;
+        // Character records expose optional effect colors, not the style flags.
+        ch.edge = _state.edge ? _state.edgeColor : void;
+        ch.shadow = _state.shadow ? _state.shadowColor : void;
         ch.cw = width; ch.width = vertical && !graph ? size : width; ch.height = height;
         ch.line = _lines.count; ch.inline = _pen; ch.block = _block;
         ch.link = _link == "" ? void : _link; ch.linkName = ch.link; ch.ruby = void;
-        ch.delay = _clock; ch.duration = _absoluteSpeed ? _speed / Math.max(0.000001, +timeScale) : _speed;
+        ch.duration = _absoluteSpeed ? _speed / Math.max(0.000001, +timeScale) : _speed;
         _clock += Math.max(0, _finite(ch.duration));
+        ch.delay = _clock;
         _chars.add(ch);
         _pen += Math.max(0, advance + _finite(_state.pitch));
         _lineHeight = Math.max(_lineHeight, Math.max(vertical ? width : height, +_state.lineSize));
@@ -186,7 +195,7 @@ class TextRenderBase {
                 if (c == "n") _break(true);
                 else if (c == "i") _indent = _pen;
                 else if (c == "r") _indent = 0;
-                else if (c == "k") _keys.add(_chars.count);
+                else if (c == "k") _keys.add(%["pos" => _chars.count, "time" => _clock]);
                 else if (c == "x") {}
                 else if (c == "t") _pen = (int (_pen / (_size() * 4)) + 1) * _size() * 4;
                 else if (c == "w") _pen += _measure(" ", _size());
@@ -218,6 +227,7 @@ class TextRenderBase {
                 if (c == "f" || c == "p" || c == "l" || c == "n" || c == "d" || c == "a" ||
                     c == "w" || c == "t" || c == "D") {
                     var value = _argument(text, i); i = value.end;
+                    if (_options.ignore_delay && "dawtD".indexOf(c) >= 0) continue;
                     if (c == "f") {
                         _state.face = value.text == "" ? defaultFace : value.text;
                         if (_state.face.substr(0, 2) == "${" && _state.face[_state.face.length - 1] == "}")
@@ -255,7 +265,8 @@ class TextRenderBase {
             }
             if (c == "[") {
                 var value = _argument(text, i, "]"); i = value.end;
-                var comma = value.text.lastIndexOf(","), count = 1, ruby = value.text;
+                var comma = -1, count = 1, ruby = value.text;
+                for (var at = value.text.indexOf(","); at >= 0; at = value.text.indexOf(",", at + 1)) comma = at;
                 if (comma >= 0) { count = int _number(value.text.substr(comma + 1), 1); ruby = value.text.substr(0, comma); }
                 if (count < 1 || count > 10000) throw "TextRenderBase: invalid ruby character count";
                 _rubies.add(%["start" => _chars.count, "count" => count, "text" => ruby,
@@ -356,12 +367,16 @@ class TextRenderBase {
         elapsed = Math.max(0, _finite(elapsed));
         if (timeScale <= 0) return _chars.count;
         var count = 0;
-        while (count < _chars.count && (_chars[count].delay + _chars[count].duration) * timeScale <= elapsed) ++count;
+        while (count < _chars.count && _chars[count].delay * timeScale <= elapsed) ++count;
         return count;
     }
     function getKeyWait(start = 0) {
-        for (var i = 0; i < _keys.count; ++i) if (_keys[i] >= start) return _keys[i];
-        return -1;
+        var result = [];
+        for (var i = 0; i < _keys.count; ++i) {
+            if (_keys[i].pos < start) continue;
+            result.add(%["pos" => _keys[i].pos, "time" => _keys[i].time * Math.max(0, _finite(timeScale))]);
+        }
+        return result;
     }
     function getCharacters(start = 0, end = 0) {
         done(); start = Math.max(0, int start);
