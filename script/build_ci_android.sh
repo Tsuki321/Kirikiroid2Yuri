@@ -4,6 +4,7 @@ ci_root="$(cd "$(dirname "$0")/.." && pwd)"
 ci_keys="$RUNNER_TEMP/krkr-signing"
 mkdir -p "$ci_keys" "$ci_root/test-results"
 python3 "$ci_root/script/create_xp3_fixtures.py" "$ci_root/tests/fixtures/archives"
+python3 "$ci_root/script/create_psb_fixtures.py" "$ci_root/tests/fixtures/psb"
 ffmpeg -nostdin -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=64x64:rate=10:duration=2 \
   -an -c:v mpeg4 -pix_fmt yuv420p -threads 1 "$ci_root/tests/fixtures/engine/test.avi"
 ffmpeg -nostdin -hide_banner -loglevel error -y -f lavfi -i sine=frequency=440:sample_rate=44100:duration=1 \
