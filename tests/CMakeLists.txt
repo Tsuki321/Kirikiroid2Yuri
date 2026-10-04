@@ -73,6 +73,12 @@ target_include_directories(test_image_effects PRIVATE ${SRC_ROOT}/plugins)
 target_link_libraries(test_image_effects PRIVATE gtest_main)
 gtest_discover_tests(test_image_effects)
 
+add_executable(test_psb test_psb.cpp)
+target_include_directories(test_psb PRIVATE ${SRC_ROOT}/core/base)
+target_compile_definitions(test_psb PRIVATE PSB_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures/psb")
+target_link_libraries(test_psb PRIVATE gtest_main)
+gtest_discover_tests(test_psb PROPERTIES TIMEOUT 60)
+
 # Exercise the actual interpreter with release optimization and sanitizers.
 # Android's ARM translation layer cannot always unwind a native crash, so these
 # tests provide source-level diagnostics for the same script/native operations.

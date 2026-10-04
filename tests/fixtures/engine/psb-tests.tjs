@@ -1,0 +1,46 @@
+Plugins.link("psbfile.dll");
+Plugins.link("psbfile.dll");
+var ciPsb = new PSBFile();
+ciCheck(ciPsb.load(ciStorage + "scene.psb"), "PSBFile loads scene metadata");
+var ciScene = ciPsb.root;
+ciCheck(ciScene.scenes[0].text == "Synthetic dialogue" && ciScene.scenes[0].choices[1] == "right",
+    "PSB nested dictionaries and arrays");
+ciCheck(ciScene.enabled === 1 && ciScene.disabled === 0 && ciScene.empty === void
+    && ciScene.negative == -1234567 && ciScene.wide == -36028797018963968
+    && ciScene.fraction == 1.25 && ciScene.single == 1.5 && ciScene.numbers[2] == 4294967295,
+    "PSB native numeric and null values");
+ciCheck(ciScene.unicode == "\x65e5\x672c\x8a9e \xd83d\xde00"
+    && ciScene["\x65e5\x672c\x8a9e\xd83d\xde00"] == "key", "PSB UTF-8 keys and UTF-16 surrogate pairs");
+ciThrows(function() { ciPsb.load(ciStorage + "invalid.psb"); }, "PSB rejects invalid offsets");
+ciCheck(ciPsb.root.scenes[0].label == "intro", "failed PSB reload preserves previous root");
+ciPsb.load(ciStorage + "images.pimg");
+var ciPimg = ciPsb.root;
+invalidate ciPsb;
+ciCheck(ciPimg.width == 2 && ciPimg.layers[0].layer_id == 0 && ciScene.scenes[0].label == "intro",
+    "PSB roots survive reload and native object invalidation");
+var ciPng = ciPimg["tile.png"];
+ciCheck(typeof ciPng == "Octet" && ciPng.length > 8 && ciPng[0] == 137 && ciPng[1] == 80
+    && ciPimg["empty.bin"].length == 0, "PSB resources materialize as octets on access");
+ciCheck(Storages.isExistentStorage("psb://IMAGES.PIMG/TILE.PNG")
+    && !Storages.isExistentStorage("psb://images.pimg/missing.png")
+    && !Storages.isExistentStorage("psb://images.pimg/width"), "PSB resource lookup and missing entries");
+var ciPsbLayer = new Layer(ciWindow, ciLayer);
+ciPsbLayer.loadImages("psb://images.pimg/tile.png");
+ciCheck(ciPsbLayer.imageWidth == 2 && ciPsbLayer.imageHeight == 2
+    && ciPsbLayer.getMainPixel(0, 0) == 0xff0000 && ciPsbLayer.getMainPixel(0, 1) == 0x0000ff,
+    "PSB PNG resource decodes into layer pixels");
+ciPsbLayer.loadImages("psb://images.pimg/0.tlg");
+ciCheck(ciPsbLayer.imageWidth == 1 && ciPsbLayer.imageHeight == 1
+    && ciPsbLayer.getMainPixel(0, 0) == 0x204080, "PSB TLG resource decodes into layer pixels");
+ciPsbLayer.loadImages("psb://images.pimg/emoji\xd83d\xde00.png");
+ciCheck(ciPsbLayer.getMainPixel(0, 0) == 0xff0000, "PSB resource names preserve supplementary Unicode");
+ciPsbLayer.loadImages("psb://images.pimg/folder/tile.png");
+ciCheck(ciPsbLayer.imageWidth == 2, "PSB resource names may contain directories");
+Storages.addAutoPath("psb://images.pimg/");
+ciCheck(Storages.isExistentStorage("tile.png"), "PSB resources enumerate through storage auto-paths");
+Storages.removeAutoPath("psb://images.pimg/");
+ciThrows(function() { ["write"].save("psb://images.pimg/tile.png"); }, "PSB resources reject writes");
+var ciPsbConstructor = new PSBFile(ciStorage + "scene.psb");
+ciCheck(ciPsbConstructor.root.scenes[0].label == "intro", "PSBFile constructor accepts a storage");
+invalidate ciPsbConstructor;
+invalidate ciPsbLayer;

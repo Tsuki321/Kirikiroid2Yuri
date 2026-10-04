@@ -195,6 +195,7 @@ try {
         ciLayer.drawText(10 + ciCh.x, 30 + ciCh.y, ciCh.text, 0xffffff);
     }
     ciCheck(ciLayout.renderCount == 4 && ciLayout.renderRight > 0, "text layout can drive Layer drawing");
+    Scripts.execStorage(ciStorage + "psb-tests.tjs");
     Scripts.compileStorage(ciStorage + "compiled-startup-source.tjs", ciStorage + "startup.tjs");
     ciWindow.minimize();
     ciCheck(!ciWindow.visible, "window minimize");

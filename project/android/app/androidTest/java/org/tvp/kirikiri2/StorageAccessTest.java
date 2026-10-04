@@ -176,6 +176,17 @@ public class StorageAccessTest {
                 assertTrue(StorageAccess.write(context, storage + "/tone.wav", tone.toByteArray()));
             }
             write(storage + "/compiled-source.tjs", program);
+            write(storage + "/psb-tests.tjs", read(tests.getAssets().open("engine/psb-tests.tjs")));
+            for (String filename : new String[] {"scene.psb", "images.pimg", "invalid.psb"}) {
+                try (InputStream source = tests.getAssets().open("psb/" + filename);
+                     ParcelFileDescriptor descriptor = StorageAccess.openDescriptor(context, storage + "/" + filename, "w")) {
+                    assertNotNull(descriptor);
+                    try (FileOutputStream target = new FileOutputStream(descriptor.getFileDescriptor())) {
+                        byte[] buffer = new byte[8192]; int count;
+                        while ((count = source.read(buffer)) != -1) target.write(buffer, 0, count);
+                    }
+                }
+            }
             if (name.startsWith("archive")) {
                 String[] archives = tests.getAssets().list("archives");
                 assertNotNull(archives);
