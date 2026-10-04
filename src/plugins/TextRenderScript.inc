@@ -84,7 +84,7 @@ class TextRenderBase {
     }
     function resetFont() {
         var defaults = _font();
-        (TextRenderBase.setFont incontextof this)(defaults);
+        (global.TextRenderBase.setFont incontextof this)(defaults);
     }
     function resetStyle() { setStyle(_font()); }
     property bold { getter() { return _state.bold; } setter(value) { _state.bold = !!value; } }
