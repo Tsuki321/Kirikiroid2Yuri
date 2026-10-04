@@ -27,7 +27,12 @@ class LayerImageEffects {
         try { operation(pixels, width, height); }
         catch(const std::invalid_argument &error) { TVPThrowExceptionMessage(ttstr(error.what()).c_str()); }
         for(auto &pixel : pixels) pixel = TVP_REVRGB(pixel);
-        const_cast<tTVPBaseTexture *>(bitmap)->Update(pixels.data(), width*4, left, top, width, height);
+        // Texture uploads are not consistently supported at an offset by the
+        // software and cached-GL backends. Copy a complete patch through the
+        // renderer so clipping, image sharing and cached pixels stay coherent.
+        tTVPBaseTexture patch(width, height);
+        patch.Update(pixels.data(), width*4, 0, 0, width, height);
+        bitmap->CopyRect(left, top, &patch, tTVPRect(0, 0, width, height));
         layer->SetImageModified(true);
         layer->Update(tTVPRect(left, top, right, bottom));
     }
