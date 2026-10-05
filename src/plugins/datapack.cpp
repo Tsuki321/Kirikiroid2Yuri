@@ -2,7 +2,7 @@
 #include "DataPackReader.h"
 #include <memory>
 
-#define NCB_MODULE_NAME nullptr
+#define NCB_MODULE_NAME TJS_W("tjsdatapack.dll")
 
 namespace {
 ttstr packString(const std::u16string &text) {

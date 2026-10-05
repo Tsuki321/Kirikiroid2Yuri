@@ -4,6 +4,7 @@
 void TVPLoadInternalPlugins()
 {
     ncbAutoRegister::AllRegist();
+	ncbAutoRegister::LoadModule(TJS_W("tjsdatapack.dll"));
 	ncbAutoRegister::LoadModule(TJS_W("xp3filter.dll"));
 	ncbAutoRegister::LoadModule(TJS_W("fstat.dll"));
 	ncbAutoRegister::LoadModule(TJS_W("dirlist.dll"));
