@@ -2,6 +2,8 @@
 #include "DataPackReader.h"
 #include <memory>
 
+#define NCB_MODULE_NAME nullptr
+
 namespace {
 ttstr packString(const std::u16string &text) {
     std::basic_string<tjs_char> units(text.begin(), text.end());

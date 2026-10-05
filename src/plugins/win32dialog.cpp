@@ -8,16 +8,7 @@ static void InitPlugin_WIN32Dialog()
 	TVPExecuteScript(
 		TJS_W(R"K2DIALOG(
 class WIN32Dialog {
-    static var MB_OK = 0, MB_OKCANCEL = 1, MB_ABORTRETRYIGNORE = 2;
-    static var MB_YESNOCANCEL = 3, MB_YESNO = 4, MB_RETRYCANCEL = 5, MB_CANCELTRYCONTINUE = 6;
-    static var MB_ICONERROR = 16, MB_ICONHAND = 16, MB_ICONSTOP = 16;
-    static var MB_ICONQUESTION = 32, MB_ICONWARNING = 48, MB_ICONEXCLAMATION = 48;
-    static var MB_ICONINFORMATION = 64, MB_ICONASTERISK = 64;
-    static var MB_DEFBUTTON1 = 0, MB_DEFBUTTON2 = 256, MB_DEFBUTTON3 = 512, MB_DEFBUTTON4 = 768;
-    static var MB_APPLMODAL = 0, MB_SYSTEMMODAL = 4096, MB_TASKMODAL = 8192, MB_TOPMOST = 262144;
-    static var IDOK = 1, IDCANCEL = 2, IDABORT = 3, IDRETRY = 4, IDIGNORE = 5;
-    static var IDYES = 6, IDNO = 7, IDTRYAGAIN = 10, IDCONTINUE = 11;
-    static function messageBox(owner, message = void, caption = void, flags = void) {
+    function messageBox(owner, message = void, caption = void, flags = void) {
         if (flags === void && typeof owner == "String") {
             flags = caption; caption = message; message = owner;
         }
@@ -33,6 +24,17 @@ class WIN32Dialog {
         if (selected < 0 || selected >= values[type].count) return type == 4 ? IDNO : IDCANCEL;
         return values[type][selected];
     }
+}
+with (WIN32Dialog) {
+    .MB_OK = 0; .MB_OKCANCEL = 1; .MB_ABORTRETRYIGNORE = 2;
+    .MB_YESNOCANCEL = 3; .MB_YESNO = 4; .MB_RETRYCANCEL = 5; .MB_CANCELTRYCONTINUE = 6;
+    .MB_ICONERROR = 16; .MB_ICONHAND = 16; .MB_ICONSTOP = 16;
+    .MB_ICONQUESTION = 32; .MB_ICONWARNING = 48; .MB_ICONEXCLAMATION = 48;
+    .MB_ICONINFORMATION = 64; .MB_ICONASTERISK = 64;
+    .MB_DEFBUTTON1 = 0; .MB_DEFBUTTON2 = 256; .MB_DEFBUTTON3 = 512; .MB_DEFBUTTON4 = 768;
+    .MB_APPLMODAL = 0; .MB_SYSTEMMODAL = 4096; .MB_TASKMODAL = 8192; .MB_TOPMOST = 262144;
+    .IDOK = 1; .IDCANCEL = 2; .IDABORT = 3; .IDRETRY = 4; .IDIGNORE = 5;
+    .IDYES = 6; .IDNO = 7; .IDTRYAGAIN = 10; .IDCONTINUE = 11;
 }
 )K2DIALOG")
 		);
