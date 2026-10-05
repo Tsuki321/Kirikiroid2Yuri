@@ -1,0 +1,63 @@
+// Synthetic metadata, dialog contracts and virtual window-control menus.
+var ciPackNames = ["plain", "big", "compressed", "empty-iv",
+                   "cipher-1", "cipher-2", "cipher-3", "cipher-4", "cipher-5", "cipher-6"];
+for (var ciPackIndex = 0; ciPackIndex < ciPackNames.count; ++ciPackIndex) {
+    var ciPack = Scripts.loadDataPack(ciStorage + "pack-" + ciPackNames[ciPackIndex] + ".pbd");
+    ciCheck(ciPack.title == "Synthetic metadata", "DataPack dictionary title: " + ciPackNames[ciPackIndex]);
+    ciCheck(ciPack.unicode == "日本語😀", "DataPack UTF-16 and supplementary characters");
+    ciCheck(ciPack.items[0] === void && ciPack.items[1] === null, "DataPack distinguishes void and null");
+    ciCheck(ciPack.items[2] == -7 && ciPack.items[3] == 1099511627776 && ciPack.items[4] == 3.25,
+        "DataPack signed integers, 64-bit values and reals");
+    ciCheck(typeof ciPack.items[6] == "Octet" && ciPack.items[6].length == 0 &&
+        ciPack.items[7].length == 256, "DataPack octets preserve their lengths");
+    ciCheck(ciPack.longtext.length == 6600 && ciPack.rows[79][1] == -79,
+        "DataPack reads across compression frames and cipher batches");
+}
+var ciOuterPack = Scripts.loadDataPack(ciStorage + "pack-outer.pbd", %[outeriv:"外部-IV"]);
+ciCheck(ciOuterPack.rows.count == 80, "DataPack external UTF-8 IV option");
+var ciPackRejected = false;
+try { Scripts.loadDataPack(ciStorage + "pack-outer.pbd"); } catch (error) { ciPackRejected = true; }
+ciCheck(ciPackRejected, "DataPack rejects a wrong IV");
+ciPackRejected = false;
+try { Scripts.loadDataPack(ciStorage + "pack-truncated.pbd"); } catch (error) { ciPackRejected = true; }
+ciCheck(ciPackRejected, "DataPack rejects truncated structures");
+
+Plugins.link("win32dialog.dll");
+ciCheck(typeof System.confirm == "Object", "System exposes confirmation dialogs");
+global.ciDialogChoice = 0;
+global.ciDialogButtons = void;
+var ciOriginalInform = System.inform;
+System.inform = function(message, caption, buttons) {
+    global.ciDialogButtons = buttons;
+    return global.ciDialogChoice;
+};
+try {
+    var ciDialogResults = [[1], [1,2], [3,4,5], [6,7,2], [6,7], [4,2], [2,10,11]];
+    for (var ciType = 0; ciType < ciDialogResults.count; ++ciType) {
+        for (var ciButton = 0; ciButton < ciDialogResults[ciType].count; ++ciButton) {
+            global.ciDialogChoice = ciButton;
+            ciCheck(WIN32Dialog.messageBox(ciWindow, "test", "fixture", ciType | WIN32Dialog.MB_ICONINFORMATION)
+                == ciDialogResults[ciType][ciButton], "desktop message box return codes");
+            ciCheck(global.ciDialogButtons.count == ciDialogResults[ciType].count, "message box button choices");
+        }
+    }
+    global.ciDialogChoice = -1;
+    ciCheck(WIN32Dialog.messageBox(ciWindow, "test", "fixture", WIN32Dialog.MB_YESNO) == WIN32Dialog.IDNO,
+        "dismissal never accepts a yes/no prompt");
+    global.ciDialogChoice = 0;
+    ciCheck(WIN32Dialog.messageBox("test", "fixture", WIN32Dialog.MB_YESNO) == WIN32Dialog.IDYES,
+        "legacy three-argument message boxes remain supported");
+} catch (error) { System.inform = ciOriginalInform; throw error; }
+System.inform = ciOriginalInform;
+delete global.ciDialogChoice;
+delete global.ciDialogButtons;
+
+var ciControlMenu = new MenuItem(ciWindow, "");
+ciControlMenu.icon = MenuItem.biPopupMinimize;
+ciControlMenu.rightJustify = true;
+ciControlMenu.bmpItem = 7;
+ciCheck(ciControlMenu.icon == 11 && ciControlMenu.rightJustify && ciControlMenu.bmpItem == 7,
+    "window-control menu properties round-trip");
+ciCheck(ciControlMenu.caption == "" && MenuItem.biClose == 5 && MenuItem.biRestore == 2 &&
+    MenuItem.biPopupMaximize == 10, "native menu icon constants preserve the script caption");
+invalidate ciControlMenu;

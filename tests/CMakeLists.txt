@@ -79,6 +79,12 @@ target_compile_definitions(test_psb PRIVATE PSB_FIXTURE_DIR="${CMAKE_SOURCE_DIR}
 target_link_libraries(test_psb PRIVATE gtest_main)
 gtest_discover_tests(test_psb PROPERTIES TIMEOUT 60)
 
+add_executable(test_datapack test_datapack.cpp)
+target_include_directories(test_datapack PRIVATE ${SRC_ROOT}/core/base)
+target_compile_definitions(test_datapack PRIVATE DATAPACK_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures/datapack")
+target_link_libraries(test_datapack PRIVATE gtest_main)
+gtest_discover_tests(test_datapack PROPERTIES TIMEOUT 60)
+
 # Exercise the actual interpreter with release optimization and sanitizers.
 # Android's ARM translation layer cannot always unwind a native crash, so these
 # tests provide source-level diagnostics for the same script/native operations.

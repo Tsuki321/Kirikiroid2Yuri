@@ -33,6 +33,9 @@ class tTJSNI_MenuItem : public tTJSNI_BaseMenuItem
 	bool IsVisible;
 	
 	tjs_int GroupIndex;
+	tjs_int MenuIcon = 0;
+	bool RightJustify = false;
+	tTJSVariant BitmapItem;
 
 public:
 	tTJSNI_MenuItem();
@@ -55,6 +58,23 @@ public:
 
 	void SetCaption(const ttstr & caption);
 	void GetCaption(ttstr & caption) const;
+	void GetDisplayCaption(ttstr &caption) const {
+		GetCaption(caption);
+		if(!caption.IsEmpty()) return;
+		switch(MenuIcon) {
+		case 1: caption = TJS_W("Menu"); break;
+		case 2: case 9: caption = TJS_W("Restore"); break;
+		case 3: case 11: caption = TJS_W("Minimize"); break;
+		case 5: case 8: caption = TJS_W("Close"); break;
+		case 7: case 10: caption = TJS_W("Maximize"); break;
+		}
+	}
+	tjs_int GetIcon() const { return MenuIcon; }
+	void SetIcon(tjs_int value) { MenuIcon = value; }
+	bool GetRightJustify() const { return RightJustify; }
+	void SetRightJustify(bool value) { RightJustify = value; }
+	tTJSVariant GetBitmapItem() const { return BitmapItem; }
+	void SetBitmapItem(const tTJSVariant &value) { BitmapItem = value; }
 
 	void SetChecked(bool b);
 	bool GetChecked() const;

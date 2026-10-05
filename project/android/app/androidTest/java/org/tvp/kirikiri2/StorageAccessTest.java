@@ -24,12 +24,15 @@ import static org.junit.Assert.*;
 public class StorageAccessTest {
     private static Context context;
     private static String documents;
-    private static String read(InputStream input) throws Exception {
+    private static byte[] readBytes(InputStream input) throws Exception {
         try (InputStream stream = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096]; int count;
             while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
-            return new String(output.toByteArray(), StandardCharsets.UTF_8);
+            return output.toByteArray();
         }
+    }
+    private static String read(InputStream input) throws Exception {
+        return new String(readBytes(input), StandardCharsets.UTF_8);
     }
     private static void write(String path, String text) { assertTrue(path, StorageAccess.write(context, path, text.getBytes(StandardCharsets.UTF_8))); }
     @BeforeClass public static void setup() throws Exception {
@@ -177,6 +180,11 @@ public class StorageAccessTest {
             }
             write(storage + "/compiled-source.tjs", program);
             write(storage + "/psb-tests.tjs", read(tests.getAssets().open("engine/psb-tests.tjs")));
+            write(storage + "/datapack-tests.tjs", read(tests.getAssets().open("engine/datapack-tests.tjs")));
+            for (String filename : tests.getAssets().list("datapack")) {
+                assertTrue(StorageAccess.write(context, storage + "/pack-" + filename,
+                        readBytes(tests.getAssets().open("datapack/" + filename))));
+            }
             for (String filename : tests.getAssets().list("psb")) {
                 try (InputStream source = tests.getAssets().open("psb/" + filename);
                      ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {

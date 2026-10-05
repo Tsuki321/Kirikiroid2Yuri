@@ -127,6 +127,7 @@ tjs_error TJS_INTF_METHOD tTJSNI_MenuItem::Construct(tjs_int numparams,
 //---------------------------------------------------------------------------
 void TJS_INTF_METHOD tTJSNI_MenuItem::Invalidate()
 {
+	BitmapItem.Clear();
 	// invalidate inherited
 	inherited::Invalidate();  // this sets Owner = NULL
 

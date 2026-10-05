@@ -204,6 +204,7 @@ try {
     }
     ciCheck(ciLayout.renderCount == 4 && ciLayout.renderRight > 0, "text layout can drive Layer drawing");
     Scripts.execStorage(ciStorage + "psb-tests.tjs");
+    Scripts.execStorage(ciStorage + "datapack-tests.tjs");
 
     // Cross TLG5 scanlines and TLG6 block/tail boundaries with independent
     // red, green, blue and alpha values, including transparent colored pixels.

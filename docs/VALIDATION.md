@@ -84,6 +84,14 @@ Do not simply update the digest to bypass an input mismatch.
 
 ## Compatibility limits
 
+- Packed-metadata fixtures exercise `Scripts.loadDataPack`, including binary
+  octets, Unicode, endian handling and encrypted LZ4 containers. See `DATAPACK.md`.
+- Dialog fixtures check the desktop `WIN32Dialog.messageBox` button/result
+  contract without opening modal dialogs. Native `System.confirm` uses the
+  Android activity's modal UI. Window-control menus retain icon/style properties
+  and show text labels for icon-only controls; arbitrary Windows bitmap handles
+  and horizontal menu-bar layout are not rendered.
+
 - This remains an Android ARM64 Kirikiri/TJS runtime. Desktop ports and the SDL
   rendering migration are separate work.
 - The target SDK remains 29. Document-tree storage works independently of legacy

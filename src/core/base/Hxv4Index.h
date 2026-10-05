@@ -24,7 +24,8 @@ inline uint64_t Rol64(uint64_t x, unsigned n) { return (x << n) | (x >> (64 - n)
 
 // BLAKE2s-256, as specified by RFC 7693. All input loads are byte-wise so that
 // archive offsets and UTF-16 strings need not be aligned on ARM.
-inline Digest Blake2s(const uint8_t *data, size_t size) {
+// keyBytes is nonzero only when data already starts with the padded key block.
+inline Digest Blake2s(const uint8_t *data, size_t size, uint8_t keyBytes = 0) {
     static const uint32_t iv[8] = {
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
@@ -43,7 +44,7 @@ inline Digest Blake2s(const uint8_t *data, size_t size) {
     };
     uint32_t h[8];
     std::copy(iv, iv + 8, h);
-    h[0] ^= 0x01010020;
+    h[0] ^= 0x01010020 | (uint32_t(keyBytes) << 8);
     uint64_t total = 0;
     do {
         uint8_t block[64] = {};

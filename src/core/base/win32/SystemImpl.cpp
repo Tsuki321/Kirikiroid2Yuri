@@ -841,8 +841,16 @@ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/inform)
 
 	if (numparams >= 3 && param[2]->Type() != tvtVoid) {
 		if (param[2]->Type() == tvtObject) { // vector of button
-			tTJSArrayNI* ni;
-			param[2]->AsObjectNoAddRef()->NativeInstanceSupport(TJS_NIS_GETINSTANCE, TJSGetArrayClassID(), (iTJSNativeInstance**)&ni);
+			tTJSArrayNI* ni = nullptr;
+			iTJSDispatch2 *buttons = param[2]->AsObjectNoAddRef();
+			if(!buttons || TJS_FAILED(buttons->NativeInstanceSupport(TJS_NIS_GETINSTANCE,
+				TJSGetArrayClassID(), (iTJSNativeInstance**)&ni)) || !ni)
+			{
+				// Desktop callers may supply an owner window instead of button labels.
+				TVPShowSimpleMessageBox(text, caption);
+				if(result) result->Clear();
+				return TJS_S_OK;
+			}
 			std::vector<ttstr> vecButtons;
 			vecButtons.reserve(ni->Items.size());
 			for (const ttstr &label : ni->Items) {
@@ -871,6 +879,20 @@ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/inform)
 }
 TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(/*object to register*/cls,
 	/*func. name*/inform)
+//----------------------------------------------------------------------
+TJS_BEGIN_NATIVE_METHOD_DECL(confirm)
+{
+	if(numparams < 1) return TJS_E_BADPARAMCOUNT;
+	ttstr text(*param[0]);
+	ttstr caption = numparams >= 2 && param[1]->Type() != tvtVoid ? ttstr(*param[1]) :
+		(TVPAppTitle.IsEmpty() ? ttstr(TJS_W("Confirmation")) : TVPAppTitle);
+	std::vector<ttstr> buttons{TJS_W("Yes"), TJS_W("No")};
+	// The optional desktop owner belongs to the current Android activity.
+	int selected = TVPShowSimpleMessageBox(text, caption, buttons);
+	if(result) *result = static_cast<tjs_int>(selected == 0);
+	return TJS_S_OK;
+}
+TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(cls, confirm)
 //----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getTickCount)
 {

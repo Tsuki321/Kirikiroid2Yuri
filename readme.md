@@ -16,6 +16,8 @@ Roadmap :
   - [ ] [layerEx](https://github.com/wamsoft/layerEx)
   - [ ] [layerExDraw](https://github.com/wamsoft/layerExDraw) (Android text, paths, transforms and images implemented; advanced modes remain)
   - [x] [scriptsEx](https://github.com/wamsoft/scriptsEx) (ported)
+  - [x] [TJS DataPack reading](docs/DATAPACK.md) (`Scripts.loadDataPack`; writing and thumbnail containers remain)
+  - [x] confirmation dialogs and window-control menu compatibility
 - platform
   - android
     - [x] SDK level above 21 (android 5.1, Lollipop)

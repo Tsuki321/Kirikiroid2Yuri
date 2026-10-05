@@ -40,7 +40,7 @@ void TVPInGameMenuForm::initMenu(const std::string& title, tTJSNI_MenuItem *item
 	_list->removeAllItems();
 	if (_title) {
 		if (title.empty()) {
-			ttstr caption; item->GetCaption(caption);
+			ttstr caption; item->GetDisplayCaption(caption);
 			_title->setTitleText(caption.AsStdString());
 		} else {
 			_title->setTitleText(title);
@@ -52,7 +52,7 @@ void TVPInGameMenuForm::initMenu(const std::string& title, tTJSNI_MenuItem *item
 	ttstr seperator = TJS::TJSMapGlobalStringMap(TJS_W("-"));
 	for (int i = 0; i < count; ++i) {
 		tTJSNI_MenuItem *subitem = static_cast<tTJSNI_MenuItem*>(item->GetChildren().at(i));
-		ttstr caption; subitem->GetCaption(caption);
+		ttstr caption; subitem->GetDisplayCaption(caption);
 		if (caption.IsEmpty() || caption == TJS_W("+")) continue;
 		_list->pushBackCustomItem(createMenuItem(idx, subitem, caption.AsStdString()));
 		if(caption != seperator)

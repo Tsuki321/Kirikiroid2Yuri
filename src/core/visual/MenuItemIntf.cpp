@@ -336,6 +336,51 @@ TJS_END_NATIVE_METHOD_DECL(/*func. name*/fireClick)
 
 //--properties
 
+TJS_BEGIN_NATIVE_PROP_DECL(icon)
+{
+	TJS_BEGIN_NATIVE_PROP_GETTER
+		TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_MenuItem);
+		*result = _this->GetIcon();
+		return TJS_S_OK;
+	TJS_END_NATIVE_PROP_GETTER
+	TJS_BEGIN_NATIVE_PROP_SETTER
+		TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_MenuItem);
+		_this->SetIcon(static_cast<tjs_int>(*param));
+		return TJS_S_OK;
+	TJS_END_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_PROP_DECL(icon)
+
+TJS_BEGIN_NATIVE_PROP_DECL(rightJustify)
+{
+	TJS_BEGIN_NATIVE_PROP_GETTER
+		TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_MenuItem);
+		*result = static_cast<tjs_int>(_this->GetRightJustify());
+		return TJS_S_OK;
+	TJS_END_NATIVE_PROP_GETTER
+	TJS_BEGIN_NATIVE_PROP_SETTER
+		TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_MenuItem);
+		_this->SetRightJustify(static_cast<tjs_int>(*param) != 0);
+		return TJS_S_OK;
+	TJS_END_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_PROP_DECL(rightJustify)
+
+TJS_BEGIN_NATIVE_PROP_DECL(bmpItem)
+{
+	TJS_BEGIN_NATIVE_PROP_GETTER
+		TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_MenuItem);
+		*result = _this->GetBitmapItem();
+		return TJS_S_OK;
+	TJS_END_NATIVE_PROP_GETTER
+	TJS_BEGIN_NATIVE_PROP_SETTER
+		TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_MenuItem);
+		_this->SetBitmapItem(*param);
+		return TJS_S_OK;
+	TJS_END_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_PROP_DECL(bmpItem)
+
 //----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_PROP_DECL(caption)
 {
@@ -587,6 +632,16 @@ TJS_END_NATIVE_PROP_DECL(index)
 //----------------------------------------------------------------------
 
 	TJS_END_NATIVE_MEMBERS
+	const struct { const tjs_char *name; tjs_int value; } icons[] = {
+		{TJS_W("biNone"), 0}, {TJS_W("biSystem"), 1}, {TJS_W("biRestore"), 2},
+		{TJS_W("biMinimize"), 3}, {TJS_W("biClose"), 5}, {TJS_W("biMaximize"), 7},
+		{TJS_W("biPopupClose"), 8}, {TJS_W("biPopupRestore"), 9},
+		{TJS_W("biPopupMaximize"), 10}, {TJS_W("biPopupMinimize"), 11}
+	};
+	for(const auto &icon : icons) {
+		tTJSVariant value(icon.value);
+		PropSet(TJS_MEMBERENSURE | TJS_STATICMEMBER, icon.name, nullptr, &value, this);
+	}
 }
 //---------------------------------------------------------------------------
 

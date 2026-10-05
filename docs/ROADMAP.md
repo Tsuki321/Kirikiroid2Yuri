@@ -12,6 +12,9 @@
 | Plugin | Status |
 |--------|--------|
 | scriptsEx | Ported (`scriptsEx.cpp`, `bitap_fuzzy.hpp`) |
+| TJS DataPack | Bounded `Scripts.loadDataPack` reader for stored/LZ4 metadata, cipher modes 1–6, both byte orders and external IVs. See `DATAPACK.md`. |
+| System / win32dialog | Native yes/no confirmation and desktop message-box button/result contracts. |
+| MenuItem controls | Window-control icon constants/properties; Android menus label icon-only controls. Custom bitmap rendering and horizontal menu-bar layout remain separate. |
 | windowEx | Virtual-window minimize, maximize and restore; other Windows APIs remain outside the Android implementation. |
 | layerExDraw / GdiPlus | Android raster backend for text, metrics, paths, transforms, basic brushes and images. Advanced modes report errors. See `VALIDATION.md`. |
 | layerEx base | In-tree (`LayerExBase.cpp`, `layerExBase.hpp`) |
