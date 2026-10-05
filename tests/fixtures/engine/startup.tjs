@@ -204,6 +204,54 @@ try {
     }
     ciCheck(ciLayout.renderCount == 4 && ciLayout.renderRight > 0, "text layout can drive Layer drawing");
     Scripts.execStorage(ciStorage + "psb-tests.tjs");
+
+    // Cross TLG5 scanlines and TLG6 block/tail boundaries with independent
+    // red, green, blue and alpha values, including transparent colored pixels.
+    var ciTlgSource = new Layer(ciWindow, ciLayer);
+    ciTlgSource.setSize(9, 10);
+    ciTlgSource.imageWidth = 9;
+    ciTlgSource.imageHeight = 10;
+    ciTlgSource.type = ltAlpha;
+    var ciTlgColors = [], ciTlgAlphas = [];
+    for (var ciY = 0; ciY < 10; ++ciY) {
+        for (var ciX = 0; ciX < 9; ++ciX) {
+            var ciColor = ((32 + ciX * 7 + ciY) << 16) | ((64 + ciY * 9) << 8) | (128 + ciX + ciY * 3);
+            var ciAlpha = (ciX * 37 + ciY * 19) & 255;
+            ciTlgSource.setMainPixel(ciX, ciY, ciColor);
+            ciTlgSource.setMaskPixel(ciX, ciY, ciAlpha);
+            ciTlgColors.add(ciColor);
+            ciTlgAlphas.add(ciAlpha);
+        }
+    }
+    var ciTlgResult = new Layer(ciWindow, ciLayer);
+    var ciTlgModes = ["tlg5", "tlg524", "tlg6", "tlg624"];
+    for (var ciModeIndex = 0; ciModeIndex < ciTlgModes.count; ++ciModeIndex) {
+        var ciMode = ciTlgModes[ciModeIndex];
+        var ciTlgPath = ciStorage + "codec-" + ciMode + ".tlg";
+        ciTlgSource.saveLayerImage(ciTlgPath, ciMode);
+        ciTlgResult.loadImages(ciTlgPath);
+        var ciTlgOK = ciTlgResult.imageWidth == 9 && ciTlgResult.imageHeight == 10;
+        var ciTlgMismatch = "";
+        for (var ciY = 0; ciY < 10 && ciTlgOK; ++ciY) {
+            for (var ciX = 0; ciX < 9; ++ciX) {
+                var ciPixelIndex = ciY * 9 + ciX;
+                var ciExpectedAlpha = (ciModeIndex & 1) ? 255 : ciTlgAlphas[ciPixelIndex];
+                if (ciTlgResult.getMainPixel(ciX, ciY) != ciTlgColors[ciPixelIndex]
+                    || ciTlgResult.getMaskPixel(ciX, ciY) != ciExpectedAlpha) {
+                    ciTlgOK = false;
+                    ciTlgMismatch = " at " + ciX + "," + ciY + " rgb=" + ciTlgResult.getMainPixel(ciX, ciY)
+                        + " alpha=" + ciTlgResult.getMaskPixel(ciX, ciY);
+                    break;
+                }
+            }
+        }
+        ciCheck(ciTlgOK, ciMode + " save/load preserves color and alpha across blocks" + ciTlgMismatch);
+    }
+    ciCheck(ciTlgSource.getMainPixel(0, 0) == ciTlgColors[0] && ciTlgSource.getMaskPixel(0, 0) == 0,
+        "TLG saving preserves the source image");
+    invalidate ciTlgSource;
+    invalidate ciTlgResult;
+
     Scripts.compileStorage(ciStorage + "compiled-startup-source.tjs", ciStorage + "startup.tjs");
     ciWindow.minimize();
     ciCheck(!ciWindow.visible, "window minimize");

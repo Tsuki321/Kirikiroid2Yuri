@@ -1013,7 +1013,7 @@ void SaveTLG6( tTJSBinaryStream* stream, const iTVPBaseBitmap* bmp, bool is24 )
 	tTJSBinaryStream *out = stream;
 
 	// DWORD medstart, medend;
-	tjs_uint reordertick;
+	tjs_uint reordertick = 0;
 #ifdef WRITE_ENTROPY_VALUES
 	FILE *vs = fopen("vs.bin", "wb");
 #endif
@@ -1098,14 +1098,16 @@ void SaveTLG6( tTJSBinaryStream* stream, const iTVPBaseBitmap* bmp, bool is24 )
 					// do med(when p=0) or take average of upper and left pixel(p=1)
 					for(int c = 0; c < colors; c++)
 					{
+						// Predict the file's BGRA channels from the renderer's RGBA rows.
+						const int channel = colors >= 3 && c < 3 ? 2 - c : c;
 						int wp = 0;
 						for(int yy = y; yy < ylim; yy++)
 						{
 							const unsigned char * sl = x*stride +
-								c + (const unsigned char *)bmp->GetScanLine(yy);
+								channel + (const unsigned char *)bmp->GetScanLine(yy);
 							const unsigned char * usl;
 							if(yy >= 1)
-								usl = x*stride + c + (const unsigned char *)bmp->GetScanLine(yy-1);
+								usl = x*stride + channel + (const unsigned char *)bmp->GetScanLine(yy-1);
 							else
 								usl = NULL;
 							for(int xx = x; xx < xlim; xx++)

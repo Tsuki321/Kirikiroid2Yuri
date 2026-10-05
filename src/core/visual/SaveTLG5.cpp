@@ -336,17 +336,18 @@ static void Compress( const iTVPBaseBitmap *bmp, tTJSBinaryStream * out, bool is
 						cmpinbuf[0][inp] = val[0];
 						break;
 					case 3:
-						cmpinbuf[0][inp] = val[0] - val[1];
+						// Bitmap rows are RGBA; TLG planes are B-G, G, R-G.
+						cmpinbuf[0][inp] = val[2] - val[1];
 						cmpinbuf[1][inp] = val[1];
-						cmpinbuf[2][inp] = val[2] - val[1];
+						cmpinbuf[2][inp] = val[0] - val[1];
 						// skip alpha
 						current++;
 						if( upper ) upper++;
 						break;
 					case 4:
-						cmpinbuf[0][inp] = val[0] - val[1];
+						cmpinbuf[0][inp] = val[2] - val[1];
 						cmpinbuf[1][inp] = val[1];
-						cmpinbuf[2][inp] = val[2] - val[1];
+						cmpinbuf[2][inp] = val[0] - val[1];
 						cmpinbuf[3][inp] = val[3];
 						break;
 					}

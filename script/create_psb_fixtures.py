@@ -132,7 +132,9 @@ def png():
 
 def tlg():
     # One opaque RGB(0x20, 0x40, 0x80) pixel, four uncompressed TLG5 planes.
-    planes = [0xe0, 0x40, 0x40, 0xff]  # R-G, G, B-G, A (modulo 256)
+    # Plane order follows krkrz/krkrz visual/LoadTLG.cpp, independent of the
+    # renderer's in-memory RGBA order.
+    planes = [0x40, 0x40, 0xe0, 0xff]  # B-G, G, R-G, A (modulo 256)
     data = b''.join(b'\x01' + struct.pack('<I', 1) + bytes([value]) for value in planes)
     return b'TLG5.0\0raw\x1a' + b'\x04' + struct.pack('<4I', 1, 1, 1, len(data)) + data
 

@@ -35,6 +35,11 @@ synthetic framework. The storage cases cover `fstat` directory listings, copying
 timestamps, renaming and removal; removal must reject the wrong entry type and
 preserve nonempty directories. The drawing cases exercise `layerExImage` clipping,
 color effects, blur and noise, and `textrender` through the Android font backend.
+TLG5 and TLG6 saves convert the renderer's RGBA channels to the file's BGRA
+channel order. A 9-by-10 pixel pattern checks 24-bit and 32-bit save/load paths,
+alpha preservation, scanline and block boundaries, and an unchanged source image.
+The synthetic PSB TLG resource follows the plane order in the
+[KiriKiri reference decoder](https://github.com/krkrz/krkrz/blob/master/visual/LoadTLG.cpp).
 
 GCC and Clang sanitizer tests cover the image-effect algorithms and compile the
 production `TextRenderBase` script into the real TJS interpreter. Its regressions
