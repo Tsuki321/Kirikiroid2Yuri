@@ -1,5 +1,5 @@
 #include "IndividualConfigManager.h"
-#include "platform/CCFileUtils.h"
+#include "StorageImpl.h"
 #include "LocaleConfigManager.h"
 #include "Platform.h"
 
@@ -24,7 +24,7 @@ void IndividualConfigManager::Clear()
 
 bool IndividualConfigManager::CheckExistAt(const std::string &folder) {
 	std::string fullpath = folder + "/" FILENAME;
-	return cocos2d::FileUtils::getInstance()->isFileExist(fullpath);
+	return TVPCheckExistentLocalFile(ttstr(fullpath));
 }
 
 bool IndividualConfigManager::CreatePreferenceAt(const std::string &folder) {
@@ -51,7 +51,7 @@ bool IndividualConfigManager::UsePreferenceAt(const std::string &folder)
 	std::string fullpath = folder + "/" FILENAME;
 	if (CurrentPath == fullpath) return true;
 	Clear();
-	if (!cocos2d::FileUtils::getInstance()->isFileExist(fullpath)) return false;
+	if (!TVPCheckExistentLocalFile(ttstr(fullpath))) return false;
 	CurrentPath = fullpath;
 	Initialize();
 	return true;
