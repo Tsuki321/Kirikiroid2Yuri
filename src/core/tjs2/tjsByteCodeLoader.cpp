@@ -203,7 +203,9 @@ void tTJSByteCodeLoader::ReadObjects( tTJSScriptBlock* block, const tjs_uint8* b
 		tTJSInterCodeContext::tSourcePos* srcPos = NULL;
 		tjs_int srcPosArraySize = 0;
 		if( count > 0 ) {
-			srcPos = new tTJSInterCodeContext::tSourcePos[count];
+			srcPos = static_cast<tTJSInterCodeContext::tSourcePos *>(TJS_malloc(
+				sizeof(tTJSInterCodeContext::tSourcePos) * static_cast<size_t>(count)));
+			if(!srcPos) TJS_eTJSError(TJSInsufficientMem);
 			srcPosArraySize = count;
 			for( int i = 0; i < count; i++ ) {
 				srcPos[i].CodePos = read4byte( &(buff[offset]) );
