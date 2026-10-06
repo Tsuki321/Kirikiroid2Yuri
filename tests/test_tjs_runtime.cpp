@@ -149,8 +149,10 @@ TEST_F(TJSRuntime, InheritanceAccountsForGlobalExpressionTemporary) {
 TEST_F(TJSRuntime, LegacyCompiledClassAllocatesItsInheritanceTemporary) {
     using namespace TJS::ByteCode;
     ByteStream stream;
-    runtime->CompileScript(TJS_W("class PackedChild extends global.PackedParent {}"
-                                "var packedInstance = new PackedChild();"), &stream, false, true);
+    runtime->CompileScript(TJS_W("class PackedChild extends global.PackedParent {"
+                                "var stored = 0; property amount { getter { return stored; } setter(v) { stored = v; } }"
+                                "function value() { return answer + amount; } }"
+                                "var packedInstance = new PackedChild(); packedInstance.amount = 8;"), &stream, false, true);
     ASSERT_TRUE(Validate(stream.bytes.data(), stream.bytes.size()));
     auto read32 = [&](size_t at) {
         return uint32_t(stream.bytes.at(at)) | uint32_t(stream.bytes.at(at + 1)) << 8 |
@@ -178,6 +180,7 @@ TEST_F(TJSRuntime, LegacyCompiledClassAllocatesItsInheritanceTemporary) {
     stream.SetPosition(0);
     ASSERT_TRUE(runtime->LoadByteCode(&stream));
     EXPECT_EQ(91, Integer(TJS_W("packedInstance.answer")));
+    EXPECT_EQ(99, Integer(TJS_W("packedInstance.value()")));
 }
 
 static const tjs_char TextRenderTestSource[] =

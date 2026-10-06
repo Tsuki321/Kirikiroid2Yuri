@@ -143,6 +143,11 @@ public:
 			if( objs[i] != toplevel ) {
 				AddRef();
 			}
+		}
+		// References in constants and class/property links now own these
+		// contexts. Only TopLevelContext retains the loader's initial ref.
+		for( int i = 0; i < count; i++ ) {
+			if( objs[i] != toplevel ) objs[i]->Release();
 			objs[i] = NULL;
 		}
 	}

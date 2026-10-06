@@ -615,6 +615,7 @@ public:
 		PropGetter = getter;
 		if( getter ) getter->AddRef();
 		SuperClassGetter = superclass;
+		if( superclass ) superclass->AddRef();
 #ifdef ENABLE_DEBUGGER
 		if (Parent) Parent->AddRef();
 #endif	// ENABLE_DEBUGGER
