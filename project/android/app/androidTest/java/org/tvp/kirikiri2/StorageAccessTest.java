@@ -159,6 +159,10 @@ public class StorageAccessTest {
             String output = new File(base, name + "-result").getPath();
             assertTrue(StorageAccess.mkdirs(context, storage));
             assertTrue(StorageAccess.mkdirs(context, output));
+            write(storage + "/Kirikiroid2Preference.xml", "<?xml version=\"1.0\"?>\n<GlobalPreference>"
+                + "<Custom key=\"ci-preference\" value=\"saved value=1 &amp; 2\"/>"
+                + "<Custom key=\"ci-launch\" value=\"overridden preference\"/>"
+                + "</GlobalPreference>\n");
             write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
             if (name.equals("local") || name.equals("documents")) {

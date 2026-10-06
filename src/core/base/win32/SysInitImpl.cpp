@@ -1750,6 +1750,10 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got)
 			// Rebuild defaults after the launch overrides, which have priority.
 			TVPProgramArguments = launch_arguments;
 			PushAllCommandlineArguments();
+			// Saved custom arguments use literal values and have lower priority
+			// than explicit launch options. The manager selects game or global defaults.
+			for(const std::string &arg : IndividualConfigManager::GetInstance()->GetCustomArgumentsForPush())
+				TVPProgramArguments.push_back(ttstr(arg));
 			PushConfigFileOptions(options[2]); // has more priority
 			PushConfigFileOptions(options[1]); // has more priority
 			PushConfigFileOptions(options[0]); // has lesser priority
