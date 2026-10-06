@@ -25,7 +25,8 @@ class ExtraTransition : public iTVPDivisibleTransHandler {
 
     void snapshot(iTVPScanLineProvider *source, Texture &texture) {
         auto manager = TVPGetRenderManager();
-        if (!texture) texture.reset(manager->CreateTexture2D(width, height, TVPTextureFormat::RGBA));
+        if (!texture) texture.reset(manager->CreateTexture2D(nullptr, 0, width, height,
+            TVPTextureFormat::RGBA, RENDER_CREATE_TEXTURE_FLAG_NO_COMPRESS));
         auto input = source->GetTexture();
         if (!input || input->GetWidth() < unsigned(width) || input->GetHeight() < unsigned(height))
             throw std::invalid_argument("extrans source is smaller than the transition image");
@@ -87,7 +88,8 @@ public:
                 pixels.data(), data->Left, data->Top, data->Width, data->Height);
             auto manager = TVPGetRenderManager();
             if (!patch || patch->GetWidth() != unsigned(data->Width) || patch->GetHeight() != unsigned(data->Height))
-                patch.reset(manager->CreateTexture2D(data->Width, data->Height, TVPTextureFormat::RGBA));
+                patch.reset(manager->CreateTexture2D(nullptr, 0, data->Width, data->Height,
+                    TVPTextureFormat::RGBA, RENDER_CREATE_TEXTURE_FLAG_NO_COMPRESS));
             const tTVPRect patchRect(0, 0, data->Width, data->Height);
             patch->Update(pixels.data(), TVPTextureFormat::RGBA, data->Width * 4, patchRect);
             const tRenderTexRectArray::Element sources[] = { tRenderTexRectArray::Element(patch.get(), patchRect) };
