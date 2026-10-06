@@ -52,7 +52,7 @@ function ciStep() {
             ciSource.fillRect(0, 0, 64, 48, 0xff00ff00);
             ciCompleted = false; ciTick = 0; ciWaits = 0;
             ciDest.startTransition(name, children, ciSource,
-                %[time:1000, tickcallback:ciClock, maxh:8, maxdrift:8, maxsize:8, rwidth:32, bgcolor:0xff0000ff]);
+                %[time:1000, callback:ciClock, maxh:8, maxdrift:8, maxsize:8, rwidth:32, bgcolor:0xff0000ff]);
             ciPhase = 1;
         } else if (ciPhase == 1) {
             ciTick = 500;
