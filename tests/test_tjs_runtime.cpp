@@ -3,12 +3,14 @@
 #include "tjsError.h"
 #include "tjsHashSearch.h"
 #include "tjsObject.h"
+#include "tjsByteCodeValidator.h"
 #include "TickCount.h"
 #include <algorithm>
 #include <chrono>
 #include <climits>
 #include <iostream>
 #include <map>
+#include <cstring>
 #include <utility>
 
 // Supply the application's clock, logging and localization hooks. The runtime and its
@@ -30,6 +32,28 @@ void TVPConsoleLog(const tjs_char *message) {
 namespace {
 using Text = std::basic_string<tjs_char>;
 std::map<Text, Text> files;
+
+class ByteStream : public TJS::tTJSBinaryStream {
+    size_t position = 0;
+public:
+    std::vector<uint8_t> bytes;
+    tjs_uint64 TJS_INTF_METHOD Seek(tjs_int64 offset, tjs_int whence) override {
+        int64_t base = whence == TJS_BS_SEEK_SET ? 0 : whence == TJS_BS_SEEK_CUR ? position : bytes.size();
+        if(base + offset < 0 || uint64_t(base + offset) > bytes.size()) throw std::runtime_error("invalid seek");
+        return position = static_cast<size_t>(base + offset);
+    }
+    tjs_uint TJS_INTF_METHOD Read(void *buffer, tjs_uint size) override {
+        size = static_cast<tjs_uint>(std::min<size_t>(size, bytes.size() - position));
+        if(size) std::memcpy(buffer, bytes.data() + position, size);
+        position += size; return size;
+    }
+    tjs_uint TJS_INTF_METHOD Write(const void *buffer, tjs_uint size) override {
+        if(size > bytes.size() - position) bytes.resize(position + size);
+        if(size) std::memcpy(bytes.data() + position, buffer, size);
+        position += size; return size;
+    }
+    tjs_uint64 TJS_INTF_METHOD GetSize() override { return bytes.size(); }
+};
 
 class Reader : public iTJSTextReadStream {
     Text data;
@@ -113,6 +137,47 @@ TEST_F(TJSRuntime, ArrayCreationNativeMethodsAndTextStreams) {
                  "var b = []; b.load('result.txt');"));
     EXPECT_EQ(2, Integer(TJS_W("b.count")));
     EXPECT_EQ(1, Integer(TJS_W("b[0] == 'ENGINE_CI_STARTED' && b[1] == 'PASS'")));
+}
+
+TEST_F(TJSRuntime, InheritanceAccountsForGlobalExpressionTemporary) {
+    Script(TJS_W("class SyntheticParent { var answer = 73; }"
+                 "class SyntheticChild extends global.SyntheticParent {}"
+                 "var syntheticInstance = new SyntheticChild();"));
+    EXPECT_EQ(73, Integer(TJS_W("syntheticInstance.answer")));
+}
+
+TEST_F(TJSRuntime, LegacyCompiledClassAllocatesItsInheritanceTemporary) {
+    using namespace TJS::ByteCode;
+    ByteStream stream;
+    runtime->CompileScript(TJS_W("class PackedChild extends global.PackedParent {}"
+                                "var packedInstance = new PackedChild();"), &stream, false, true);
+    ASSERT_TRUE(Validate(stream.bytes.data(), stream.bytes.size()));
+    auto read32 = [&](size_t at) {
+        return uint32_t(stream.bytes.at(at)) | uint32_t(stream.bytes.at(at + 1)) << 8 |
+               uint32_t(stream.bytes.at(at + 2)) << 16 | uint32_t(stream.bytes.at(at + 3)) << 24;
+    };
+    auto write32 = [&](size_t at, uint32_t value) {
+        for(unsigned i = 0; i < 4; ++i) stream.bytes.at(at + i) = uint8_t(value >> (i * 8));
+    };
+    size_t objects = 12 + read32(16);
+    size_t count = read32(objects + 12), at = objects + 16;
+    unsigned patched = 0;
+    for(size_t i = 0; i < count; ++i) {
+        size_t size = read32(at + 4), header = at + 8;
+        ASSERT_LE(header + size, stream.bytes.size());
+        if(read32(header + 8) == 6 && int32_t(read32(header + 44)) >= 0) {
+            EXPECT_GE(read32(header + 20), 2u); // corrected compiler declaration
+            write32(header + 20, 1); // reproduce the legacy compiler's metadata
+            ++patched;
+        }
+        at = header + size;
+    }
+    ASSERT_EQ(patched, 1u);
+    ASSERT_TRUE(Validate(stream.bytes.data(), stream.bytes.size()));
+    Script(TJS_W("class PackedParent { var answer = 91; }"));
+    stream.SetPosition(0);
+    ASSERT_TRUE(runtime->LoadByteCode(&stream));
+    EXPECT_EQ(91, Integer(TJS_W("packedInstance.answer")));
 }
 
 static const tjs_char TextRenderTestSource[] =

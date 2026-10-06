@@ -84,6 +84,12 @@ Do not simply update the digest to bypass an input mismatch.
 
 ## Compatibility limits
 
+- Legacy class bytecode that undercounts the `extends global.Base` temporary
+  receives a matching register-allocation correction in the validator and
+  loader. A sanitizer test compiles a synthetic class, reproduces the old frame
+  declaration, loads it and constructs an instance. New compilation records the
+  temporary correctly; other out-of-range registers remain rejected.
+
 - Packed-metadata fixtures exercise `Scripts.loadDataPack`, including binary
   octets, Unicode, endian handling and encrypted LZ4 containers. See `DATAPACK.md`.
 - Dialog fixtures check the desktop `WIN32Dialog.messageBox` button/result

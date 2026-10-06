@@ -21,7 +21,8 @@ class WIN32Dialog {
         var type = int flags & 15;
         if (type > 6) throw "WIN32Dialog: unsupported message box type";
         var selected = System.inform(message, caption, types[type]);
-        if (selected < 0 || selected >= values[type].count) return type == 4 ? IDNO : IDCANCEL;
+        if (selected < 0 || selected >= values[type].count)
+            return type == 4 ? WIN32Dialog.IDNO : WIN32Dialog.IDCANCEL;
         return values[type][selected];
     }
 }

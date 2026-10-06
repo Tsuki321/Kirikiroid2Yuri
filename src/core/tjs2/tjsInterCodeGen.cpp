@@ -3481,6 +3481,7 @@ void tTJSInterCodeContext::CreateExtendsExprCode(tTJSExprNode *node, bool hold)
 
 	tjs_int fr = FrameBase;
 	tjs_int resaddr = GenNodeCode(fr, node, TJS_RT_NEEDED, 0, tSubParam());
+	if(fr - 1 > MaxFrameCount) MaxFrameCount = fr - 1;
 
 	PutCode(VM_CHGTHIS, NODE_POS);
 	PutCode(TJS_TO_VM_REG_ADDR(resaddr), NODE_POS);

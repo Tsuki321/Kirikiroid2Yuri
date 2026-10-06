@@ -194,6 +194,7 @@ void tTJSByteCodeLoader::ReadObjects( tTJSScriptBlock* block, const tjs_uint8* b
 		offset += 4;
 		superClassGetter[o] = read4byte( &(buff[offset]) );
 		offset += 4;
+		maxFrameCount = ByteCode::ClassFrameCount(contextType, maxFrameCount, superClassGetter[o]);
 
 		int count = read4byte( &(buff[offset]) );
 		offset += 4;

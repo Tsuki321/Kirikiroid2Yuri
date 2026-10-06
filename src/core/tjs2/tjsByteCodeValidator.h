@@ -58,6 +58,13 @@ inline bool Reference(int32_t index, size_t count) {
     return index == -1 || (index >= 0 && static_cast<size_t>(index) < count);
 }
 
+// Older compilers missed the temporary for `extends global.Base`. Only the
+// inheritance class initializer is affected; the loader allocates the same
+// extra slot before the interpreter can execute the accepted register.
+inline int32_t ClassFrameCount(int32_t context, int32_t frames, int32_t superGetter) {
+    return context == 6 && superGetter >= 0 && frames == 1 ? 2 : frames;
+}
+
 inline void Instructions(Object &object) {
     const std::vector<int32_t> &code = object.code;
     const size_t total = code.size();
@@ -356,6 +363,7 @@ inline bool Validate(const uint8_t *bytes, size_t size) {
             info.superGetter = object.I32();
             Require(Reference(info.setter, objectCount) && Reference(info.getter, objectCount) &&
                     Reference(info.superGetter, objectCount));
+            info.maxRegister = ClassFrameCount(context, frames, info.superGetter);
             size_t debug = object.Count(8);
             object.Take(debug * 8);
             size_t instructions = object.Count(2);

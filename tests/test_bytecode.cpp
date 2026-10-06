@@ -20,9 +20,10 @@ void Chunk(std::vector<uint8_t> &out, uint32_t tag, const std::vector<uint8_t> &
 }
 std::vector<uint8_t> Program(const std::vector<int16_t> &code,
                              const std::vector<std::pair<uint16_t, uint16_t>> &constants = {},
-                             const std::vector<uint32_t> &entries = {}) {
+                             const std::vector<uint32_t> &entries = {},
+                             int32_t context = 0, int32_t frames = 4, int32_t superGetter = -1) {
     std::vector<uint8_t> data(7 * 4, 0), object, objects, file;
-    const int32_t metadata[] = {-1, -1, 0, 0, 2, 4, 0, 0, -1, -1, -1, -1};
+    const int32_t metadata[] = {-1, -1, context, 0, 2, frames, 0, 0, -1, -1, -1, superGetter};
     for (int32_t field : metadata)
         Put32(object, field);
     Put32(object, 0); // source positions
@@ -113,4 +114,12 @@ TEST(Bytecode, SuperclassGetterEntriesAllowUnreachablePadding) {
     EXPECT_FALSE(Valid(Program({VM_RET, VM_NOP}, {}, {1})));
     EXPECT_FALSE(Valid(Program({VM_RET, VM_NOP}, {}, {2})));
     EXPECT_FALSE(Valid(Program({VM_JMP, 3, VM_RET, VM_NOP})));
+}
+
+TEST(Bytecode, LegacyInheritanceTemporaryNeedsARealAllocatedSlot) {
+    EXPECT_TRUE(Valid(Program({VM_CP, 2, 1, VM_RET}, {}, {}, 6, 1, 0)));
+    EXPECT_FALSE(Valid(Program({VM_CP, 3, 1, VM_RET}, {}, {}, 6, 1, 0)));
+    EXPECT_FALSE(Valid(Program({VM_CP, 2, 1, VM_RET}, {}, {}, 0, 1, 0)));
+    EXPECT_FALSE(Valid(Program({VM_CP, 2, 1, VM_RET}, {}, {}, 6, 1, -1)));
+    EXPECT_FALSE(Valid(Program({VM_CP, 1, 0, VM_RET}, {}, {}, 6, 0, 0)));
 }
