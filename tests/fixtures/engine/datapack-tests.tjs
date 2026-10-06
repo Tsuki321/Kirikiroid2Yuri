@@ -4,7 +4,7 @@ var ciPackNames = ["plain", "big", "compressed", "empty-iv",
 for (var ciPackIndex = 0; ciPackIndex < ciPackNames.count; ++ciPackIndex) {
     var ciPack = Scripts.loadDataPack(ciStorage + "pack-" + ciPackNames[ciPackIndex] + ".pbd");
     ciCheck(ciPack.title == "Synthetic metadata", "DataPack dictionary title: " + ciPackNames[ciPackIndex]);
-    ciCheck(ciPack.unicode == "日本語😀", "DataPack UTF-16 and supplementary characters");
+    ciCheck(ciPack.unicode == "\x65e5\x672c\x8a9e\xd83d\xde00", "DataPack UTF-16 and supplementary characters");
     ciCheck(ciPack.items[0] === void && ciPack.items[1] === null, "DataPack distinguishes void and null");
     ciCheck(ciPack.items[2] == -7 && ciPack.items[3] == 1099511627776 && ciPack.items[4] == 3.25,
         "DataPack signed integers, 64-bit values and reals");
