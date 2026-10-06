@@ -3,6 +3,7 @@
 #include "cocos-ext.h"
 #include "tjsCommHead.h"
 #include "StorageIntf.h"
+#include "StorageImpl.h"
 #include "EventIntf.h"
 #include "SysInitImpl.h"
 #include "WindowImpl.h"
