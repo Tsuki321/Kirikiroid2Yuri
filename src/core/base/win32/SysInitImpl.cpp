@@ -1714,6 +1714,10 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got)
 	{
 		TVPProgramArgumentsInit = true;
 
+		// Platform launchers set options before the engine has a project/data
+		// path. Keep those overrides when rebuilding the configuration layers.
+		const std::vector<ttstr> launch_arguments = TVPProgramArguments;
+
 		// find options from self executable image
 		const int num_option_layers = 3;
 		std::vector<std::string> * options[num_option_layers];
@@ -1743,9 +1747,8 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got)
 //			options[2] = TVPGetConfigFileOptions(ApplicationSpecialPath::GetUserConfigFileName(config_datapath, ExePath()));
 
 			// push each options into option stock
-			// we need to clear TVPProgramArguments first because of the
-			// option priority order.
-			TVPProgramArguments.clear();
+			// Rebuild defaults after the launch overrides, which have priority.
+			TVPProgramArguments = launch_arguments;
 			PushAllCommandlineArguments();
 			PushConfigFileOptions(options[2]); // has more priority
 			PushConfigFileOptions(options[1]); // has more priority

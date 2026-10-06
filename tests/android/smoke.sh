@@ -39,7 +39,8 @@ while IFS=$'\t' read -r -u 3 name storage output; do
   executed=$((executed + 1))
   adb shell am force-stop com.yuri.kirikiri2
   adb shell rm -f "$output/result.txt"
-  if ! adb shell am start -W -n com.yuri.kirikiri2/.MainActivity --es startupPath "$storage"; then
+  if ! adb shell am start -W -n com.yuri.kirikiri2/.MainActivity --es startupPath "$storage" \
+      --esa args '-ci-launch=kept,-ci-zero=0,-ci-flag,-ci-empty=,-ci-equals=left=right,-ci-duplicate=old,-ci-duplicate=new'; then
     echo "Cannot start engine fixture: $name" >&2
     failures=$((failures + 1))
     continue

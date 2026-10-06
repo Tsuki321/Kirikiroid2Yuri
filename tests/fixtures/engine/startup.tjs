@@ -21,6 +21,14 @@ var ciLayer = void;
 ciMessages.add("ENGINE_CI_STARTED");
 ciMessages.save(ciOutput + "started.txt");
 try {
+    ciCheck(System.getArgument("-ci-launch") === "kept", "launch arguments survive engine initialization");
+    ciCheck(System.getArgument("-ci-zero") === "0" && System.getArgument("-ci-flag") === "yes"
+        && System.getArgument("-ci-empty") === "" && System.getArgument("-ci-equals") === "left=right",
+        "launch arguments preserve zero, flags, empty values, and equals signs");
+    ciCheck(System.getArgument("-ci-duplicate") === "new" && System.getArgument("-ci-missing") === void,
+        "launch argument replacement and missing values");
+    System.setArgument("-ci-launch", "changed");
+    ciCheck(System.getArgument("-ci-launch") === "changed", "script can update a launch argument");
     if (typeof global.ciColdCompiledStartup != "undefined")
         ciCheck(global.ciColdCompiledStartup === 1, "cold compiled startup preserves bootstrap globals");
     ciCheck("%d:%s".sprintf(42, "ok") == "42:ok", "formatted string arguments");
