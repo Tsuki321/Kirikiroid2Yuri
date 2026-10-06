@@ -69,6 +69,10 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     fi
   done
   adb exec-out screencap -p > "test-results/android/$name.png"
+  if adb shell cat "$output/progress.txt" > "test-results/android/$name-progress.raw" 2>/dev/null; then
+    python3 tests/android/decode_result.py "test-results/android/$name-progress.raw" \
+      > "test-results/android/$name-progress.txt"
+  fi
   if [ "$passed" != true ]; then
     echo "Engine fixture failed or timed out: $name" >&2
     failures=$((failures + 1))

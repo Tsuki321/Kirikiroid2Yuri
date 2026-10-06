@@ -102,7 +102,8 @@ try {
     ciReject("ripple", %[time:1000, maxdrift:128]);
     ciReject("rotateswap", %[time:-1]);
     ciReject("mosaic", %[]);
-    ciTimer = new Timer();
+    ciTimer = new Timer(ciWindow);
+    ciTimer.enabled = false;
     ciTimer.interval = 150;
     ciTimer.onTimer = ciStep;
     ciTimer.enabled = true;
