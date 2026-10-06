@@ -149,11 +149,12 @@ public class StorageAccessTest {
         String script = read(tests.getAssets().open("engine/startup.tjs"));
         String movieScript = read(tests.getAssets().open("engine/movie-startup.tjs"));
         String archiveScript = read(tests.getAssets().open("engine/archive-startup.tjs"));
+        String transitionScript = read(tests.getAssets().open("engine/transition-startup.tjs"));
         String program = read(tests.getAssets().open("engine/compiled-source.tjs"));
         File base = new File(context.getFilesDir(), "engine-ci");
         assertTrue(StorageAccess.mkdirs(context, base.getPath()));
         StringBuilder manifest = new StringBuilder();
-        String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents"};
+        String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents", "transitions"};
         for (String name : names) {
             String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
             String output = new File(base, name + "-result").getPath();
@@ -163,7 +164,8 @@ public class StorageAccessTest {
                 + "<Custom key=\"ci-preference\" value=\"saved value=1 &amp; 2\"/>"
                 + "<Custom key=\"ci-launch\" value=\"overridden preference\"/>"
                 + "</GlobalPreference>\n");
-            write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript : script)
+            write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript
+                : name.equals("transitions") ? transitionScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
             if (name.equals("local") || name.equals("documents")) {
                 write(storage + "/engine-body.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));

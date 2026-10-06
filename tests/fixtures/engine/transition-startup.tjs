@@ -1,0 +1,109 @@
+var ciOutput = "@@OUTPUT@@/";
+var ciMessages = ["ENGINE_CI_STARTED"];
+var ciTimer = void, ciFinished = false;
+var ciTick = 0, ciCompleted = false, ciIndex = 0, ciPhase = 0, ciWaits = 0;
+var ciWindow = void, ciPrimary = void, ciDest = void, ciSource = void, ciCapture = void;
+var ciEffects = ["mosaic", "wave", "ripple", "rotateswap"];
+
+function ciCheck(ok, message) {
+    if (!ok) throw "CI assertion: " + message;
+    ciMessages.add("PASS " + message);
+    ciMessages.save(ciOutput + "progress.txt");
+}
+function ciFinish(error) {
+    if (ciFinished) return;
+    ciFinished = true;
+    if (ciTimer !== void) ciTimer.enabled = false;
+    if (error !== void) {
+        try { if (error.message !== void) error = error.message; } catch (ignored) {}
+        ciMessages.add("ENGINE_CI_FAIL " + error);
+    } else ciMessages.add("ENGINE_CI_PASS");
+    ciMessages.save(ciOutput + "result.txt");
+}
+function ciClock() { return ciTick; }
+function ciReject(method, options) {
+    var rejected = false;
+    try { ciDest.startTransition(method, false, ciSource, options); }
+    catch (error) { rejected = true; }
+    ciCheck(rejected, method + " rejects invalid transition options");
+}
+class CITransitionLayer extends Layer {
+    function CITransitionLayer(w, p) { super.Layer(w, p); }
+    function onTransitionCompleted(dest, src) { ciCompleted = true; }
+}
+function ciStep() {
+    try {
+        if (ciIndex == 8) {
+            ciDest.visible = true; ciSource.visible = false;
+            ciCompleted = false;
+            ciDest.startTransition("mosaic", false, ciSource, %[time:1000]);
+            ciDest.stopTransition();
+            ciCheck(ciCompleted, "manual transition cancellation sends completion");
+            ciFinish(void);
+            return;
+        }
+        var name = ciEffects[ciIndex % 4];
+        var children = ciIndex >= 4;
+        if (ciPhase == 0) {
+            ciDest.setPos(0, 0); ciSource.setPos(0, 0);
+            ciDest.visible = true; ciSource.visible = false;
+            ciDest.type = ciSource.type = children ? ltAlpha : ltOpaque;
+            ciDest.fillRect(0, 0, 64, 48, 0xffff0000);
+            ciSource.fillRect(0, 0, 64, 48, 0xff00ff00);
+            ciCompleted = false; ciTick = 0; ciWaits = 0;
+            ciDest.startTransition(name, children, ciSource,
+                %[time:1000, tickcallback:ciClock, maxh:8, maxdrift:8, maxsize:8, rwidth:32, bgcolor:0xff0000ff]);
+            ciPhase = 1;
+        } else if (ciPhase == 1) {
+            ciTick = 500;
+            ciPhase = 2;
+        } else if (ciPhase == 2) {
+            ciCapture.piledCopy(0, 0, ciPrimary, 0, 0, 64, 48);
+            var changed = false;
+            for (var y = 4; y < 48; y += 8) for (var x = 4; x < 64; x += 8) {
+                var pixel = ciCapture.getMainPixel(x, y) & 0xffffff;
+                if (pixel != 0xff0000 && pixel != 0x00ff00) changed = true;
+            }
+            ciCheck(!ciCompleted && changed, name + " renders an intermediate frame, children=" + children);
+            ciTick = 1000;
+            ciPhase = 3;
+        } else if (ciCompleted) {
+            ciCapture.piledCopy(0, 0, ciPrimary, 0, 0, 64, 48);
+            ciCheck((ciCapture.getMainPixel(32, 24) & 0xffffff) == 0x00ff00,
+                name + " completes with the incoming image, children=" + children);
+            ++ciIndex; ciPhase = 0;
+        } else if (++ciWaits > 30) throw "transition completion timed out: " + name;
+    } catch (error) { ciFinish(error); }
+}
+
+ciMessages.save(ciOutput + "started.txt");
+try {
+    Plugins.link("extrans.dll");
+    Plugins.link("extrans.dll");
+    ciWindow = new Window();
+    ciWindow.innerWidth = 128; ciWindow.innerHeight = 96;
+    ciPrimary = new Layer(ciWindow, null);
+    ciPrimary.setSize(128, 96); ciPrimary.setImageSize(128, 96);
+    ciPrimary.fillRect(0, 0, 128, 96, 0xff000000);
+    ciPrimary.visible = true;
+    ciDest = new CITransitionLayer(ciWindow, ciPrimary);
+    ciSource = new Layer(ciWindow, ciPrimary);
+    ciCapture = new Layer(ciWindow, ciPrimary);
+    var layers = [ciDest, ciSource, ciCapture];
+    for (var i = 0; i < layers.count; ++i) {
+        layers[i].setSize(64, 48); layers[i].setImageSize(64, 48);
+        layers[i].type = ltOpaque;
+    }
+    ciDest.visible = true; ciSource.visible = ciCapture.visible = false;
+    ciWindow.visible = true;
+    ciReject("mosaic", %[time:1000, maxsize:0]);
+    ciReject("wave", %[time:1000, wavetype:3]);
+    ciReject("ripple", %[time:1000, rwidth:31]);
+    ciReject("ripple", %[time:1000, maxdrift:128]);
+    ciReject("rotateswap", %[time:-1]);
+    ciReject("mosaic", %[]);
+    ciTimer = new Timer();
+    ciTimer.interval = 150;
+    ciTimer.onTimer = ciStep;
+    ciTimer.enabled = true;
+} catch (error) { ciFinish(error); }

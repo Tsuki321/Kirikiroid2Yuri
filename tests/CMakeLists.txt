@@ -73,6 +73,11 @@ target_include_directories(test_image_effects PRIVATE ${SRC_ROOT}/plugins)
 target_link_libraries(test_image_effects PRIVATE gtest_main)
 gtest_discover_tests(test_image_effects)
 
+add_executable(test_extra_transitions test_extra_transitions.cpp)
+target_include_directories(test_extra_transitions PRIVATE ${SRC_ROOT}/plugins)
+target_link_libraries(test_extra_transitions PRIVATE gtest_main)
+gtest_discover_tests(test_extra_transitions)
+
 add_executable(test_psb test_psb.cpp)
 target_include_directories(test_psb PRIVATE ${SRC_ROOT}/core/base)
 target_compile_definitions(test_psb PRIVATE PSB_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures/psb")
