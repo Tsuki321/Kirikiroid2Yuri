@@ -13,7 +13,7 @@ for (var ciPackIndex = 0; ciPackIndex < ciPackNames.count; ++ciPackIndex) {
     ciCheck(ciPack.longtext.length == 6600 && ciPack.rows[79][1] == -79,
         "DataPack reads across compression frames and cipher batches");
 }
-var ciOuterPack = Scripts.loadDataPack(ciStorage + "pack-outer.pbd", %[outeriv:"外部-IV"]);
+var ciOuterPack = Scripts.loadDataPack(ciStorage + "pack-outer.pbd", %[outeriv:"\x5916\x90e8-IV"]);
 ciCheck(ciOuterPack.rows.count == 80, "DataPack external UTF-8 IV option");
 var ciPackRejected = false;
 try { Scripts.loadDataPack(ciStorage + "pack-outer.pbd"); } catch (error) { ciPackRejected = true; }
