@@ -18,7 +18,11 @@ def adb(*args, check=True):
 
 def stage_text(output):
     result = adb("exec-out", "cat", output + "/dialog-stage.txt", check=False)
-    return result.stdout.decode("utf-8-sig").strip() if result.returncode == 0 else ""
+    if result.returncode:
+        return ""
+    data = result.stdout
+    encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+    return data.decode(encoding).strip()
 
 
 def drive(name, output):
