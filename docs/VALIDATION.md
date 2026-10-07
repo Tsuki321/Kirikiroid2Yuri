@@ -29,9 +29,9 @@ Both debug and optimized/minified release builds are exercised. The images run
 on x86-64 hosts and execute the ARM64 APK through Android's native bridge; this
 does not replace testing on physical ARM64 devices and their GPU drivers.
 
-Each configuration runs fourteen engine cases: local and document-tree storage,
+Each configuration runs sixteen engine cases: local and document-tree storage,
 their cold launches from compiled `startup.tjs`, two movie cases, two archive
-cases, four transition cases and two audio-filter cases. Transition cases run
+cases, four transition cases, two audio-filter cases and two modal-dialog cases. Transition cases run
 with both software and OpenGL rendering; the harness checks the selected renderer
 in the process log. Compiled startup must preserve its bootstrap globals before entering the
 synthetic framework. The storage cases cover `fstat` directory listings, copying,
@@ -59,6 +59,13 @@ compare the visualization samples from one -12 dB gain filter and two serial
 -6 dB filters, and repeat after stop/open/play. This checks that script filter
 objects reach the engine's decoder pipeline. Pure DSP tests check the individual
 algorithms independently of Android playback scheduling.
+
+The modal-dialog driver inspects the real Android UI and answers eight successive
+dialogs. Before every tap it confirms the script is still waiting at that request.
+This checks fresh Yes/No and button-index results, accepted and empty input,
+cancellation, and a message after an input dialog through both storage backends.
+Each Java dialog owns its editor and callbacks; native results are reset before
+dispatch and synchronized with the UI response.
 
 Tests use synthetic data and a test-only document provider in a separate APK.
 The provider grants a subtree from its own UID; the application then uses normal

@@ -32,7 +32,7 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
 failures=0
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -eq 14
+test "$expected" -eq 16
 # adb shell reads stdin. Keep the manifest on another descriptor so starting
 # the first activity cannot consume the remaining fixture rows.
 while IFS=$'\t' read -r -u 3 name storage output; do
@@ -48,6 +48,13 @@ while IFS=$'\t' read -r -u 3 name storage output; do
   pid="$(adb shell pidof com.yuri.kirikiri2 | tr -d '\r' || true)"
   if [[ "$pid" =~ ^[0-9]+$ ]]; then
     adb exec-out cat "/proc/$pid/maps" > "test-results/android/$name-maps.txt" 2>/dev/null || true
+  fi
+  if [[ "$name" == dialogs-* ]] && ! python3 tests/android/dialogs.py "$name" "$output"; then
+    adb exec-out screencap -p > "test-results/android/$name.png"
+    adb logcat -d > "test-results/android/$name-logcat.txt"
+    echo "Dialog driver failed: $name" >&2
+    failures=$((failures + 1))
+    continue
   fi
   passed=false
   for attempt in $(seq 1 60); do

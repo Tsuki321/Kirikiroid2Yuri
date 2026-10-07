@@ -383,16 +383,12 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 	
 	static class DialogMessage
 	{
-		public String Title;
-		public String Text;
-		public String[] Buttons;
+		public final String Title;
+		public final String Text;
+		public final String[] Buttons;
 		public EditText TextEditor = null;
 
-		public DialogMessage()
-		{
-		}
-		
-		public void Init(final String title, final String text, final String[] buttons)
+		public DialogMessage(final String title, final String text, final String[] buttons)
 		{
 			this.Title = title;
 			this.Text = text;
@@ -464,7 +460,6 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
             imm.showSoftInput(TextEditor, 0);
 		}
 	}
-	static DialogMessage mDialogMessage = new DialogMessage();
 
     protected static View mTextEdit = null;
     SharedPreferences Sp;
@@ -481,21 +476,21 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 	}
 	
 	static public void ShowMessageBox(final String title, final String text, final String[] Buttons) {
-		mDialogMessage.Init(title, text, Buttons);
+		final DialogMessage message = new DialogMessage(title, text, Buttons);
 		msgHandler.post(new Runnable() {
 			@Override
 			public void run() {
-				mDialogMessage.ShowMessageBox();
+				message.ShowMessageBox();
 			}
 		});
 	}
 	
 	static public void ShowInputBox(final String title, final String prompt, final String text, final String[] Buttons) {
-		mDialogMessage.Init(title, prompt, Buttons);
+		final DialogMessage message = new DialogMessage(title, prompt, Buttons);
 		msgHandler.post(new Runnable() {
 			@Override
 			public void run() {
-				mDialogMessage.ShowInputBox(text);
+				message.ShowInputBox(text);
 			}
 		});
 	}

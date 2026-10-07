@@ -455,6 +455,12 @@ int TVPShowSimpleMessageBox(const char *pszText, const char *pszTitle, unsigned 
 			methodInfo.env->DeleteLocalRef(jstrBtn);
 		}
 
+		{
+			std::lock_guard<std::mutex> lk(MessageBoxLock);
+			// Every dialog must wait for its own response, including an error
+			// dialog shown immediately after a script confirmation.
+			MsgBoxRet = -2;
+		}
 		methodInfo.env->CallStaticVoidMethod(methodInfo.classID, methodInfo.methodID, jstrTitle, jstrText, btns);
 
 		methodInfo.env->DeleteLocalRef(jstrTitle);
@@ -466,7 +472,9 @@ int TVPShowSimpleMessageBox(const char *pszText, const char *pszTitle, unsigned 
 		while (MsgBoxRet == -2) {
 			MessageBoxCond.wait_for(lk, std::chrono::milliseconds(200));
 			if (MsgBoxRet == -2) {
+				lk.unlock();
 				TVPForceSwapBuffer(); // update opengl events
+				lk.lock();
 			}
 		}
 		return MsgBoxRet;
@@ -501,7 +509,11 @@ int TVPShowSimpleInputBox(ttstr &text, const ttstr &caption, const ttstr &prompt
 			methodInfo.env->DeleteLocalRef(jstrBtn);
 		}
 
-		MsgBoxRet = -2;
+		{
+			std::lock_guard<std::mutex> lk(MessageBoxLock);
+			MsgBoxRet = -2;
+			MessageBoxRetText = text.AsStdString();
+		}
 		methodInfo.env->CallStaticVoidMethod(methodInfo.classID, methodInfo.methodID, jstrTitle, jstrPrompt, jstrText, btns);
 
 		methodInfo.env->DeleteLocalRef(jstrTitle);
@@ -514,7 +526,9 @@ int TVPShowSimpleInputBox(ttstr &text, const ttstr &caption, const ttstr &prompt
 		while (MsgBoxRet == -2) {
 			MessageBoxCond.wait_for(lk, std::chrono::milliseconds(200));
 			if (MsgBoxRet == -2) {
+				lk.unlock();
 				TVPForceSwapBuffer(); // update opengl events
+				lk.lock();
 			}
 		}
 		text = MessageBoxRetText;

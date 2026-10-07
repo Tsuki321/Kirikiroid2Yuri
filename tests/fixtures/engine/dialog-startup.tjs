@@ -1,0 +1,40 @@
+var ciOutput = "@@OUTPUT@@/";
+var ciMessages = ["ENGINE_CI_STARTED"];
+var ciWindow = new Window();
+ciWindow.setSize(320, 240);
+ciWindow.visible = true;
+function ciCheck(ok, message) {
+    if (!ok) throw "CI assertion: " + message;
+    ciMessages.add("PASS " + message);
+    ciMessages.save(ciOutput + "progress.txt", "utf-8");
+}
+function ciStage(number) {
+    var stage = ["" + number];
+    stage.save(ciOutput + "dialog-stage.txt", "utf-8");
+    return "CI_DIALOG_" + number;
+}
+ciMessages.save(ciOutput + "started.txt");
+try {
+    ciCheck(System.inform("Select Continue.", ciStage(1), ["Continue"]) == 0,
+        "first dialog returns its selected button");
+    ciCheck(!System.confirm("Select No.", ciStage(2)),
+        "No after an OK response remains No");
+    ciCheck(System.inform("Select Third.", ciStage(3), ["First", "Second", "Third"]) == 2,
+        "a later message waits for its own third-button response");
+    ciCheck(System.confirm("Select Yes.", ciStage(4)),
+        "Yes after a nonzero response remains Yes");
+    ciCheck(System.inputString(ciStage(5), "Accept the initial value.", "first") == "first",
+        "input dialog returns its accepted text");
+    ciCheck(System.inputString(ciStage(6), "Accept the empty value.", "") == "",
+        "empty accepted input replaces previous text");
+    ciCheck(System.inputString(ciStage(7), "Select Cancel.", "cancelled") === void,
+        "canceled input returns void");
+    ciCheck(System.inform("Select Done.", ciStage(8), ["Done"]) == 0,
+        "message after canceled input waits for a fresh response");
+    ciMessages.add("ENGINE_CI_PASS");
+} catch (error) {
+    var message = "" + error;
+    try { if (error.message !== void) message = "" + error.message; } catch (ignored) {}
+    ciMessages.add("ENGINE_CI_FAIL " + message);
+}
+ciMessages.save(ciOutput + "result.txt", "utf-8");

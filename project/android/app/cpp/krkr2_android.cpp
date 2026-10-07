@@ -71,14 +71,19 @@ extern "C" {
 	}
 	
 	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_onMessageBoxOK(JNIEnv* env, jclass cls, jint nButton) {
-		MsgBoxRet = nButton;
+		{
+			std::lock_guard<std::mutex> lk(MessageBoxLock);
+			MsgBoxRet = nButton;
+		}
 		MessageBoxCond.notify_one();
 	}
     
 	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_onMessageBoxText(JNIEnv* env, jclass cls, jstring text) {
 		const char* pszText = env->GetStringUTFChars(text, NULL);
-		if (pszText && *pszText) {
-            MessageBoxRetText = pszText;
+		if (!pszText) return;
+		{
+			std::lock_guard<std::mutex> lk(MessageBoxLock);
+			MessageBoxRetText = pszText;
 		}
 		env->ReleaseStringUTFChars(text, pszText);
 	}

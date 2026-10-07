@@ -151,13 +151,14 @@ public class StorageAccessTest {
         String archiveScript = read(tests.getAssets().open("engine/archive-startup.tjs"));
         String transitionScript = read(tests.getAssets().open("engine/transition-startup.tjs"));
         String audioScript = read(tests.getAssets().open("engine/audio-startup.tjs"));
+        String dialogScript = read(tests.getAssets().open("engine/dialog-startup.tjs"));
         String program = read(tests.getAssets().open("engine/compiled-source.tjs"));
         File base = new File(context.getFilesDir(), "engine-ci");
         assertTrue(StorageAccess.mkdirs(context, base.getPath()));
         StringBuilder manifest = new StringBuilder();
         String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents",
                 "transitions", "transitions-documents", "transitions-opengl", "transitions-opengl-documents",
-                "audio-local", "audio-documents"};
+                "audio-local", "audio-documents", "dialogs-local", "dialogs-documents"};
         for (String name : names) {
             String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
             String output = new File(base, name + "-result").getPath();
@@ -169,7 +170,8 @@ public class StorageAccessTest {
                 + "<Custom key=\"ci-launch\" value=\"overridden preference\"/>"
                 + "</GlobalPreference>\n");
             write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript
-                : name.startsWith("transitions") ? transitionScript : name.startsWith("audio-") ? audioScript : script)
+                : name.startsWith("transitions") ? transitionScript : name.startsWith("audio-") ? audioScript
+                : name.startsWith("dialogs-") ? dialogScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
             if (name.equals("local") || name.equals("documents")) {
                 write(storage + "/engine-body.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
