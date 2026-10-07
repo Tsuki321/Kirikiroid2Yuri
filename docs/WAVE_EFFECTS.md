@@ -68,7 +68,7 @@ family/response/state combinations throw instead of returning a dummy filter.
 The order limit is 50 where the underlying design has an order parameter.
 
 `setParams` uses the chosen design's positional parameters and returns the
-number of supplied slots consumed. Omitted or `void` slots return to design
+number of supplied slots, capped at eight. Omitted or `void` slots return to design
 defaults. Slot zero is the design sample rate: omitting it tracks the source
 rate, while an explicit value stays fixed. No resampling is performed.
 

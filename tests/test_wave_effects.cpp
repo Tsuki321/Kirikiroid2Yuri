@@ -169,18 +169,29 @@ TEST(WaveEffects, EqualizerGainIsLinearAndAffectsTheSelectedBand) {
 }
 
 TEST(WaveEffects, EqualizerResetAndChannelsAreIndependent) {
-    EqualizerDSP eq;
-    eq.SetGain(5, 2);
-    eq.Prepare(44100, 2);
-    std::vector<float> values(4096, 0);
-    values[0] = 0.5f;
+    EqualizerDSP eq, quiet;
+    for (auto *filter : {&eq, &quiet}) {
+        filter->SetGain(5, 2);
+        filter->Prepare(44100, 2);
+    }
+    // DSPFilters injects a tiny alternating anti-denormal signal even on a
+    // silent channel. Compare independent instances at the same sample count.
+    // An odd count also exercises its retained phase across reset.
+    std::vector<float> values(513 * 2, 0), silence(values.size(), 0);
+    for (std::size_t i = 0; i < values.size(); i += 2) values[i] = 0.5f;
     eq.Process(values.data(), values.size() / 2, 2);
+    quiet.Process(silence.data(), silence.size() / 2, 2);
     for (std::size_t i = 1; i < values.size(); i += 2)
-        EXPECT_NEAR(0, values[i], 1.0e-12);
+        ASSERT_FLOAT_EQ(silence[i], values[i]) << "right channel sample " << i / 2;
+    // The driven channel still has history when reset occurs. It must then
+    // match the silent instance, including the library's background signal.
     eq.Reset();
+    quiet.Reset();
     std::fill(values.begin(), values.end(), 0);
+    std::fill(silence.begin(), silence.end(), 0);
     eq.Process(values.data(), values.size() / 2, 2);
-    EXPECT_LT(Energy(values), 1.0e-20);
+    quiet.Process(silence.data(), silence.size() / 2, 2);
+    EXPECT_EQ(silence, values);
 }
 
 TEST(WaveEffects, FreeVerbHasDryAndWetImpulseResponses) {
@@ -233,16 +244,19 @@ TEST(TypicalWaveDSP, OriginalDesignFamiliesProcessPCM) {
     for (const char *family : {"RBJ", "Butterworth", "ChebyshevI", "ChebyshevII",
                               "Bessel", "Elliptic", "Legendre"}) {
         SCOPED_TRACE(family);
-        TypicalDSP dsp("LowPass", family);
+        TypicalDSP dsp("LowPass", family), quiet("LowPass", family);
         dsp.Prepare(44100, 2);
-        std::vector<float> values(1024, 0);
+        quiet.Prepare(44100, 2);
+        std::vector<float> values(1024, 0), silence(values.size(), 0);
         values[0] = 1;
         dsp.Process(values.data(), values.size() / 2, 2);
+        quiet.Process(silence.data(), silence.size() / 2, 2);
         EXPECT_GT(Energy(values), 1.0e-8);
         EXPECT_LT(std::abs(values[0]), 0.9f);
         for (std::size_t i = 0; i < values.size(); ++i) {
             ASSERT_TRUE(std::isfinite(values[i])) << i;
-            if (i % 2) EXPECT_NEAR(0, values[i], 1.0e-9);
+            // Isolate leakage from DSPFilters' intentional anti-denormal input.
+            if (i % 2) ASSERT_FLOAT_EQ(silence[i], values[i]) << i;
         }
     }
 }
