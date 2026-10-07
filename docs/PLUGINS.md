@@ -23,6 +23,13 @@ registration objects, including modules that are only referenced by script names
 See [audio effect APIs and limits](WAVE_EFFECTS.md) for constructor units,
 supported DSP combinations and filter ownership behavior.
 
+The native `KAGParser` accepts the `emb` tag's `escape` option from
+[KAGParserEx](https://github.com/wamsoft/KAGParserEx/blob/61d5f1e65f500b5aef5a621333f86f3457939b31/readme.txt#L73-L95).
+`escape=false` lets an expression insert bracketed scenario commands, including
+macro definitions and calls. Omitted or void values keep the original escaped
+text behavior; generated `@` commands remain text. Other KAGParserEx extensions
+still require a separate implementation.
+
 Transition sources are snapshotted through the renderer's RGBA texture API before
 CPU effect rendering. GPU writes invalidate cached CPU pixels, so a subsequent
 effect or screenshot reads the current frame. This path prioritizes compatible

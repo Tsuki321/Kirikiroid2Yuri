@@ -1,0 +1,90 @@
+// Original synthetic scenarios for emb and KAGParserEx's optional tag expansion.
+class CiEmbParser extends KAGParser {
+    var source, embedding, escapeValue, helperSource;
+
+    function CiEmbParser(scenario, replacement, flag, helper) {
+        super.KAGParser();
+        this.source = scenario;
+        this.embedding = replacement;
+        this.escapeValue = flag;
+        this.helperSource = helper;
+        this.ignoreCR = true;
+        this.debugLevel = tkdlNone;
+    }
+
+    function onScenarioLoad(storage) {
+        return storage === "helper.ks" ? this.helperSource : this.source;
+    }
+}
+
+function ciCollectEmb(scenario, replacement, flag, helper) {
+    var parser = new CiEmbParser(scenario, replacement, flag, helper);
+    var text = "", markers = [], depths = [], ended = false;
+    try {
+        parser.loadScenario("emb-fixture.ks");
+        for (var count = 0; count < 512; ++count) {
+            var tag = parser.getNextTag();
+            if (tag === void) { ended = true; break; }
+            if (tag.tagname === "ch") text += tag.text;
+            else if (tag.tagname === "ci") {
+                markers.add(tag.value);
+                depths.add(parser.callStackDepth);
+            } else if (tag.tagname !== "r") {
+                throw "unexpected synthetic KAG tag: " + tag.tagname;
+            }
+        }
+        if (!ended) throw "synthetic KAG scenario exceeded 512 tags";
+        var result = %["text" => text, "markers" => markers, "depths" => depths,
+            "endDepth" => parser.callStackDepth];
+        invalidate parser;
+        return result;
+    } catch (error) {
+        invalidate parser;
+        throw error;
+    }
+}
+
+var ciEmbPayload = "[[literal][ci value=expanded]";
+var ciEmbEscapedModes = ["", " escape=true", " escape=1", " escape=&true", " escape=&void"];
+for (var ciEmbMode = 0; ciEmbMode < ciEmbEscapedModes.count; ++ciEmbMode) {
+    var ciEmbResult = ciCollectEmb("left[emb" + ciEmbEscapedModes[ciEmbMode]
+        + " exp=embedding]right", ciEmbPayload);
+    ciCheck(ciEmbResult.text === "left" + ciEmbPayload + "right"
+        && ciEmbResult.markers.count === 0,
+        "KAG emb preserves literal brackets with default/true escaping " + ciEmbMode);
+}
+
+var ciEmbRawModes = ["false", "0", "&false", "&escapeValue", "&0.5"];
+for (var ciEmbMode = 0; ciEmbMode < ciEmbRawModes.count; ++ciEmbMode) {
+    var ciEmbResult = ciCollectEmb("left[emb escape=" + ciEmbRawModes[ciEmbMode]
+        + " exp=embedding]right", ciEmbPayload, false);
+    ciCheck(ciEmbResult.text === "left[literal]right"
+        && ciEmbResult.markers.join(",") === "expanded",
+        "KAG emb parses generated tags with false escaping " + ciEmbMode);
+}
+
+var ciEmbResult = ciCollectEmb("[emb escape=&escapeValue exp=embedding]", ciEmbPayload, true);
+ciCheck(ciEmbResult.text === ciEmbPayload && ciEmbResult.markers.count === 0,
+    "KAG emb escape expression resolves against the parser owner");
+
+var ciEmbResult = ciCollectEmb("[emb escape=false exp=embedding]", "@ci value=literal");
+ciCheck(ciEmbResult.text === "@ci value=literal" && ciEmbResult.markers.count === 0,
+    "KAG emb raw expansion leaves generated line commands as text");
+
+var ciEmbResult = ciCollectEmb("left[emb escape=false exp=embedding]right[ci value=tail]", "");
+ciCheck(ciEmbResult.text === "leftright" && ciEmbResult.markers.join(",") === "tail",
+    "KAG emb empty expansion preserves following text and tags");
+
+var ciEmbResult = ciCollectEmb("[macro name=emit][emb escape=%mode exp=embedding]"
+    + "[endmacro][emit mode=false]", "[ci value=argument]");
+ciCheck(ciEmbResult.text === "" && ciEmbResult.markers.join(",") === "argument",
+    "KAG emb accepts escape from macro arguments");
+
+var ciEmbResult = ciCollectEmb("*start\nleft[emb escape=false exp=embedding]right[ci value=after]\n",
+    "[call storage=helper.ks target=*begin]", false,
+    "*begin\n[macro name=emit][ci value=%value][endmacro]"
+    + "[emit value=macro][ci value=callee][return]\n");
+ciCheck(ciEmbResult.text === "leftright"
+    && ciEmbResult.markers.join(",") === "macro,callee,after"
+    && ciEmbResult.depths.join(",") === "1,1,0" && ciEmbResult.endDepth === 0,
+    "KAG emb generated call runs macros and returns to the original suffix");

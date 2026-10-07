@@ -146,7 +146,8 @@ TEST_F(TJSRuntime, EngineFixtureScriptsCompileToValidBytecode) {
     // the emulator jobs. API and output checks still run in the actual engine.
     const char *names[] = {"startup.tjs", "compiled-source.tjs", "movie-startup.tjs",
         "archive-startup.tjs", "transition-startup.tjs", "psb-tests.tjs",
-        "datapack-tests.tjs", "plugin-tests.tjs", "audio-startup.tjs", "dialog-startup.tjs"};
+        "datapack-tests.tjs", "plugin-tests.tjs", "kag-parser-tests.tjs",
+        "audio-startup.tjs", "dialog-startup.tjs"};
     for (const char *name : names) {
         SCOPED_TRACE(name);
         std::ifstream input(std::string(ENGINE_FIXTURE_DIR) + "/" + name, std::ios::binary);

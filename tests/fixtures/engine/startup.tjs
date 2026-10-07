@@ -74,6 +74,7 @@ try {
     ciThrows(function() { Plugins.unlink("ci-missing-plugin.dll"); }, "unloading an unknown plugin rejected");
     ciCheck(Plugins.getList().count == ciPluginCount, "failed plugin links do not change the loaded list");
     Scripts.execStorage(ciStorage + "plugin-tests.tjs");
+    Scripts.execStorage(ciStorage + "kag-parser-tests.tjs");
     global.ciCompiled = 0;
     Scripts.compileStorage(ciStorage + "compiled-source.tjs", ciStorage + "compiled.tjb");
     Scripts.execStorage(ciStorage + "compiled.tjb");
