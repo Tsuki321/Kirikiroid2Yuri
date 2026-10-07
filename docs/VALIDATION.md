@@ -15,11 +15,12 @@ these changes run in GitHub Actions.
 |---|---|
 | GCC and Clang host tests | MD5, fuzzy matching, file append/update/truncate, atomic replacement, extraction path boundaries, symlink/hardlink rejection, worker startup/join, bytecode structure and operands, XP3 index bounds and segment validation, alpha-blending endpoints |
 | Address/undefined-behavior sanitizers | Host tests, including 20,000 deterministic bytecode mutations and truncated input prefixes; sanitizer findings fail the test |
-| Optimized TJS runtime | Production interpreter compiled with `-O2`: empty-string conversion and serialization, closures across array growth, inheritance, exception-stack recovery, garbage collection with nested active frames and reentry, aligned hash storage, and bounded string formatting |
+| Optimized TJS runtime | Production interpreter compiled with `-O2`: empty-string conversion and serialization, closures across array growth, inheritance, exception-stack recovery, garbage collection with nested active frames and reentry, aligned hash storage, bounded string formatting, and compilation/bytecode validation of every engine fixture |
 | Offline package inspector | Bounded XP3 metadata inspection, protected/obscured entry reporting, and checks that archive member payloads are never read |
 | Android instrumentation | Existing-directory creation, write failures, local replacement, real persisted document grants, Unicode/case handling, read/write/list/rename/delete, subtree and startup-permission boundaries |
 | Native TJS fixtures | Text/binary/compressed dictionary and empty-string serialization, literal-only loading, bytecode compilation/loading, malformed bytecode, missing/repeated plugins, actual text/shape/image pixels, alpha endpoints, transforms, window controls, valid and malformed XP3 archives through local and document-tree storage |
 | Media fixtures | Generated PCM audio and MPEG-4 video, metadata, playback status/rate, pause/resume and stop frames |
+| Plugin regressions | Seven extrans and twelve extNagano pixel algorithms, option bounds, rule images, morph meshes, locale naming and DSP filter responses under host sanitizers; actual TJS registration, transition completion and filtered PCM playback on Android |
 | Android lifecycle | Backgrounding and returning to the existing activity |
 | APK verification | 16 KB ELF load/RELRO alignment and uncompressed library packing |
 
@@ -28,9 +29,11 @@ Both debug and optimized/minified release builds are exercised. The images run
 on x86-64 hosts and execute the ARM64 APK through Android's native bridge; this
 does not replace testing on physical ARM64 devices and their GPU drivers.
 
-Each configuration runs eight engine cases: local and document-tree storage,
-their cold launches from compiled `startup.tjs`, two movie cases, and two archive
-cases. Compiled startup must preserve its bootstrap globals before entering the
+Each configuration runs fourteen engine cases: local and document-tree storage,
+their cold launches from compiled `startup.tjs`, two movie cases, two archive
+cases, four transition cases and two audio-filter cases. Transition cases run
+with both software and OpenGL rendering; the harness checks the selected renderer
+in the process log. Compiled startup must preserve its bootstrap globals before entering the
 synthetic framework. The storage cases cover `fstat` directory listings, copying,
 timestamps, renaming and removal; removal must reject the wrong entry type and
 preserve nonempty directories. The drawing cases exercise `layerExImage` clipping,
@@ -46,6 +49,16 @@ production `TextRenderBase` script into the real TJS interpreter. Its regression
 cover font callbacks, wrapping, formatting, ruby, links, Unicode clusters,
 vertical layout, language options, character timing, click-wait records and
 malformed/recursive controls.
+
+The transition fixtures call the native `Layer.beginTransition` API, capture
+intermediate and final pixels with and without child layers, and verify option
+errors explicitly. Rule images come from synthetic BMP data through both storage
+backends. Repeated GPU writes and reads exercise cached-pixel invalidation.
+Audio fixtures decode a constant PCM WAV through real `WaveSoundBuffer` objects,
+compare the visualization samples from one -12 dB gain filter and two serial
+-6 dB filters, and repeat after stop/open/play. This checks that script filter
+objects reach the engine's decoder pipeline. Pure DSP tests check the individual
+algorithms independently of Android playback scheduling.
 
 Tests use synthetic data and a test-only document provider in a separate APK.
 The provider grants a subtree from its own UID; the application then uses normal

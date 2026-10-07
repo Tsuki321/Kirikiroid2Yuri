@@ -6,7 +6,8 @@ using namespace ExtraTransitions;
 
 namespace {
 constexpr int Width = 64, Height = 48;
-const Effect Effects[] = { Effect::Mosaic, Effect::Wave, Effect::Ripple, Effect::RotateSwap };
+const Effect Effects[] = { Effect::Mosaic, Effect::Wave, Effect::Ripple, Effect::RotateSwap,
+                          Effect::Turn, Effect::RotateZoom, Effect::RotateVanish };
 Options options(Effect effect) {
     Options o;
     o.effect = effect; o.time = 1000;
@@ -162,6 +163,89 @@ TEST(ExtraTransitions, AlphaInterpolationDoesNotLeakTransparentColors) {
     EXPECT_EQ(blend(opaqueRed, transparentBlue, 255, Alpha::Straight), transparentBlue);
 }
 
+TEST(ExtraTransitions, TurnMatchesOriginalTableSamplesAndClipsPartialTiles) {
+    const auto a = picture(false), b = picture(true);
+    auto o = options(Effect::Turn); o.bgcolor = 0xff234567;
+    Transition t(o, Width, Height);
+    // Golden samples from W.Dee's turntrans_table.cpp, phases 8, 16 and 32.
+    // The 48-pixel image height also exercises the clipped final tile.
+    auto out = render(t, 148, a, b);
+    EXPECT_EQ(out[24 * Width], 0xffbfbfc5u); // phase 8's 192/256 gloss
+    out = render(t, 265, a, b);
+    EXPECT_EQ(out[24 * Width + 4], 0xff00011bu);
+    EXPECT_EQ(out[24 * Width + 2], o.bgcolor);
+    out = render(t, 500, a, b);
+    EXPECT_EQ(out[24 * Width + 23], 0xff80002bu);
+    EXPECT_EQ(out[24 * Width + 24], 0xff803600u);
+    EXPECT_EQ(out[24 * Width + 25], o.bgcolor);
+    EXPECT_EQ(out[47 * Width + 46], o.bgcolor); // source y=63 exceeds this image
+}
+
+TEST(ExtraTransitions, TurnStaggersTilesFromBottomLeftToTopRight) {
+    constexpr int w = 192, h = 128;
+    const std::vector<uint32_t> a(w * h, 0xffff0000), b(w * h, 0xff00ff00);
+    std::vector<uint32_t> out(w * h);
+    auto o = options(Effect::Turn); o.bgcolor = 0xff0000ff;
+    Transition t(o, w, h);
+    t.setTime(500);
+    t.render(Image(a.data(), w * 4), Image(b.data(), w * 4), out.data(), 0, 0, w, h);
+    EXPECT_EQ(out[96 * w + 32], b.front());
+    EXPECT_EQ(out[32 * w + 160], a.front());
+    EXPECT_EQ(out[90 * w + 4], o.bgcolor);
+}
+
+TEST(ExtraTransitions, TurnGlossPreservesStraightAndAdditiveAlpha) {
+    for (Alpha alpha : { Alpha::Straight, Alpha::Additive }) {
+        const uint32_t color = alpha == Alpha::Straight ? 0x800000ffu : 0x80000080u;
+        const std::vector<uint32_t> a(Width * Height, color), b(Width * Height, 0);
+        auto o = options(Effect::Turn); o.alpha = alpha;
+        Transition t(o, Width, Height);
+        const uint32_t pixel = render(t, 148, a, b)[24 * Width];
+        EXPECT_EQ(pixel >> 24, 128u);
+        EXPECT_EQ(pixel & 255u, color & 255u);
+        EXPECT_EQ((pixel >> 8) & 255u, alpha == Alpha::Straight ? 191u : 96u);
+    }
+}
+
+TEST(ExtraTransitions, RotateZoomAndVanishUseOppositeForegroundImages) {
+    const auto a = picture(false), b = picture(true);
+    auto o = options(Effect::RotateZoom); o.factor = 0; o.twist = 0;
+    Transition zoom(o, Width, Height);
+    auto out = render(zoom, 500, a, b);
+    EXPECT_EQ(out.front(), a.front());
+    EXPECT_EQ(out[12 * Width + 16], b.front());
+    EXPECT_EQ(out[30 * Width + 40], b[36 * Width + 48]);
+    EXPECT_NE(out, a); EXPECT_NE(out, b);
+
+    o.effect = Effect::RotateVanish;
+    Transition vanish(o, Width, Height);
+    out = render(vanish, 500, a, b);
+    EXPECT_EQ(out.front(), b.front());
+    EXPECT_EQ(out[12 * Width + 16], a.front());
+    EXPECT_EQ(out[30 * Width + 40], a[36 * Width + 48]);
+    EXPECT_NE(out, a); EXPECT_NE(out, b);
+}
+
+TEST(ExtraTransitions, RotateZoomHonorsCenterAccelerationAndTwist) {
+    const auto a = picture(false), b = picture(true);
+    auto o = options(Effect::RotateZoom); o.factor = 0; o.twist = 0;
+    o.accel = -2;
+    Transition decelerating(o, Width, Height);
+    EXPECT_EQ(render(decelerating, 500, a, b)[6 * Width + 8], b.front());
+    o.accel = 2;
+    Transition accelerating(o, Width, Height);
+    EXPECT_EQ(render(accelerating, 500, a, b)[12 * Width + 16], a[12 * Width + 16]);
+    o.accel = 0; o.centerx = 0; o.centery = 0;
+    Transition corner(o, Width, Height);
+    EXPECT_EQ(render(corner, 500, a, b)[24 * Width + 32], b[12 * Width + 16]);
+    o.centerx = Width / 2; o.centery = Height / 2; o.twist = 0.5;
+    Transition rotation(o, Width, Height);
+    EXPECT_EQ(render(rotation, 500, a, b)[24 * Width + 40], b[40 * Width + 32]);
+    o.twistaccel = 2;
+    Transition acceleratedRotation(o, Width, Height);
+    EXPECT_NE(render(rotation, 500, a, b), render(acceleratedRotation, 500, a, b));
+}
+
 TEST(ExtraTransitions, RejectsInvalidDimensionsRegionsAndNonfiniteOptions) {
     auto o = options(Effect::Mosaic);
     EXPECT_THROW(Transition(o, 0, Height), std::invalid_argument);
@@ -176,6 +260,10 @@ TEST(ExtraTransitions, RejectsInvalidDimensionsRegionsAndNonfiniteOptions) {
     o.rwidth = 16; o.centerx = Width;
     EXPECT_THROW(Transition(o, Width, Height), std::invalid_argument);
     o = options(Effect::RotateSwap); o.twist = std::numeric_limits<double>::infinity();
+    EXPECT_THROW(Transition(o, Width, Height), std::invalid_argument);
+    o = options(Effect::RotateZoom); o.factor = std::numeric_limits<double>::infinity();
+    EXPECT_THROW(Transition(o, Width, Height), std::invalid_argument);
+    o = options(Effect::RotateVanish); o.accel = std::numeric_limits<double>::quiet_NaN();
     EXPECT_THROW(Transition(o, Width, Height), std::invalid_argument);
     o = options(Effect::Mosaic); Transition t(o, Width, Height);
     const auto a = picture(false), b = picture(true);

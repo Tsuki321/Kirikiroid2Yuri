@@ -1,0 +1,100 @@
+Plugins.link("getLangName.dll");
+var ciLanguageFunction = System.getCurrentUILangName;
+Plugins.link("GETLANGNAME.DLL");
+ciCheck(System.getCurrentUILangName === ciLanguageFunction,
+    "locale plugin repeated loading preserves the function object");
+var ciLanguageName = System.getCurrentUILangName();
+ciCheck(typeof ciLanguageName == "String" && ciLanguageName.length > 0,
+    "getLangName returns the actual device language name");
+ciCheck(System.getCurrentLocaleName() == ciLanguageName &&
+    System.getCurrentUILangName(true) == ciLanguageName &&
+    System.getCurrentLocaleName(true) == ciLanguageName,
+    "locale plugin supports UI and formatting locale methods and system selector");
+
+Plugins.link("wfBasicEffect.dll");
+Plugins.link("wfTypicalDSP.dll");
+var ciGainClass = WaveSoundBuffer.GainLimit;
+var ciDSPClass = WaveSoundBuffer.WaveDSPFilter;
+Plugins.link("WFBasicEffect.DLL");
+Plugins.link("wfTypicalDSP.DLL");
+ciCheck(WaveSoundBuffer.GainLimit === ciGainClass && WaveSoundBuffer.WaveDSPFilter === ciDSPClass,
+    "wave plugins expose stable nested native classes");
+
+var ciGain = new WaveSoundBuffer.GainLimit(-12);
+ciGain.init(-6, 1, 0);
+var ciClip = new WaveSoundBuffer.GainLimit(0, 0.5, -1);
+var ciDelay = new WaveSoundBuffer.DelayEffect(10, 0.5, 0.75, 1000);
+ciDelay.init(20, 0.25);
+var ciEQ = new WaveSoundBuffer.GraphicEqualizer(1, 1, 1, 1, 1, 0.5);
+ciCheck(ciEQ.getGain(5) == 0.5 && ciEQ.getGain(9) == 1,
+    "equalizer constructor uses ten linear gain bands");
+ciEQ.setGain(5, 0.25);
+ciCheck(ciEQ.getGain(5) == 0.25, "equalizer gain changes are visible to scripts");
+var ciVerb = new WaveSoundBuffer.StkFreeVerb(0.25);
+ciVerb.roomSize = 0.6;
+ciVerb.damping = 0.4;
+ciVerb.width = 0.5;
+ciVerb.mode = true;
+ciVerb.extend = 500;
+ciCheck(ciVerb.effectMix == 0.25 && ciVerb.roomSize == 0.6 && ciVerb.damping == 0.4 &&
+    ciVerb.width == 0.5 && ciVerb.mode && ciVerb.extend == 500,
+    "FreeVerb exposes reverb controls and finite tail extension");
+ciVerb.mode = false;
+ciThrows(function() { ciEQ.setGain(10, 1); }, "equalizer rejects an invalid band");
+ciThrows(function() { ciVerb.effectMix = 2; }, "reverb rejects an invalid wet mix");
+ciThrows(function() { ciDelay.init(10); }, "delay rejects incomplete init arguments");
+ciThrows(function() { new WaveSoundBuffer.WaveDSPFilter("LowPass", "unknown"); },
+    "unknown DSP designs are rejected explicitly");
+
+var ciDSP = new WaveSoundBuffer.WaveDSPFilter("LowPass", "Butterworth");
+ciCheck(ciDSP.setParams(void, 4, 1200) == 3, "DSP accepts the original positional setParams contract");
+var ciDSPOrder = ciDSP.getParamInfo(1);
+var ciDSPCutoff = ciDSP.getParamInfo(2);
+ciCheck(ciDSPOrder.currentValue == 4 && ciDSPCutoff.currentValue == 1200 &&
+    ciDSPCutoff.name == "Cutoff Frequency" && ciDSPCutoff.label == "Fc",
+    "DSP reports original design parameter metadata");
+ciCheck(ciDSP.getParamInfo(99) === void, "DSP metadata returns void past the final parameter");
+ciDSP.setParams(void, void, void);
+ciCheck(ciDSP.getParamInfo(1).currentValue == ciDSPOrder.defaultValue &&
+    ciDSP.getParamInfo(2).currentValue == ciDSPCutoff.defaultValue,
+    "void DSP parameters restore the design defaults");
+
+var ciWaveEffects = [ciGain, ciClip, ciDelay, ciEQ, ciVerb, ciDSP];
+for (var ciEffectIndex = 0; ciEffectIndex < ciWaveEffects.count; ++ciEffectIndex) {
+    ciCheck(ciWaveEffects[ciEffectIndex].interface > 0,
+        "wave effect exposes a native audio interface " + ciEffectIndex);
+    var ciEffectSound = new WaveSoundBuffer(null);
+    ciEffectSound.volume = 0;
+    ciEffectSound.filters.add(ciWaveEffects[ciEffectIndex]);
+    ciEffectSound.open(ciStorage + "plugin-tone.wav");
+    ciEffectSound.play();
+    ciEffectSound.stop();
+    invalidate ciEffectSound;
+}
+ciCheck(true, "all wave effect classes attach to the real PCM decoder chain");
+
+var ciSharedGain = new WaveSoundBuffer.GainLimit(-12);
+var ciOwnerSound = new WaveSoundBuffer(null);
+var ciOtherSound = new WaveSoundBuffer(null);
+ciOwnerSound.volume = ciOtherSound.volume = 0;
+ciOwnerSound.filters.add(ciSharedGain);
+ciOwnerSound.open(ciStorage + "plugin-tone.wav");
+ciOtherSound.filters.add(ciSharedGain);
+ciThrows(function() { ciOtherSound.open(ciStorage + "plugin-tone.wav"); },
+    "two wave buffers cannot own the same effect instance");
+ciOwnerSound.play();
+ciOwnerSound.stop();
+ciOtherSound.filters.clear();
+var ciIndependentGain = new WaveSoundBuffer.GainLimit(-6);
+ciOtherSound.filters.add(ciIndependentGain);
+ciOtherSound.filters.add(ciIndependentGain);
+ciThrows(function() { ciOtherSound.open(ciStorage + "plugin-tone.wav"); },
+    "duplicate effects cannot create a recursive filter chain");
+ciOtherSound.filters.clear();
+ciOtherSound.filters.add(ciIndependentGain);
+ciOtherSound.open(ciStorage + "plugin-tone.wav");
+ciOtherSound.play();
+ciOtherSound.stop();
+invalidate ciOtherSound;
+invalidate ciOwnerSound;
+ciCheck(true, "failed filter attachment leaves existing owners and retry usable");

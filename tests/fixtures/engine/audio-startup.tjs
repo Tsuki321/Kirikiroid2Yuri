@@ -1,0 +1,94 @@
+function ciErrorText(error) {
+    try { if (error.message !== void) return "" + error.message; } catch (ignored) {}
+    return "" + error;
+}
+var ciStorage = "@@STORAGE@@/", ciOutput = "@@OUTPUT@@/";
+var ciMessages = ["ENGINE_CI_STARTED"], ciSounds = [];
+var ciWindow = void, ciTimer = void, ciTicks = 0, ciPhase = 0, ciFinished = false;
+function ciCheck(ok, message) {
+    if (!ok) throw "CI assertion: " + message;
+    ciMessages.add("PASS " + message);
+    ciMessages.save(ciOutput + "progress.txt");
+}
+function ciFinish(error) {
+    if (ciFinished) return;
+    ciFinished = true;
+    if (ciTimer !== void) ciTimer.enabled = false;
+    for (var i = 0; i < ciSounds.count; ++i) {
+        try { ciSounds[i].stop(); } catch (ignored) {}
+    }
+    ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + ciErrorText(error));
+    ciMessages.save(ciOutput + "result.txt", "utf-8");
+}
+function ciSound(gains) {
+    var sound = new WaveSoundBuffer(ciWindow);
+    ciSounds.add(sound);
+    // sampleValue reads processed PCM through the engine's real visualization
+    // buffer; a constant half-scale source removes playback-phase ambiguity.
+    sound.sampleCount = 128;
+    sound.sampleAhead = 0;
+    sound.useVisBuffer = true;
+    for (var i = 0; i < gains.count; ++i)
+        sound.filters.add(new WaveSoundBuffer.GainLimit(gains[i]));
+    sound.open(ciStorage + "plugin-tone.wav");
+    ciCheck(sound.totalTime >= 900, "filter chain decodes the PCM source");
+    if (gains.count == 1) {
+        var other = new WaveSoundBuffer(ciWindow), rejected = false;
+        other.filters.add(sound.filters[0]);
+        try { other.open(ciStorage + "plugin-tone.wav"); }
+        catch (error) { rejected = true; }
+        invalidate other;
+        ciCheck(rejected, "a second sound cannot steal a connected effect");
+        // This happens before the owner has decoded any playback buffers.
+        // The amplitude checks below therefore also prove that failed reuse
+        // and the rejected sound's cleanup preserve the owner's connection.
+    }
+    sound.looping = true;
+    sound.volume = 0;
+    sound.play();
+}
+function ciStep() {
+    try {
+        if (++ciTicks > 50) throw "filtered PCM visualization did not become available";
+        if (ciTicks < 3) return;
+        var base = ciSounds[0].sampleValue;
+        var single = ciSounds[1].sampleValue;
+        var chain = ciSounds[2].sampleValue;
+        if (base < 0.01 || single <= 0 || chain <= 0) return;
+        ciCheck(base > 0.245 && base < 0.255, "unfiltered PCM retains half-scale amplitude");
+        // sampleValue is amplitude squared, so -12 dB is a power ratio of
+        // 10^(-12/10), about 0.0631. Two -6 dB filters must compose to match.
+        ciCheck(single / base > 0.060 && single / base < 0.066,
+            "GainLimit retains its owner and processes actual samples by -12 dB");
+        ciCheck(chain / single > 0.98 && chain / single < 1.02,
+            "two serial filters process PCM in the engine chain");
+        if (ciPhase == 0) {
+            for (var i = 0; i < ciSounds.count; ++i) {
+                ciSounds[i].stop();
+                ciSounds[i].open(ciStorage + "plugin-tone.wav");
+                ciSounds[i].play();
+            }
+            ciPhase = 1;
+            ciTicks = 0;
+        } else {
+            ciCheck(true, "stop and reopen rebuilds the filter chain without losing its processing");
+            ciFinish();
+        }
+    } catch (error) { ciFinish(error); }
+}
+ciMessages.save(ciOutput + "started.txt");
+try {
+    Plugins.link("wfBasicEffect.dll");
+    Plugins.link("getSample.dll");
+    ciWindow = new Window();
+    ciWindow.setSize(128, 96);
+    ciWindow.visible = true;
+    ciSound([]);
+    ciSound([-12]);
+    ciSound([-6, -6]);
+    ciTimer = new Timer(ciWindow);
+    ciTimer.enabled = false;
+    ciTimer.interval = 100;
+    ciTimer.onTimer = ciStep;
+    ciTimer.enabled = true;
+} catch (error) { ciFinish(error); }

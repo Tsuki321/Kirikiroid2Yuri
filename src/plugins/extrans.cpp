@@ -129,8 +129,8 @@ class ExtraProvider : public iTVPTransHandlerProvider {
         tTJSVariant v;
         return value(provider, key, v) ? double(v) : fallback;
     }
-    static uint32_t color(iTVPSimpleOptionProvider *provider, const tjs_char *key) {
-        const uint32_t result = uint32_t(integer(provider, key, 0, INT32_MIN, UINT32_MAX));
+    static uint32_t color(iTVPSimpleOptionProvider *provider, const tjs_char *key, uint32_t fallback = 0) {
+        const uint32_t result = uint32_t(integer(provider, key, fallback, INT32_MIN, UINT32_MAX));
         return TVP_REVRGB(result);
     }
 public:
@@ -149,7 +149,8 @@ public:
         if (!provider || w != w2 || h != h2 || !w || !h || w > 16384 || h > 16384) return TJS_E_FAIL;
         try {
             tTJSVariant time;
-            if (!value(provider, TJS_W("time"), time)) return TJS_E_FAIL;
+            if (!value(provider, TJS_W("time"), time))
+                throw std::invalid_argument("extrans time option is required");
             ExtraTransitions::Options o;
             o.effect = effect;
             o.alpha = TVPIsTypeUsingAlpha(layerType) ? ExtraTransitions::Alpha::Straight :
@@ -178,6 +179,20 @@ public:
                 o.bgcolor = color(provider, TJS_W("bgcolor"));
                 o.twist = real(provider, TJS_W("twist"), 1.0);
                 break;
+            case ExtraTransitions::Effect::Turn:
+                o.bgcolor = color(provider, TJS_W("bgcolor"), 0xffffff);
+                break;
+            case ExtraTransitions::Effect::RotateZoom:
+            case ExtraTransitions::Effect::RotateVanish: {
+                const bool zoom = effect == ExtraTransitions::Effect::RotateZoom;
+                o.factor = zoom ? real(provider, TJS_W("factor"), 1.0) : 1.0;
+                o.accel = real(provider, TJS_W("accel"), zoom ? 0.0 : 2.0);
+                o.twist = real(provider, TJS_W("twist"), 2.0);
+                o.twistaccel = real(provider, TJS_W("twistaccel"), zoom ? -2.0 : 2.0);
+                o.centerx = int(integer(provider, TJS_W("centerx"), w / 2));
+                o.centery = int(integer(provider, TJS_W("centery"), h / 2));
+                break;
+            }
             }
             *handler = new ExtraTransition(o, int(w), int(h));
             if (type) *type = ttExchange;
@@ -190,7 +205,7 @@ public:
     }
 };
 
-ExtraProvider *providers[4] = {};
+ExtraProvider *providers[7] = {};
 void unregisterProviders() {
     for (auto &provider : providers) if (provider) {
         TVPRemoveTransHandlerProvider(provider);
@@ -199,11 +214,13 @@ void unregisterProviders() {
     }
 }
 void registerProviders() {
-    const tjs_char *names[] = { TJS_W("mosaic"), TJS_W("wave"), TJS_W("ripple"), TJS_W("rotateswap") };
+    const tjs_char *names[] = { TJS_W("mosaic"), TJS_W("wave"), TJS_W("ripple"), TJS_W("rotateswap"),
+                              TJS_W("turn"), TJS_W("rotatezoom"), TJS_W("rotatevanish") };
     const ExtraTransitions::Effect effects[] = { ExtraTransitions::Effect::Mosaic, ExtraTransitions::Effect::Wave,
-                                               ExtraTransitions::Effect::Ripple, ExtraTransitions::Effect::RotateSwap };
+        ExtraTransitions::Effect::Ripple, ExtraTransitions::Effect::RotateSwap, ExtraTransitions::Effect::Turn,
+        ExtraTransitions::Effect::RotateZoom, ExtraTransitions::Effect::RotateVanish };
     try {
-        for (unsigned i = 0; i < 4; ++i) {
+        for (unsigned i = 0; i < sizeof(providers) / sizeof(providers[0]); ++i) {
             if (providers[i]) continue;
             auto provider = new ExtraProvider(names[i], effects[i]);
             try { TVPAddTransHandlerProvider(provider); }

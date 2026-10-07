@@ -32,7 +32,7 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
 failures=0
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -eq 9
+test "$expected" -eq 14
 # adb shell reads stdin. Keep the manifest on another descriptor so starting
 # the first activity cannot consume the remaining fixture rows.
 while IFS=$'\t' read -r -u 3 name storage output; do
@@ -69,6 +69,17 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     fi
   done
   adb exec-out screencap -p > "test-results/android/$name.png"
+  if [[ "$pid" =~ ^[0-9]+$ ]]; then
+    adb logcat -d --pid="$pid" > "test-results/android/$name-logcat.txt"
+    if [[ "$name" == transitions* ]]; then
+      renderer=software
+      if [[ "$name" == *opengl* ]]; then renderer=opengl; fi
+      if ! grep -q "Render manager selected: $renderer" "test-results/android/$name-logcat.txt"; then
+        echo "Engine did not select the requested renderer: $name / $renderer" >&2
+        passed=false
+      fi
+    fi
+  fi
   if adb shell cat "$output/progress.txt" > "test-results/android/$name-progress.raw" 2>/dev/null; then
     python3 tests/android/decode_result.py "test-results/android/$name-progress.raw" \
       > "test-results/android/$name-progress.txt"

@@ -893,6 +893,7 @@ class SoundBufferConvertPCM32ToPCM16 : public iSoundBufferConvertToPCM16 {
 tTJSNI_BaseWaveSoundBuffer::tTJSNI_BaseWaveSoundBuffer()
 {
 	LoopManager = NULL;
+	FilterOutput = NULL;
 	WaveFlagsObject = NULL;
 	WaveLabelsObject = NULL;
 	Filters = TJSCreateArrayObject();
@@ -947,17 +948,17 @@ void tTJSNI_BaseWaveSoundBuffer::RecreateWaveLabelsObject()
 //---------------------------------------------------------------------------
 void tTJSNI_BaseWaveSoundBuffer::RebuildFilterChain()
 {
-	// rebuild filter array
-	FilterInterfaces.clear();
+	ClearFilterChain();
+	// Keep script objects alive while collecting the requested chain, but only
+	// record successful connections in FilterInterfaces. A rejected Recreate
+	// can belong to a different, still-playing sound and must not be cleared.
+	std::vector<tFilterObjectAndInterface> requested;
 
 	// get filter count
 	tTJSVariant v;
 	tjs_int count = 0;
 	Filters->PropGet(0, TJS_W("count"), NULL, &v, Filters);
 	count = v;
-
-	// reset filter output
-	FilterOutput = LoopManager;
 
 	// for each filter ...
 	for(int i = 0; i < count; i++)
@@ -970,37 +971,46 @@ void tTJSNI_BaseWaveSoundBuffer::RebuildFilterChain()
 		if(TJS_FAILED(clo.PropGet(0, TJS_W("interface"), NULL, &iface_v, NULL))) continue;
 		iTVPBasicWaveFilter * filter =
 			reinterpret_cast<iTVPBasicWaveFilter *>((tjs_intptr_t)(tjs_int64)iface_v);
-		// save to the backupped array
-		FilterInterfaces.emplace_back(v, filter);
+		if(!filter)
+			TVPThrowExceptionMessage(TJS_W("Wave filter has a null native interface."));
+		requested.emplace_back(v, filter);
 	}
 
-	// reset filter output
+	// Reserve before attaching anything, including room for the PCM converter.
+	FilterInterfaces.reserve(requested.size() + 1);
 	FilterOutput = LoopManager;
-
-	// for each filter ...
-	for(std::vector<tFilterObjectAndInterface>::iterator i = FilterInterfaces.begin();
-		i != FilterInterfaces.end(); i++)
+	try
 	{
-		// recreate filter
-		FilterOutput = i->Interface->Recreate(FilterOutput);
-	}
+		for(const auto &entry : requested)
+		{
+			tTVPSampleAndLabelSource *output = entry.Interface->Recreate(FilterOutput);
+			FilterInterfaces.push_back(entry);
+			if(!output)
+				TVPThrowExceptionMessage(TJS_W("Wave filter returned a null sample source."));
+			FilterOutput = output;
+		}
 
-	const tTVPWaveFormat &filteredFormat = FilterOutput->GetFormat();
-	if (filteredFormat.IsFloat) {
-		SoundBufferConvertFloatToPCM16 *filter = new SoundBufferConvertFloatToPCM16;
-		FilterInterfaces.emplace_back(filter, filter);
-		FilterOutput = filter->Recreate(FilterOutput);
-		filter->Release();
-	} else if (filteredFormat.BitsPerSample == 24) {
-		SoundBufferConvertPCM24ToPCM16 *filter = new SoundBufferConvertPCM24ToPCM16;
-		FilterInterfaces.emplace_back(filter, filter);
-		FilterOutput = filter->Recreate(FilterOutput);
-		filter->Release();
-	} else if (filteredFormat.BitsPerSample == 32) {
-		SoundBufferConvertPCM32ToPCM16 *filter = new SoundBufferConvertPCM32ToPCM16;
-		FilterInterfaces.emplace_back(filter, filter);
-		FilterOutput = filter->Recreate(FilterOutput);
-		filter->Release();
+		const tTVPWaveFormat &filteredFormat = FilterOutput->GetFormat();
+		iSoundBufferConvertToPCM16 *converter = nullptr;
+		if(filteredFormat.IsFloat)
+			converter = new SoundBufferConvertFloatToPCM16;
+		else if(filteredFormat.BitsPerSample == 24)
+			converter = new SoundBufferConvertPCM24ToPCM16;
+		else if(filteredFormat.BitsPerSample == 32)
+			converter = new SoundBufferConvertPCM32ToPCM16;
+		if(converter)
+		{
+			tTJSVariant owner(converter);
+			converter->Release();
+			tTVPSampleAndLabelSource *output = converter->Recreate(FilterOutput);
+			FilterInterfaces.emplace_back(owner, converter);
+			FilterOutput = output;
+		}
+	}
+	catch(...)
+	{
+		ClearFilterChain();
+		throw;
 	}
 }
 //---------------------------------------------------------------------------

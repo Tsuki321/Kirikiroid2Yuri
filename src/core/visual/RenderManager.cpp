@@ -2,6 +2,7 @@
 #include "renderer/CCTexture2D.h"
 typedef cocos2d::Texture2D::PixelFormat CCPixelFormat;
 #include "MsgIntf.h"
+#include "DebugIntf.h"
 #include "LayerBitmapIntf.h"
 #include "SysInitIntf.h"
 #include "tvpgl.h"
@@ -4395,6 +4396,7 @@ iTVPRenderManager * TVPGetRenderManager() {
 	if (!_RenderManager) {
 		ttstr str = IndividualConfigManager::GetInstance()->GetValue<std::string>("renderer", "software");
 		_RenderManager = TVPGetRenderManager(str);
+		TVPAddImportantLog(TJS_W("Render manager selected: ") + str);
 	}
 	return _RenderManager;
 }

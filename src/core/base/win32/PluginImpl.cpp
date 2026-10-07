@@ -444,6 +444,7 @@ tTVPAtExit TVPDestroyPluginVectorAtExit
 #endif
 //---------------------------------------------------------------------------
 bool TVPLoadInternalPlugin(const ttstr &_name);
+ttstr TVPNormalizeInternalPluginName(const ttstr &name);
 extern std::set<ttstr> TVPRegisteredPlugins;
 static bool TVPPluginLoading = false;
 void TVPLoadPlugin(const ttstr & name)
@@ -487,6 +488,12 @@ void TVPLoadPlugin(const ttstr & name)
 //---------------------------------------------------------------------------
 bool TVPUnloadPlugin(const ttstr & name)
 {
+    // Built-in implementations remain resident with their TJS classes and
+    // native instances. Report the same refusal as a DLL whose objects are
+    // still in use, rather than claiming its APIs have been removed.
+    if (TVPRegisteredPlugins.find(TVPNormalizeInternalPluginName(name)) == TVPRegisteredPlugins.end())
+        TVPThrowExceptionMessage(TVPNotLoadedPlugin, name);
+    return false;
 	// unload plugin
 #if 0
 	tTVPPluginVectorType::iterator i;
@@ -504,7 +511,6 @@ bool TVPUnloadPlugin(const ttstr & name)
 	TVPThrowExceptionMessage(TVPNotLoadedPlugin, name);
 	return false;
 #endif
-	return true;
 }
 //---------------------------------------------------------------------------
 
@@ -525,7 +531,7 @@ static tjs_int TVPAutoLoadPluginCount = 0;
 static void TVPSearchPluginsAt(std::vector<tTVPFoundPlugin> &list, std::string folder)
 {
 	TVPListDir(folder, [&](const std::string &filename, int mask){
-		if (mask & S_IFREG) {
+		if ((mask & S_IFREG) && filename.length() >= 4) {
 			if (!strcasecmp(filename.c_str() + filename.length() - 4, ".tpm")) {
 				tTVPFoundPlugin fp;
 				fp.Path = folder;
@@ -1047,7 +1053,6 @@ TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(cls, getList)
 	return cls;
 }
 //---------------------------------------------------------------------------
-
 
 
 

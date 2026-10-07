@@ -15,7 +15,7 @@
 
 namespace ExtraTransitions {
 
-enum class Effect { Mosaic, Wave, Ripple, RotateSwap };
+enum class Effect { Mosaic, Wave, Ripple, RotateSwap, Turn, RotateZoom, RotateVanish };
 enum class Alpha { Opaque, Straight, Additive };
 constexpr double Pi = 3.14159265358979323846;
 constexpr size_t MaxPixels = 16777216;
@@ -35,6 +35,7 @@ struct Options {
     int maxdrift = 24;
     uint32_t bgcolor = 0;
     double twist = 1.0;
+    double factor = 1.0, accel = 0.0, twistaccel = 0.0;
 };
 
 inline int clamp(int value, int low, int high) {
@@ -74,6 +75,16 @@ inline void validate(const Options &o, int width, int height) {
     case Effect::RotateSwap:
         if (!finiteRange(o.twist, -1000000, 1000000))
             throw std::invalid_argument("invalid rotateswap twist");
+        break;
+    case Effect::Turn:
+        break;
+    case Effect::RotateZoom:
+    case Effect::RotateVanish:
+        if (!finiteRange(o.factor, -1000000, 1000000) ||
+            !finiteRange(o.accel, -1000000, 1000000) ||
+            !finiteRange(o.twist, -1000000, 1000000) ||
+            !finiteRange(o.twistaccel, -1000000, 1000000))
+            throw std::invalid_argument("invalid rotate factor, accel, twist or twistaccel");
         break;
     }
 }
@@ -119,6 +130,7 @@ class Transition {
     unsigned ratio = 0;
     int block = 2, offsetx = 0, offsety = 0;
     int waveHeight = 0;
+    int turnPhase = 0;
     double omega = 0;
     uint32_t background = 0;
     std::vector<uint16_t> rippleMap;
@@ -126,11 +138,12 @@ class Transition {
 
     struct Transform {
         double cx = 0, cy = 0, scale = 0, sine = 0, cosine = 0;
+        double verticalScale = 1, pivotx = 0, pivoty = 0;
         bool sample(int x, int y, int width, int height, int &sx, int &sy) const {
-            if (scale < 0.000001) return false;
-            const double dx = x - cx, dy = (y - cy) / scale;
-            const double xx = (dx * cosine - dy * sine) / scale + width / 2;
-            const double yy = (dx * sine + dy * cosine) / scale + height / 2;
+            if (std::abs(scale) < 0.000001 || std::abs(verticalScale) < 0.000001) return false;
+            const double dx = x - cx, dy = (y - cy) / verticalScale;
+            const double xx = (dx * cosine - dy * sine) / scale + width / 2 + pivotx;
+            const double yy = (dx * sine + dy * cosine) / scale + height / 2 + pivoty;
             // Check in floating point before conversion, including degenerate
             // transforms near the endpoints of a very long transition.
             if (xx < -0.5 || yy < -0.5 || xx >= width - 0.5 || yy >= height - 0.5) return false;
@@ -138,6 +151,72 @@ class Transition {
             return true;
         }
     } outgoing, incoming;
+
+    struct TurnLine { int start, length, sx, sy, stepx, stepy; };
+    static const std::array<TurnLine, 64 * 64> &turnTable() {
+        // Reproduce extrans/maketable/mkturntranstable.pl at runtime instead of
+        // importing its 4,096-row Win32 table. Geometry uses 16.16 source steps.
+        static const auto table = [] {
+            std::array<TurnLine, 64 * 64> result = {};
+            for (int phase = 1; phase < 63; ++phase) {
+                const int n = phase < 32 ? phase : 63 - phase;
+                const int p = n * n / 31;
+                const int d = int(std::sin(p * Pi / 64) * 4);
+                const int ax = p + (phase < 32 ? -d : d);
+                const int ay = 63 - p + (phase < 32 ? -d : d);
+                const int bx = 63 - ax, by = 63 - ay;
+                for (int y = 0; y < 64; ++y) {
+                    const int left = y <= ay ? (ay ? ax * y / ay : 0) :
+                        (ay != 63 ? ax + (63 - ax) * (y - ay) / (63 - ay) : 63);
+                    const int right = std::max(left, y <= by ? (by ? bx * y / by : 63) :
+                        (by != 63 ? bx + (63 - bx) * (y - by) / (63 - by) : 63));
+                    const int sx = y <= ay ? 0 : 63 * (y - ay) / (63 - ay);
+                    const int sy = y <= ay ? (ay ? 63 * y / ay : 0) : 63;
+                    const int ex = y <= by ? (by ? 63 * y / by : 63) : 63;
+                    const int ey = y <= by ? 0 : 63 * (y - by) / (63 - by);
+                    const int length = right - left + 1;
+                    result[phase * 64 + y] = { left, length, sx * 65536, sy * 65536,
+                        length > 1 ? int(double(ex - sx) / (length - 1) * 65536) : 0,
+                        length > 1 ? int(double(ey - sy) / (length - 1) * 65536) : 0 };
+                }
+            }
+            return result;
+        }();
+        return table;
+    }
+
+    uint32_t turnPixel(const Image &a, const Image &b, int x, int y) const {
+        const int phase = clamp(turnPhase - (x / 64 - y / 64) * 2, 0, 63);
+        if (!phase) return a.get(x, y);
+        if (phase == 63) return b.get(x, y);
+        const auto &line = turnTable()[phase * 64 + y % 64];
+        const int dx = x % 64 - line.start;
+        if (dx < 0 || dx >= line.length) return background;
+        const int sx = x / 64 * 64 + (line.sx + dx * line.stepx) / 65536;
+        const int sy = y / 64 * 64 + (line.sy + dx * line.stepy) / 65536;
+        // Partial tiles along the image edges must never sample past the image.
+        if (sx < 0 || sy < 0 || sx >= width || sy >= height) return background;
+        uint32_t value = (phase < 32 ? a : b).get(sx, sy);
+        static const int gloss[] = { 0, 0, 0, 0, 16, 48, 80, 128, 192, 128, 80, 48, 16 };
+        const int amount = phase < 13 ? gloss[phase] : 0;
+        if (amount) {
+            // Preserve transparency, including premultiplied additive layers.
+            const int white = options.alpha == Alpha::Additive ? value >> 24 : 255;
+            uint32_t highlighted = value & 0xff000000u;
+            for (unsigned shift = 0; shift < 24; shift += 8) {
+                const int channel = (value >> shift) & 255;
+                highlighted |= uint32_t(channel + (white - channel) * amount / 256) << shift;
+            }
+            value = highlighted;
+        }
+        return value;
+    }
+
+    static double accelerate(double value, double acceleration) {
+        if (acceleration < 0) return 1 - std::pow(1 - value, -acceleration);
+        if (acceleration > 0) return std::pow(value, acceleration);
+        return value;
+    }
 
     void prepareRipple() {
         rippleMap.resize(size_t(width) * height);
@@ -214,6 +293,16 @@ class Transition {
             }
             return options.alpha == Alpha::Opaque ? options.bgcolor | 0xff000000u : options.bgcolor;
         }
+        case Effect::Turn:
+            return turnPixel(a, b, x, y);
+        case Effect::RotateZoom:
+        case Effect::RotateVanish: {
+            int sx, sy;
+            const bool zoom = options.effect == Effect::RotateZoom;
+            if (incoming.sample(x, y, width, height, sx, sy))
+                return (zoom ? b : a).get(sx, sy);
+            return (zoom ? a : b).get(x, y);
+        }
         }
         return 0;
     }
@@ -261,10 +350,30 @@ public:
             incoming.cx = int((cx - (width - 1)) * b + width - 1 - std::sin(b * Pi) * cx * 1.5);
             incoming.cy = int((cy - (height - 1)) * b + height - 1);
             outgoing.scale = 1 - a; incoming.scale = b;
+            outgoing.verticalScale = outgoing.scale; incoming.verticalScale = incoming.scale;
             outgoing.sine = std::sin(a * options.twist * 2 * Pi);
             outgoing.cosine = std::cos(a * options.twist * 2 * Pi);
             incoming.sine = std::sin((b - 1) * options.twist * 2 * Pi);
             incoming.cosine = std::cos((b - 1) * options.twist * 2 * Pi);
+            break;
+        }
+        case Effect::Turn: {
+            const int columns = (width - 1) / 64 + 1, rows = (height - 1) / 64 + 1;
+            turnPhase = int(progress * (64 + (columns + rows) * 2)) - rows * 2;
+            background = options.alpha == Alpha::Opaque ? options.bgcolor | 0xff000000u : options.bgcolor;
+            break;
+        }
+        case Effect::RotateZoom:
+        case Effect::RotateVanish: {
+            const double zoom = accelerate(progress, options.accel);
+            const double rotation = accelerate(progress, options.twistaccel);
+            incoming.cx = width / 2; incoming.cy = height / 2;
+            incoming.pivotx = int((double(width / 2) - options.centerx) * zoom + options.centerx) - double(width / 2);
+            incoming.pivoty = int((double(height / 2) - options.centery) * zoom + options.centery) - double(height / 2);
+            incoming.scale = options.effect == Effect::RotateZoom ?
+                options.factor + (1 - options.factor) * zoom : 1 - zoom;
+            incoming.sine = std::sin(2 * Pi * options.twist * rotation);
+            incoming.cosine = std::cos(2 * Pi * options.twist * rotation);
             break;
         }
         }

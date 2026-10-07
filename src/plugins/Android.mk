@@ -7,6 +7,7 @@ LOCAL_MODULE := kr2plugin
 LOCAL_SRC_FILES := \
 $(wildcard $(LOCAL_PATH)/*.cpp) \
 $(wildcard $(LOCAL_PATH)/*.c) \
+$(wildcard $(LOCAL_PATH)/thirdparty/dspfilters/source/*.cpp) \
 ncbind/ncbind.cpp \
 
 LOCAL_SRC_FILES := $(LOCAL_SRC_FILES:$(LOCAL_PATH)/%=%)
@@ -14,6 +15,8 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES:$(LOCAL_PATH)/%=%)
 LOCAL_C_INCLUDES += \
 $(LOCAL_PATH) \
 $(LOCAL_PATH)/ncbind \
+$(LOCAL_PATH)/thirdparty/dspfilters/include \
+$(LOCAL_PATH)/../../thirdparty/port/cocos2d-x/cocos \
 $(LOCAL_PATH)/../../vendor/freetype/current/include \
 $(LOCAL_PATH)/../core \
 $(LOCAL_PATH)/../core/base  \

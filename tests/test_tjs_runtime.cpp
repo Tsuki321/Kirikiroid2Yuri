@@ -8,7 +8,9 @@
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <cstring>
 #include <utility>
@@ -137,6 +139,28 @@ TEST_F(TJSRuntime, ArrayCreationNativeMethodsAndTextStreams) {
                  "var b = []; b.load('result.txt');"));
     EXPECT_EQ(2, Integer(TJS_W("b.count")));
     EXPECT_EQ(1, Integer(TJS_W("b[0] == 'ENGINE_CI_STARTED' && b[1] == 'PASS'")));
+}
+
+TEST_F(TJSRuntime, EngineFixtureScriptsCompileToValidBytecode) {
+    // Parse every native-engine fixture with the production compiler before
+    // the emulator jobs. API and output checks still run in the actual engine.
+    const char *names[] = {"startup.tjs", "compiled-source.tjs", "movie-startup.tjs",
+        "archive-startup.tjs", "transition-startup.tjs", "psb-tests.tjs",
+        "datapack-tests.tjs", "plugin-tests.tjs", "audio-startup.tjs"};
+    for (const char *name : names) {
+        SCOPED_TRACE(name);
+        std::ifstream input(std::string(ENGINE_FIXTURE_DIR) + "/" + name, std::ios::binary);
+        ASSERT_TRUE(input.is_open());
+        const std::string source((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+        ASSERT_FALSE(source.empty());
+        ByteStream compiled;
+        try {
+            runtime->CompileScript(ttstr(source.c_str()).c_str(), &compiled, false, true, false, ttstr(name).c_str());
+        } catch (const eTJSError &error) {
+            FAIL() << error.GetMessage().AsStdString();
+        }
+        EXPECT_TRUE(TJS::ByteCode::Validate(compiled.bytes.data(), compiled.bytes.size()));
+    }
 }
 
 TEST_F(TJSRuntime, InheritanceAccountsForGlobalExpressionTemporary) {

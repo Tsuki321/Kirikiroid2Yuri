@@ -59,11 +59,21 @@ try {
         ciCheck(fullRejected, "disk-full at close is catchable");
     }
     Plugins.link("scriptsEx.dll");
+    var ciPluginCount = Plugins.getList().count;
     Plugins.link("scriptsEx.dll");
-    ciCheck(true, "plugin reload is idempotent");
+    Plugins.link("C:\\game\\plugin\\ScRiPtSeX.DlL");
+    Plugins.link("plugin/scriptsEx.tpm");
+    Plugins.link("data.xp3>plugin/SCRIPTSEX.TPM");
+    ciCheck(Plugins.getList().count == ciPluginCount, "plugin paths and DLL/TPM aliases share one registration");
+    ciCheck(!Plugins.unlink("plugin/ScRiPtSeX.TPM"), "resident plugin refuses unloading while its APIs remain available");
+    ciCheck(Plugins.getList().count == ciPluginCount, "refused unload preserves registered modules");
     var rejected = false;
     try { Plugins.link("ci-missing-plugin.dll"); } catch (error) { rejected = true; }
     ciCheck(rejected, "missing plugin reported");
+    ciThrows(function() { Plugins.link(""); }, "empty plugin name rejected");
+    ciThrows(function() { Plugins.unlink("ci-missing-plugin.dll"); }, "unloading an unknown plugin rejected");
+    ciCheck(Plugins.getList().count == ciPluginCount, "failed plugin links do not change the loaded list");
+    Scripts.execStorage(ciStorage + "plugin-tests.tjs");
     global.ciCompiled = 0;
     Scripts.compileStorage(ciStorage + "compiled-source.tjs", ciStorage + "compiled.tjb");
     Scripts.execStorage(ciStorage + "compiled.tjb");

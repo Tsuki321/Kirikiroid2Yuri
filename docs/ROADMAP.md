@@ -19,7 +19,10 @@
 | layerExDraw / GdiPlus | Android raster backend for text, metrics, paths, transforms, basic brushes and images. Advanced modes report errors. See `VALIDATION.md`. |
 | layerEx base | In-tree (`LayerExBase.cpp`, `layerExBase.hpp`) |
 | layerExImage | Portable brightness/contrast, HSL effects, noise and Gaussian blur, with clipping and alpha preservation. |
-| extrans | Portable mosaic, wave, ripple and rotateswap handlers with bounded options and renderer-independent pixel tests. Uses CPU effect rendering with RGBA texture snapshots. The original turn, rotatezoom and rotatevanish effects remain unimplemented. |
+| extrans | Portable mosaic, wave, ripple, rotateswap, turn, rotatezoom and rotatevanish handlers with bounded options and renderer-independent pixel tests. Uses CPU effect rendering with RGBA texture snapshots. |
+| extNagano | All twelve effect names register native transition handlers, including rule-image and triangle-mesh inputs. Recovered algorithms and fidelity limits are documented in [EXTNAGANO.md](EXTNAGANO.md). |
+| getLangName | English locale/language names from Android, preserving Simplified/Traditional Chinese distinctions for script alias tables. |
+| wfBasicEffect / wfTypicalDSP | PCM gain/limiting, delay, equalization, reverb and DSP filter families connected to the engine's wave-filter chain. See [PLUGINS.md](PLUGINS.md). |
 | textrender | Portable `TextRenderBase` layout, formatting, ruby, links and dialogue timing. Font and image callbacks use the framework's raster backend. |
 | fstat / dirlist | Directory enumeration and file operations for local storage, document trees and readable archive metadata. Empty-directory removal preserves contents. |
 

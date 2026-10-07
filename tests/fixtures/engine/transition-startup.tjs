@@ -1,75 +1,152 @@
+var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
 var ciMessages = ["ENGINE_CI_STARTED"];
 var ciTimer = void, ciFinished = false;
 var ciTick = 0, ciCompleted = false, ciIndex = 0, ciPhase = 0, ciWaits = 0;
+var ciCompletionCount = 0, ciCompletionArgs = false;
 var ciWindow = void, ciPrimary = void, ciDest = void, ciSource = void, ciCapture = void;
-var ciEffects = ["mosaic", "wave", "ripple", "rotateswap"];
+var ciDestChild = void, ciSourceChild = void, ciRule = void;
+var ciEffects = ["mosaic", "wave", "ripple", "rotateswap", "turn", "rotatezoom", "rotatevanish",
+    "3duniversal", "blurfade", "scanline", "zoomfade", "rgbfade", "spin", "flutter", "book",
+    "imagewipe", "honeyturn", "morphing", "multiripple"];
 
 function ciCheck(ok, message) {
     if (!ok) throw "CI assertion: " + message;
     ciMessages.add("PASS " + message);
     ciMessages.save(ciOutput + "progress.txt");
 }
+function ciErrorText(error) {
+    try { if (error.message !== void) return "" + error.message; } catch (ignored) {}
+    return "" + error;
+}
 function ciFinish(error) {
     if (ciFinished) return;
     ciFinished = true;
     if (ciTimer !== void) ciTimer.enabled = false;
-    if (error !== void) {
-        try { if (error.message !== void) error = error.message; } catch (ignored) {}
-        ciMessages.add("ENGINE_CI_FAIL " + error);
-    } else ciMessages.add("ENGINE_CI_PASS");
+    if (error !== void) ciMessages.add("ENGINE_CI_FAIL " + ciErrorText(error));
+    else ciMessages.add("ENGINE_CI_PASS");
     ciMessages.save(ciOutput + "result.txt");
 }
 function ciClock() { return ciTick; }
-function ciReject(method, options) {
-    var rejected = false;
-    try { ciDest.startTransition(method, false, ciSource, options); }
-    catch (error) { rejected = true; }
-    ciCheck(rejected, method + " rejects invalid transition options");
+function ciReject(method, options, expected) {
+    var reason = "";
+    try { ciDest.beginTransition(method, false, ciSource, options); }
+    catch (error) { reason = ciErrorText(error); }
+    ciCheck(reason.indexOf(expected) >= 0,
+        method + " rejects invalid transition options (" + expected + "): " + reason);
 }
 class CITransitionLayer extends Layer {
     function CITransitionLayer(w, p) { super.Layer(w, p); }
-    function onTransitionCompleted(dest, src) { ciCompleted = true; }
+    function onTransitionCompleted(dest, src) {
+        ++ciCompletionCount;
+        ciCompletionArgs = dest === ciDest && src === ciSource;
+        ciCompleted = true;
+    }
+}
+function ciColor(x, y, second) {
+    return second ? 0x208080 + int(x / 8) * 0x0b0000 + int(y / 8) * 0x000900 :
+                    0x900030 + int(x / 8) * 0x000900 + int(y / 8) * 0x00000b;
+}
+function ciPattern(layer, second) {
+    for (var y = 0; y < 48; y += 8) for (var x = 0; x < 64; x += 8)
+        layer.fillRect(x, y, 8, 8, 0xff000000 | ciColor(x, y, second));
+}
+function ciExpected(second, children) {
+    var pixels = [];
+    for (var y = 4; y < 48; y += 8) for (var x = 4; x < 64; x += 8)
+        pixels.add(children && x >= 16 && x < 32 && y >= 16 && y < 32 ?
+            (second ? 0xf0d030 : 0x3050f0) : ciColor(x, y, second));
+    return pixels;
+}
+function ciFrame() {
+    // Both the layer location and the captured region have nonzero origins.
+    ciCapture.piledCopy(0, 0, ciPrimary, 8, 12, 64, 48);
+    var pixels = [];
+    for (var y = 4; y < 48; y += 8) for (var x = 4; x < 64; x += 8)
+        pixels.add(ciCapture.getMainPixel(x, y) & 0xffffff);
+    return pixels;
+}
+function ciSame(a, b) {
+    if (a.count != b.count) return false;
+    for (var i = 0; i < a.count; ++i) if (a[i] != b[i]) return false;
+    return true;
+}
+function ciPrepare(children) {
+    ciDest.setPos(8, 12); ciSource.setPos(8, 12);
+    ciDest.visible = true; ciSource.visible = false;
+    ciDest.type = ciSource.type = children ? ltAlpha : ltOpaque;
+    ciDestChild.parent = ciDest; ciSourceChild.parent = ciSource;
+    ciDestChild.visible = ciSourceChild.visible = children;
+    ciDestChild.fillRect(0, 0, 16, 16, 0xff3050f0);
+    ciSourceChild.fillRect(0, 0, 16, 16, 0xfff0d030);
+    ciPattern(ciDest, false); ciPattern(ciSource, true);
+    ciCompleted = false; ciCompletionCount = 0; ciCompletionArgs = false;
+    ciTick = 0; ciWaits = 0;
+}
+function ciOptions(name, children) {
+    return %[time:1000, callback:ciClock, maxh:8, maxdrift:8, maxsize:8, rwidth:16,
+        bgcolor:0xff0000ff, factor:0.25, accel:0, twist:1.25, twistaccel:0,
+        rule:children ? ciRule : ciStorage + "transition-rule.bmp", speed1:1, accel1:0, speed2:0,
+        blur1:8, blur2:8, zoom1:150, zoom2:200, delayR:128,
+        type1:0, type2:1, back:0xffffff, alpha:180, slip:8, dir:name == "honeyturn" ? 6 : 0,
+        size:12, order:2, count:3, wavecount:2,
+        before:[0,0,64,0,0,48, 64,0,64,48,0,48],
+        after:[4,3,60,6,8,44, 60,6,60,45,8,44]];
+}
+function ciMutationStep() {
+    if (ciPhase == 0) {
+        ciPrepare(false);
+        ciDest.fillRect(0, 0, 64, 48, 0xffff0000);
+        ciSource.fillRect(0, 0, 64, 48, 0xff00ff00);
+        ciDest.beginTransition("mosaic", false, ciSource, %[time:1000, callback:ciClock, maxsize:8]);
+        ciPhase = 1;
+    } else if (ciPhase == 1) {
+        ciTick = 500; ciPhase = 2;
+    } else if (ciPhase == 2) {
+        ciFrame();
+        ciCheck((ciCapture.getMainPixel(32, 24) & 0xffffff) == 0x807f00,
+            "transition texture readback contains the first intermediate frame");
+        // Keep the tick fixed while changing the same source texture. A cached
+        // GPU readback must be invalidated when the next snapshot is copied.
+        ciSource.fillRect(0, 0, 64, 48, 0xff0000ff);
+        ciPhase = 3;
+    } else if (ciPhase == 3) {
+        ciFrame();
+        ciCheck((ciCapture.getMainPixel(32, 24) & 0xffffff) == 0x80007f,
+            "transition snapshots refresh after the source texture changes");
+        ciTick = 1000; ciPhase = 4;
+    } else if (ciCompleted) {
+        ciCheck(ciCompletionCount == 1 && ciCompletionArgs,
+            "a transition sends one completion with its destination and source");
+        ciPrepare(false);
+        ciDest.beginTransition("mosaic", false, ciSource, %[time:1000]);
+        ciDest.stopTransition();
+        ciCheck(ciCompleted && ciCompletionCount == 1 && ciCompletionArgs,
+            "manual transition cancellation sends one completion");
+        ciFinish(void);
+    } else if (++ciWaits > 30) throw "source mutation transition completion timed out";
 }
 function ciStep() {
     try {
-        if (ciIndex == 8) {
-            ciDest.visible = true; ciSource.visible = false;
-            ciCompleted = false;
-            ciDest.startTransition("mosaic", false, ciSource, %[time:1000]);
-            ciDest.stopTransition();
-            ciCheck(ciCompleted, "manual transition cancellation sends completion");
-            ciFinish(void);
-            return;
-        }
-        var name = ciEffects[ciIndex % 4];
-        var children = ciIndex >= 4;
+        if (ciIndex == ciEffects.count * 2) { ciMutationStep(); return; }
+        var name = ciEffects[ciIndex % ciEffects.count];
+        var children = ciIndex >= ciEffects.count;
         if (ciPhase == 0) {
-            ciDest.setPos(0, 0); ciSource.setPos(0, 0);
-            ciDest.visible = true; ciSource.visible = false;
-            ciDest.type = ciSource.type = children ? ltAlpha : ltOpaque;
-            ciDest.fillRect(0, 0, 64, 48, 0xffff0000);
-            ciSource.fillRect(0, 0, 64, 48, 0xff00ff00);
-            ciCompleted = false; ciTick = 0; ciWaits = 0;
-            ciDest.startTransition(name, children, ciSource,
-                %[time:1000, callback:ciClock, maxh:8, maxdrift:8, maxsize:8, rwidth:32, bgcolor:0xff0000ff]);
+            ciPrepare(children);
+            ciDest.beginTransition(name, children, ciSource, ciOptions(name, children));
             ciPhase = 1;
         } else if (ciPhase == 1) {
-            ciTick = 500;
-            ciPhase = 2;
+            ciCheck(!ciCompleted && ciSame(ciFrame(), ciExpected(false, children)),
+                name + " starts with the outgoing image, children=" + children);
+            ciTick = 500; ciPhase = 2;
         } else if (ciPhase == 2) {
-            ciCapture.piledCopy(0, 0, ciPrimary, 0, 0, 64, 48);
-            var changed = false;
-            for (var y = 4; y < 48; y += 8) for (var x = 4; x < 64; x += 8) {
-                var pixel = ciCapture.getMainPixel(x, y) & 0xffffff;
-                if (pixel != 0xff0000 && pixel != 0x00ff00) changed = true;
-            }
-            ciCheck(!ciCompleted && changed, name + " renders an intermediate frame, children=" + children);
-            ciTick = 1000;
-            ciPhase = 3;
+            var pixels = ciFrame();
+            ciCheck(!ciCompleted && !ciSame(pixels, ciExpected(false, children)) &&
+                !ciSame(pixels, ciExpected(true, children)),
+                name + " renders an intermediate frame, children=" + children);
+            ciTick = 1000; ciPhase = 3;
         } else if (ciCompleted) {
-            ciCapture.piledCopy(0, 0, ciPrimary, 0, 0, 64, 48);
-            ciCheck((ciCapture.getMainPixel(32, 24) & 0xffffff) == 0x00ff00,
+            ciCheck(ciCompletionCount == 1 && ciCompletionArgs && ciSame(ciFrame(), ciExpected(true, children)),
                 name + " completes with the incoming image, children=" + children);
             ++ciIndex; ciPhase = 0;
         } else if (++ciWaits > 30) throw "transition completion timed out: " + name;
@@ -78,8 +155,8 @@ function ciStep() {
 
 ciMessages.save(ciOutput + "started.txt");
 try {
-    Plugins.link("extrans.dll");
-    Plugins.link("extrans.dll");
+    Plugins.link("extrans.dll"); Plugins.link("extrans.dll");
+    Plugins.link("extNagano.dll"); Plugins.link("extNagano.dll");
     ciWindow = new Window();
     ciWindow.innerWidth = 128; ciWindow.innerHeight = 96;
     ciPrimary = new Layer(ciWindow, null);
@@ -89,22 +166,44 @@ try {
     ciDest = new CITransitionLayer(ciWindow, ciPrimary);
     ciSource = new Layer(ciWindow, ciPrimary);
     ciCapture = new Layer(ciWindow, ciPrimary);
-    var layers = [ciDest, ciSource, ciCapture];
+    ciRule = new Layer(ciWindow, ciPrimary);
+    var layers = [ciDest, ciSource, ciCapture, ciRule];
     for (var i = 0; i < layers.count; ++i) {
         layers[i].setSize(64, 48); layers[i].setImageSize(64, 48);
-        layers[i].type = ltOpaque;
+        layers[i].type = ltOpaque; layers[i].visible = false;
     }
-    ciDest.visible = true; ciSource.visible = ciCapture.visible = false;
-    ciWindow.visible = true;
-    ciReject("mosaic", %[time:1000, maxsize:0]);
-    ciReject("wave", %[time:1000, wavetype:3]);
-    ciReject("ripple", %[time:1000, rwidth:31]);
-    ciReject("ripple", %[time:1000, maxdrift:128]);
-    ciReject("rotateswap", %[time:-1]);
-    ciReject("mosaic", %[]);
+    ciRule.loadImages(ciStorage + "transition-rule.bmp");
+    ciCheck(ciRule.imageWidth == 64 && ciRule.imageHeight == 48,
+        "transition rule loads through the selected storage backend");
+    ciDestChild = new Layer(ciWindow, ciDest);
+    ciSourceChild = new Layer(ciWindow, ciSource);
+    layers = [ciDestChild, ciSourceChild];
+    for (var i = 0; i < layers.count; ++i) {
+        layers[i].setSize(16, 16); layers[i].setImageSize(16, 16);
+        layers[i].setPos(16, 16); layers[i].type = ltOpaque; layers[i].visible = false;
+    }
+    ciDestChild.fillRect(0, 0, 16, 16, 0xff3050f0);
+    ciSourceChild.fillRect(0, 0, 16, 16, 0xfff0d030);
+    ciDest.visible = true; ciWindow.visible = true;
+    ciCheck(typeof ciDest.beginTransition == "Object" && typeof ciDest.stopTransition == "Object",
+        "Layer exposes the actual TJS transition entry points");
+    ciReject("mosaic", %[time:1000, maxsize:0], "maxsize");
+    ciReject("wave", %[time:1000, wavetype:3], "wavetype");
+    ciReject("ripple", %[time:1000, rwidth:31], "rwidth");
+    ciReject("ripple", %[time:1000, maxdrift:128], "maxdrift");
+    ciReject("rotateswap", %[time:-1], "out of range");
+    ciReject("turn", %[time:-1], "out of range");
+    ciReject("rotatezoom", %[time:1000, factor:1e30], "factor");
+    ciReject("rotatevanish", %[time:1000, twist:1e30], "twist");
+    ciReject("mosaic", %[], "time option is required");
+    ciReject("imagewipe", %[time:1000], "requires a rule image");
+    ciReject("morphing", %[time:1000, before:[0,0], after:[0,0]], "six coordinates per triangle");
+    ciReject("multiripple", %[time:1000, count:21], "multiripple options");
+    ciReject("honeyturn", %[time:1000, size:0], "honeyturn options");
     ciTimer = new Timer(ciWindow);
-    ciTimer.enabled = false;
-    ciTimer.interval = 150;
-    ciTimer.onTimer = ciStep;
-    ciTimer.enabled = true;
+    ciTimer.enabled = false; ciTimer.interval = 150;
+    // A stalled emulator must render between phases instead of draining
+    // several queued callbacks before the continuous transition hook runs.
+    ciTimer.capacity = 1;
+    ciTimer.onTimer = ciStep; ciTimer.enabled = true;
 } catch (error) { ciFinish(error); }

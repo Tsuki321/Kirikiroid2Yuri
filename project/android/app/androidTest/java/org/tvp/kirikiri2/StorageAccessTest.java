@@ -150,22 +150,26 @@ public class StorageAccessTest {
         String movieScript = read(tests.getAssets().open("engine/movie-startup.tjs"));
         String archiveScript = read(tests.getAssets().open("engine/archive-startup.tjs"));
         String transitionScript = read(tests.getAssets().open("engine/transition-startup.tjs"));
+        String audioScript = read(tests.getAssets().open("engine/audio-startup.tjs"));
         String program = read(tests.getAssets().open("engine/compiled-source.tjs"));
         File base = new File(context.getFilesDir(), "engine-ci");
         assertTrue(StorageAccess.mkdirs(context, base.getPath()));
         StringBuilder manifest = new StringBuilder();
-        String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents", "transitions"};
+        String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents",
+                "transitions", "transitions-documents", "transitions-opengl", "transitions-opengl-documents",
+                "audio-local", "audio-documents"};
         for (String name : names) {
             String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
             String output = new File(base, name + "-result").getPath();
             assertTrue(StorageAccess.mkdirs(context, storage));
             assertTrue(StorageAccess.mkdirs(context, output));
             write(storage + "/Kirikiroid2Preference.xml", "<?xml version=\"1.0\"?>\n<GlobalPreference>"
+                + "<Item key=\"renderer\" value=\"" + (name.contains("opengl") ? "opengl" : "software") + "\"/>"
                 + "<Custom key=\"ci-preference\" value=\"saved value=1 &amp; 2\"/>"
                 + "<Custom key=\"ci-launch\" value=\"overridden preference\"/>"
                 + "</GlobalPreference>\n");
             write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript
-                : name.equals("transitions") ? transitionScript : script)
+                : name.startsWith("transitions") ? transitionScript : name.startsWith("audio-") ? audioScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
             if (name.equals("local") || name.equals("documents")) {
                 write(storage + "/engine-body.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
@@ -187,6 +191,12 @@ public class StorageAccessTest {
             write(storage + "/compiled-source.tjs", program);
             write(storage + "/psb-tests.tjs", read(tests.getAssets().open("engine/psb-tests.tjs")));
             write(storage + "/datapack-tests.tjs", read(tests.getAssets().open("engine/datapack-tests.tjs")));
+            write(storage + "/plugin-tests.tjs", read(tests.getAssets().open("engine/plugin-tests.tjs")));
+            assertTrue(StorageAccess.write(context, storage + "/plugin-tone.wav",
+                    readBytes(tests.getAssets().open("engine/plugin-tone.wav"))));
+            if (name.startsWith("transitions"))
+                assertTrue(StorageAccess.write(context, storage + "/transition-rule.bmp",
+                        readBytes(tests.getAssets().open("engine/transition-rule.bmp"))));
             for (String filename : tests.getAssets().list("datapack")) {
                 assertTrue(StorageAccess.write(context, storage + "/pack-" + filename,
                         readBytes(tests.getAssets().open("datapack/" + filename))));

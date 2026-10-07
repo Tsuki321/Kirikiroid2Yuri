@@ -974,6 +974,15 @@ public:
 			PixelData = nullptr;
 		}
 	}
+	void PrepareForWrite() {
+		// Flush pending CPU edits before a GPU write, then invalidate readback.
+		// Readback's age counter is only useful while the texture is unchanged.
+		// Otherwise Copy -> GetScanLineForRead can retain stale pixels forever.
+		SyncPixel();
+		delete[] PixelData;
+		PixelData = nullptr;
+		PixelDataCounter = 0;
+	}
 	virtual void ApplyVertex(GLVertexInfo &vtx, const tTVPRect &rc) {
 		vtx.tex = this;
 		GLfloat sminu, smaxu, sminv, smaxv;
@@ -1449,6 +1458,7 @@ public:
 
 	virtual void SetPoint(int x, int y, uint32_t clr) {
 		if (texture) {
+			PrepareForWrite();
 			_glBindTexture2D(texture);
 			//glBindTexture(GL_TEXTURE_2D, texture);
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1533,23 +1543,17 @@ public:
 	}
 
 	virtual void Update(const void *pixel, TVPTextureFormat::e format, int pitch, const tTVPRect& rc) {
-		if (PixelData) {
-			if (rc.left > 0 || rc.top > 0 || rc.bottom < Height || rc.right < Width) {
-				unsigned char *src = (unsigned char *)pixel, *dst = (unsigned char *)PixelData;
-				int dpitch = internalW * 4;
-				for (int y = 0; y < Height; ++y) {
-					memcpy(dst, src, dpitch);
-					src += pitch; dst += dpitch;
-				}
-				pixel = PixelData; pitch = internalW * 4;
-				PixelDataCounter = 5;
-			} else {
-				delete[] PixelData;
-				PixelData = nullptr;
-			}
+		if (PixelData && IsTextureDirty) {
+			// Preserve CPU edits outside the incoming update rectangle.
+			InternalUpdate(PixelData, internalW * 4, 0, 0, internalW, internalH);
 			IsTextureDirty = false;
 		}
+		// Upload only the supplied rectangle. Keep readback alive until the
+		// upload finishes in case the caller supplied a pointer into it.
 		InternalUpdate(pixel, pitch, rc.left, rc.top, rc.get_width(), rc.get_height());
+		delete[] PixelData;
+		PixelData = nullptr;
+		PixelDataCounter = 0;
 	}
 
 	virtual void * GetScanLineForWrite(tjs_uint l) {
@@ -1559,7 +1563,7 @@ public:
 
 	virtual void SetPoint(int x, int y, tjs_uint32 clr) {
 		if (texture) {
-			SyncPixel();
+			PrepareForWrite();
 			_glBindTexture2D(texture);
 			//glBindTexture(GL_TEXTURE_2D, texture);
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1582,7 +1586,7 @@ public:
 	virtual bool IsStatic() override { return false; }
 
 	virtual void AsTarget() override {
-		SyncPixel();
+		PrepareForWrite();
 		TVPSetRenderTarget(texture);
 	}
 };
@@ -1852,11 +1856,13 @@ public:
 			(uint8_t)(c >> 24)
 		};
 		if (rctar->left <= 0 && rctar->top <= 0 && rctar->get_width() >= tar->GetWidth() && rctar->get_height() >= tar->GetHeight()) {
+			tar->PrepareForWrite();
 			GL::glClearTexImage(tar->texture, 0, GL_RGBA, GL_UNSIGNED_BYTE, clr);
 		} else {
 			float sw, sh;
 			tar->GetScale(sw, sh);
-			if (sw != 1.f && sh != 1.f) return false;
+			if (sw != 1.f || sh != 1.f) return false;
+			tar->PrepareForWrite();
 			GL::glClearTexSubImage(tar->texture, 0, rctar->left, rctar->top, 0, rctar->get_width(), rctar->get_height(),
 				1, GL_RGBA, GL_UNSIGNED_BYTE, clr);
 		}
@@ -3521,6 +3527,8 @@ public:
 	}
 
 	void CopyTexture(tTVPOGLTexture2D *dst, tTVPOGLTexture2D *src, const tTVPRect &rcsrc) {
+		src->SyncPixel();
+		dst->PrepareForWrite();
 		if (GL::glCopyImageSubData && !src->IsCompressed &&
 			src->_scaleW == dst->_scaleW && src->_scaleH == dst->_scaleH &&
 			src->Format == dst->Format) {
