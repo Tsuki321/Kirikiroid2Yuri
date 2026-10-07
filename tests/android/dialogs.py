@@ -17,12 +17,20 @@ def adb(*args, check=True):
 
 
 def stage_text(output):
-    result = adb("exec-out", "cat", output + "/dialog-stage.txt", check=False)
+    # shell v2 preserves the remote exit status; -T also preserves UTF-16 bytes.
+    result = adb("shell", "-T", "cat", output + "/dialog-stage.txt", check=False)
     if result.returncode:
         return ""
     data = result.stdout
     encoding = "utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
-    return data.decode(encoding).strip()
+    try:
+        text = data.decode(encoding)
+    except UnicodeDecodeError:
+        return ""
+    # Array.save writes its BOM, value and newline separately. Retry until a
+    # complete numeric line is available instead of reading a partial stage.
+    match = re.fullmatch(r"([1-9][0-9]*)\r?\n", text)
+    return match.group(1) if match else ""
 
 
 def drive(name, output):
@@ -37,14 +45,26 @@ def drive(name, output):
             current = stage_text(output)
             if current and int(current) > stage:
                 raise RuntimeError("native dialog returned before the response: " + caption)
+            if current != str(stage):
+                time.sleep(0.3)
+                continue
             dumped = adb("shell", "uiautomator", "dump", "--compressed",
                          "/data/local/tmp/ci-dialog.xml", check=False)
             if dumped.returncode:
                 time.sleep(0.3)
                 continue
-            xml = adb("exec-out", "cat", "/data/local/tmp/ci-dialog.xml").stdout
+            result = adb("shell", "-T", "cat", "/data/local/tmp/ci-dialog.xml", check=False)
+            if result.returncode:
+                time.sleep(0.3)
+                continue
+            xml = result.stdout
             (diagnostics / (name + "-dialog-" + str(stage) + ".xml")).write_bytes(xml)
-            nodes = [node for node in ET.fromstring(xml).iter("node")
+            try:
+                hierarchy = ET.fromstring(xml)
+            except ET.ParseError:
+                time.sleep(0.3)
+                continue
+            nodes = [node for node in hierarchy.iter("node")
                      if node.get("package") == PACKAGE]
             if not any(node.get("text") == caption for node in nodes):
                 time.sleep(0.3)
@@ -52,7 +72,10 @@ def drive(name, output):
             # Leave a visible dialog unanswered, then prove the script still
             # waits at that request. This detects stale result reuse directly.
             time.sleep(0.35)
-            if stage_text(output) != str(stage):
+            current = stage_text(output)
+            if not current:
+                continue
+            if current != str(stage):
                 raise RuntimeError("script advanced with an unanswered dialog: " + caption)
             if stage in INITIAL_TEXT:
                 editors = [node for node in nodes if node.get("class") == "android.widget.EditText"]

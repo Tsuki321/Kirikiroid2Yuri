@@ -63,13 +63,22 @@ var ciWaveEffects = [ciGain, ciClip, ciDelay, ciEQ, ciVerb, ciDSP];
 for (var ciEffectIndex = 0; ciEffectIndex < ciWaveEffects.count; ++ciEffectIndex) {
     ciCheck(ciWaveEffects[ciEffectIndex].interface > 0,
         "wave effect exposes a native audio interface " + ciEffectIndex);
-    var ciEffectSound = new WaveSoundBuffer(null);
-    ciEffectSound.volume = 0;
-    ciEffectSound.filters.add(ciWaveEffects[ciEffectIndex]);
-    ciEffectSound.open(ciStorage + "plugin-tone.wav");
-    ciEffectSound.play();
-    ciEffectSound.stop();
-    invalidate ciEffectSound;
+    // Stop must finish outstanding decoding before reopen or invalidation can
+    // release the filter chain and sample queues. Exercise both immediately.
+    for (var ciEffectCycle = 0; ciEffectCycle < 4; ++ciEffectCycle) {
+        var ciEffectSound = new WaveSoundBuffer(null);
+        ciEffectSound.volume = 0;
+        ciEffectSound.filters.add(ciWaveEffects[ciEffectIndex]);
+        for (var ciReopenCycle = 0; ciReopenCycle < 2; ++ciReopenCycle) {
+            ciEffectSound.open(ciStorage + "plugin-tone.wav");
+            ciEffectSound.play();
+            ciEffectSound.stop();
+        }
+        ciCheck(ciEffectSound.status == "stop",
+            "wave decoder stops before reopen and invalidation " +
+            ciEffectIndex + ":" + ciEffectCycle);
+        invalidate ciEffectSound;
+    }
 }
 ciCheck(true, "all wave effect classes attach to the real PCM decoder chain");
 

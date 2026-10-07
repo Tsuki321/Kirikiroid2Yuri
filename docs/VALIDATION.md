@@ -57,15 +57,19 @@ backends. Repeated GPU writes and reads exercise cached-pixel invalidation.
 Audio fixtures decode a constant PCM WAV through real `WaveSoundBuffer` objects,
 compare the visualization samples from one -12 dB gain filter and two serial
 -6 dB filters, and repeat after stop/open/play. This checks that script filter
-objects reach the engine's decoder pipeline. Pure DSP tests check the individual
-algorithms independently of Android playback scheduling.
+objects reach the engine's decoder pipeline. Repeated immediate playback, stop,
+reopen and invalidation exercise decoder shutdown before filter and sample-buffer
+release. Pure DSP tests check the individual algorithms independently of Android
+playback scheduling.
 
 The modal-dialog driver inspects the real Android UI and answers eight successive
 dialogs. Before every tap it confirms the script is still waiting at that request.
 This checks fresh Yes/No and button-index results, accepted and empty input,
 cancellation, and a message after an input dialog through both storage backends.
 Each Java dialog owns its editor and callbacks; native results are reset before
-dispatch and synchronized with the UI response.
+dispatch and synchronized with the UI response. Progress reads wait for complete
+UTF-16 or UTF-8 stage records, and a completion marker checks the final dialog.
+Host tests cover partial records, transient ADB/XML read failures and early returns.
 
 Tests use synthetic data and a test-only document provider in a separate APK.
 The provider grants a subtree from its own UID; the application then uses normal

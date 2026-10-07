@@ -31,6 +31,7 @@ try {
         "canceled input returns void");
     ciCheck(System.inform("Select Done.", ciStage(8), ["Done"]) == 0,
         "message after canceled input waits for a fresh response");
+    ciStage(9); // Let the driver detect an early return from the final dialog.
     ciMessages.add("ENGINE_CI_PASS");
 } catch (error) {
     var message = "" + error;

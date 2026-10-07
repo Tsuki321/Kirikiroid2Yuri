@@ -15,6 +15,7 @@
 #endif
 #include <math.h>
 #include <algorithm>
+#include <atomic>
 #include "SystemControl.h"
 #include "DebugIntf.h"
 #include "MsgIntf.h"
@@ -1825,7 +1826,7 @@ class tTVPWaveSoundBufferDecodeThread : public tTVPThread
 	tTJSNI_WaveSoundBuffer * Owner;
 	tTVPThreadEvent Event;
 	tTJSCriticalSection OneLoopCS;
-	volatile bool Running;
+	std::atomic<bool> Running;
 
 public:
 	tTVPWaveSoundBufferDecodeThread(tTJSNI_WaveSoundBuffer * owner);
@@ -1873,9 +1874,11 @@ void tTVPWaveSoundBufferDecodeThread::Execute(void)
 			bool wait;
 			DWORD et;
 
-			if(Running)
 			{
-				volatile tTJSCriticalSectionHolder cs_holder(OneLoopCS);
+				tTJSCriticalSectionHolder cs_holder(OneLoopCS);
+				// Interrupt may have stopped us while we waited for this lock.
+				// Do not touch the decoder or buffers after it has returned.
+				if(!Running) break;
 				wait = !Owner->FillL2Buffer(false, true); // fill
 			}
 
