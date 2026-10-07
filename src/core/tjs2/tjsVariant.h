@@ -1179,14 +1179,12 @@ public:
 		if(vt==tvtString || rhs.vt==tvtString)
 		{
 			// combines as string
+			// Own converted strings across exceptions and use c_str() for the
+			// null backing object that represents an empty string.
+			const tTJSString s1(*this), s2(rhs);
 			tTJSVariant val;
+			val.String = TJSAllocVariantString(s1.c_str(), s2.c_str());
 			val.vt = tvtString;
-			tTJSVariantString *s1, *s2;
-			s1 = AsString();
-			s2 = rhs.AsString();
-			val.String = TJSAllocVariantString(*s1, *s2);
-			if(s1) s1->Release();
-			if(s2) s2->Release();
 			return val;
 		}
 

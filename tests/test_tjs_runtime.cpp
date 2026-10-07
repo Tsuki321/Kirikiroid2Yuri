@@ -349,6 +349,102 @@ TEST_F(TJSRuntime, EmptyStringsRemainValidWithOptimization) {
     EXPECT_EQ(1, Integer(TJS_W("copy[0] == '' && copy[1] == 'value' && copy[2] == ''")));
 }
 
+TEST_F(TJSRuntime, EmptyStringConcatenationOperatorsPreserveText) {
+    const tTJSVariant values[] = {tTJSVariant(TJS_W("")), tTJSVariant(),
+        tTJSVariant(42), tTJSVariant(1.5), tTJSVariant(TJS_W("value"))};
+    const char *expected[] = {"", "", "42", "1.5", "value"};
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i) {
+        SCOPED_TRACE(i);
+        const tTJSVariant empty(TJS_W(""));
+        const tTJSVariant left = empty + values[i], right = values[i] + empty;
+        EXPECT_EQ(tvtString, left.Type());
+        EXPECT_EQ(tvtString, right.Type());
+        EXPECT_EQ(expected[i], ttstr(left).AsStdString());
+        EXPECT_EQ(expected[i], ttstr(right).AsStdString());
+        tTJSVariant appendLeft(empty), appendRight(values[i]);
+        appendLeft += values[i];
+        appendRight += empty;
+        EXPECT_EQ(tvtString, appendLeft.Type());
+        EXPECT_EQ(tvtString, appendRight.Type());
+        EXPECT_EQ(expected[i], ttstr(appendLeft).AsStdString());
+        EXPECT_EQ(expected[i], ttstr(appendRight).AsStdString());
+    }
+}
+
+TEST_F(TJSRuntime, EmptyStringConcatenationWrappersPreserveText) {
+    const ttstr empty, value(TJS_W("value"));
+    EXPECT_TRUE((empty + empty).IsEmpty());
+    EXPECT_EQ("value", (empty + value).AsStdString());
+    EXPECT_EQ("value", (value + empty).AsStdString());
+    EXPECT_EQ("value", (empty + TJS_W("value")).AsStdString());
+    EXPECT_EQ("value", (value + TJS_W("")).AsStdString());
+    EXPECT_EQ("value", (TJS_W("value") + empty).AsStdString());
+    EXPECT_EQ("value", (TJS_W("") + value).AsStdString());
+    EXPECT_TRUE((empty + static_cast<const tjs_char *>(nullptr)).IsEmpty());
+    EXPECT_EQ("x", (empty + TJS_W('x')).AsStdString());
+    EXPECT_EQ("value", (value + static_cast<tjs_char>(0)).AsStdString());
+}
+
+TEST_F(TJSRuntime, FailedStringConcatenationPreservesOperandsAndReferences) {
+    const tjs_uint8 bytes[] = {0x41, 0x42};
+    tTJSVariant octet(bytes, sizeof(bytes)), text(TJS_W("retained"));
+    tTJSVariantString *original = text.AsStringNoAddRef();
+    const tjs_int references = original->GetRefCount();
+    tTJSVariantOctet *originalOctet = octet.AsOctetNoAddRef();
+    EXPECT_THROW(text + octet, eTJSVariantError);
+    EXPECT_EQ(references, original->GetRefCount());
+    EXPECT_THROW(octet + text, eTJSVariantError);
+    EXPECT_EQ(references, original->GetRefCount());
+    EXPECT_THROW(text += octet, eTJSVariantError);
+    EXPECT_EQ(original, text.AsStringNoAddRef());
+    EXPECT_EQ(references, original->GetRefCount());
+    EXPECT_EQ("retained", ttstr(text).AsStdString());
+    EXPECT_THROW(octet += text, eTJSVariantError);
+    EXPECT_EQ(originalOctet, octet.AsOctetNoAddRef());
+    EXPECT_EQ(references, original->GetRefCount());
+    tTJSVariant empty(TJS_W(""));
+    EXPECT_THROW(empty + octet, eTJSVariantError);
+    EXPECT_THROW(empty += octet, eTJSVariantError);
+    EXPECT_EQ(tvtString, empty.Type());
+    EXPECT_EQ(nullptr, empty.AsStringNoAddRef());
+}
+
+TEST_F(TJSRuntime, EmptyStringConcatenationExecutesFromSourceAndBytecode) {
+    const tjs_char *source = TJS_W(
+        "var concatValues = ['', void, 42, 1.5, 'value'];"
+        "var concatExpected = ['', '', '42', '1.5', 'value'];"
+        "var concatChecks = 0;"
+        "for (var i = 0; i < concatValues.count; ++i) {"
+        "  var left = '', right = concatValues[i];"
+        "  if (left + right !== concatExpected[i] || right + left !== concatExpected[i])"
+        "    throw 'empty string concatenation changed the text';"
+        "  left += right; right += '';"
+        "  if (left !== concatExpected[i] || right !== concatExpected[i])"
+        "    throw 'empty string append changed the text';"
+        "  ++concatChecks;"
+        "}"
+        "function concatStage(number) {"
+        "  var stage = ['' + number]; stage.save('concat-stage.txt');"
+        "  return 'CI_DIALOG_' + number;"
+        "}"
+        "var concatCaption = concatStage(1);"
+        "var concatSaved = []; concatSaved.load('concat-stage.txt');");
+    for (bool compiled : {false, true}) {
+        SCOPED_TRACE(compiled ? "bytecode" : "source");
+        if (compiled) {
+            ByteStream stream;
+            runtime->CompileScript(source, &stream, false, true);
+            stream.SetPosition(0);
+            ASSERT_TRUE(runtime->LoadByteCode(&stream));
+        } else {
+            Script(source);
+        }
+        EXPECT_EQ(5, Integer(TJS_W("concatChecks")));
+        EXPECT_EQ(1, Integer(TJS_W("concatCaption === 'CI_DIALOG_1'")));
+        EXPECT_EQ(1, Integer(TJS_W("concatSaved.count == 1 && concatSaved[0] === '1'")));
+    }
+}
+
 TEST_F(TJSRuntime, ClosuresKeepObjectsAliveAcrossArrayGrowth) {
     Script(TJS_W("class Counter { var value; function Counter() { value = 0; } function next() { return ++value; } }"
                  "var object = new Counter(); var callback = object.next; var values = [];"
