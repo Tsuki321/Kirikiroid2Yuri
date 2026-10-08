@@ -38,6 +38,7 @@ public class LibraryUiTest {
             UiChecks.automation().setRotation(UiAutomation.ROTATION_FREEZE_0); SystemClock.sleep(500);
             UiChecks.screenshot("library-portrait");
             UiChecks.automation().setRotation(UiAutomation.ROTATION_FREEZE_90); SystemClock.sleep(500);
+            UiChecks.waitFor("+  Add game folder"); UiChecks.screenshot("library-landscape-top");
             UiChecks.scrollTo("Options for A new story"); UiChecks.screenshot("library-landscape");
             UiChecks.click("Options for A new story"); UiChecks.click("Remove from library"); UiChecks.click("Remove");
             UiChecks.waitFor("No games added yet. Use Add game folder to get started.");

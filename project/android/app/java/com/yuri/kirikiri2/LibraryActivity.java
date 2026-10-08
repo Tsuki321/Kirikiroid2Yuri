@@ -44,7 +44,7 @@ public class LibraryActivity extends Activity {
     private static final int PICK_FOLDER = 410;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private GameLibrary library;
-    private LinearLayout content, cards, recent;
+    private LinearLayout content, cards, recent, filters;
     private EditText search;
     private Button add, sort;
     private TextView status;
@@ -56,6 +56,7 @@ public class LibraryActivity extends Activity {
     private int order;
     private GameLibrary.Entry relocating;
     private boolean busy;
+    private boolean compact;
     private String busyMessage;
 
     @Override public void onCreate(Bundle state) {
@@ -102,7 +103,7 @@ public class LibraryActivity extends Activity {
         intent.removeExtra("pending_game"); intent.removeExtra("exiting_engine"); intent.removeExtra("pending_entry");
         if (path == null || previousPid <= 0) return;
         busy = true; busyMessage = "Closing the previous game…";
-        add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setText(busyMessage);
+        add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setVisibility(View.VISIBLE); status.setText(busyMessage);
         long deadline = SystemClock.uptimeMillis() + 10000;
         handler.post(new Runnable() {
             @Override public void run() {
@@ -129,41 +130,50 @@ public class LibraryActivity extends Activity {
     }
 
     private void buildView() {
+        Configuration configuration = getResources().getConfiguration();
+        compact = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                && configuration.screenHeightDp < 600 && configuration.fontScale <= 1.3f;
         scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BACKGROUND);
         FrameLayout center = new FrameLayout(this);
-        content = column(this, 24);
+        content = column(this, compact ? 16 : 24);
         int width = Math.min(getResources().getDisplayMetrics().widthPixels, dp(this, 860));
         FrameLayout.LayoutParams centered = new FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         center.addView(content, centered);
         scroll.addView(center);
         setContentView(scroll);
 
-        LinearLayout top = row(this);
-        TextView brand = text(this, "KIRIKIROID", 12, ACCENT);
-        brand.setLetterSpacing(0.18f);
-        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
-        Button help = button(this, "Help", false);
-        help.setOnClickListener(view -> showHelp());
-        top.addView(help);
-        content.addView(top);
-        gap(content, 26);
-        content.addView(title(this, "Your library", 32));
-        gap(content, 6);
-        content.addView(text(this, "Pick a story. Settle in.", 16, MUTED));
-        gap(content, 22);
-        recent = column(this, 22);
-        recent.setBackground(shape(this, SURFACE, 22));
-        content.addView(recent, new LinearLayout.LayoutParams(-1, -2));
-        gap(content, 18);
-
         add = button(this, "+  Add game folder", true);
         add.setOnClickListener(view -> { relocating = null; pickFolder(null); });
-        content.addView(add, new LinearLayout.LayoutParams(-1, -2));
-        gap(content, 16);
+        LinearLayout top = row(this);
+        TextView brand = compact ? title(this, "Your library", 24) : text(this, "KIRIKIROID", 12, ACCENT);
+        if (!compact) brand.setLetterSpacing(0.18f);
+        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+        if (compact) top.addView(add, new LinearLayout.LayoutParams(-2, dp(this, 48)));
+        Button help = button(this, "Help", false);
+        help.setOnClickListener(view -> showHelp());
+        LinearLayout.LayoutParams helpParams = new LinearLayout.LayoutParams(-2, dp(this, 48));
+        helpParams.leftMargin = dp(this, 8);
+        top.addView(help, helpParams);
+        content.addView(top);
+        if (!compact) {
+            gap(content, 26);
+            content.addView(title(this, "Your library", 32));
+            gap(content, 6);
+            content.addView(text(this, "Pick a story. Settle in.", 16, MUTED));
+        }
+        gap(content, compact ? 12 : 22);
+        recent = column(this, compact ? 16 : 22);
+        recent.setBackground(shape(this, SURFACE, 22));
+        content.addView(recent, new LinearLayout.LayoutParams(-1, -2));
+        gap(content, compact ? 12 : 18);
+        if (!compact) {
+            content.addView(add, new LinearLayout.LayoutParams(-1, -2));
+            gap(content, 16);
+        }
 
-        LinearLayout filters = row(this);
+        filters = row(this);
         search = new EditText(this);
         search.setSingleLine(true);
         search.setTextColor(TEXT);
@@ -172,6 +182,13 @@ public class LibraryActivity extends Activity {
         search.setHint("Search your games");
         search.setContentDescription("Search your games");
         search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        search.setOnEditorActionListener((view, action, event) -> {
+            if (action != EditorInfo.IME_ACTION_SEARCH && action != EditorInfo.IME_ACTION_DONE) return false;
+            ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE))
+                    .hideSoftInputFromWindow(search.getWindowToken(), 0);
+            search.clearFocus();
+            return true;
+        });
         search.setPadding(dp(this, 14), 0, dp(this, 14), 0);
         search.setBackground(shape(this, SURFACE, 14));
         search.setText(query);
@@ -222,19 +239,31 @@ public class LibraryActivity extends Activity {
         GameLibrary.Entry latest = null;
         for (GameLibrary.Entry entry : entries)
             if (entry.lastPlayed > 0 && (latest == null || entry.lastPlayed > latest.lastPlayed)) latest = entry;
+        recent.setVisibility(compact && latest == null && !entries.isEmpty() ? View.GONE : View.VISIBLE);
         if (latest == null) {
             recent.addView(text(this, entries.isEmpty() ? "A PLACE FOR YOUR STORIES" : "READY WHEN YOU ARE", 11, ACCENT));
             gap(recent, 12);
             recent.addView(title(this, entries.isEmpty() ? "Your next story starts here." : "Your games, one tap away.", 23));
             gap(recent, 8);
             recent.addView(text(this, "Add an extracted Kirikiri game folder once. Keep its archives, patches and support files together.", 15, MUTED));
+        } else if (compact) {
+            final GameLibrary.Entry entry = latest;
+            LinearLayout line = row(this), details = column(this, 0);
+            details.addView(text(this, "LAST PLAYED", 11, ACCENT)); gap(details, 4);
+            TextView name = title(this, entry.name, 20); name.setMaxLines(2);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END); details.addView(name);
+            details.setPadding(0, 0, dp(this, 16), 0);
+            line.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+            Button play = button(this, "Play again", true); play.setOnClickListener(view -> play(entry));
+            line.addView(play, new LinearLayout.LayoutParams(-2, dp(this, 48)));
+            recent.addView(line);
         } else {
             final GameLibrary.Entry entry = latest;
             recent.addView(text(this, "LAST PLAYED", 11, ACCENT));
             gap(recent, 10);
             recent.addView(title(this, entry.name, 24));
             gap(recent, 6);
-            recent.addView(text(this, "Launch the game, then load your save from its menu.", 14, MUTED));
+            recent.addView(text(this, "Open your game. Saved progress is available from its own menu.", 14, MUTED));
             gap(recent, 16);
             Button play = button(this, "Play again", true);
             play.setOnClickListener(view -> play(entry));
@@ -246,6 +275,8 @@ public class LibraryActivity extends Activity {
     private void renderCards() {
         cards.removeAllViews();
         List<GameLibrary.Entry> all = library.load();
+        filters.setVisibility(all.isEmpty() ? View.GONE : View.VISIBLE);
+        status.setVisibility(all.isEmpty() && !busy ? View.GONE : View.VISIBLE);
         List<GameLibrary.Entry> entries = GameLibrary.filter(all, query, order);
         if (!busy) status.setText(entries.size() + (entries.size() == 1 ? " game" : " games"));
         if (entries.isEmpty()) {
@@ -424,7 +455,7 @@ public class LibraryActivity extends Activity {
 
     private <T> void runWork(String message, Work<T> work, Done<T> done) {
         if (busy) return;
-        busy = true; busyMessage = message; add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setText(message);
+        busy = true; busyMessage = message; add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setVisibility(View.VISIBLE); status.setText(message);
         worker.execute(() -> {
             T value = null; String error = null;
             try { value = work.run(); } catch (Exception exception) {

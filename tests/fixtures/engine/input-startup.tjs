@@ -20,6 +20,7 @@ var inputLayer = new Layer(inputWindow, null);
 inputLayer.setSize(640, 480); inputLayer.setImageSize(640, 480);
 inputLayer.fillRect(0, 0, 640, 480, 0xff171e30);
 inputLayer.fillRect(32, 112, 576, 300, 0xff252f48);
+inputLayer.fillRect(152, 178, 48, 48, 0xff46b6a1);
 inputLayer.font.height = 24;
 inputLayer.drawText(32, 36, "Input playground", 0xffffff);
 inputLayer.font.height = 18;

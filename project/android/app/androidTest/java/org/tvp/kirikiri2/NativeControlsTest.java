@@ -93,14 +93,14 @@ public class NativeControlsTest {
         int width = screenshot.getWidth(), height = screenshot.getHeight();
         int[] pixels = new int[width * height]; screenshot.getPixels(pixels, 0, width, 0, 0, width, height); screenshot.recycle();
         int left = width, right = -1, top = height, bottom = -1;
-        for (int py = height / 5; py < height * 9 / 10; ++py) for (int px = 0; px < width; ++px) {
+        for (int py = 0; py < height; ++py) for (int px = 0; px < width; ++px) {
             int color = pixels[py * width + px];
-            if (Math.abs(((color >> 16) & 255) - 37) + Math.abs(((color >> 8) & 255) - 47) + Math.abs((color & 255) - 72) <= 3) {
+            if (Math.abs(((color >> 16) & 255) - 70) + Math.abs(((color >> 8) & 255) - 182) + Math.abs((color & 255) - 161) <= 3) {
                 left = Math.min(left, px); right = Math.max(right, px); top = Math.min(top, py); bottom = Math.max(bottom, py);
             }
         }
-        assertTrue("The game’s rendered input target is visible", right - left > width / 4 && bottom - top > height / 4);
-        float px = left + (right - left) / 4f, py = top + (bottom - top) * 0.3f;
+        assertTrue("The game’s rendered input target is visible", right - left > width / 40 && bottom - top > height / 40);
+        float px = (left + right) / 2f, py = (top + bottom) / 2f;
         int before = count("CLICK ");
         finger(MotionEvent.ACTION_DOWN, px, py); finger(MotionEvent.ACTION_UP, px, py);
         waitCount("CLICK ", before + 1);
