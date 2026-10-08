@@ -91,10 +91,10 @@ public final class GameControls {
                 active = enabled;
                 if (!active) input.release();
                 overlay.setVisibility(active ? View.VISIBLE : View.GONE);
-                if (active && !preferences.getBoolean("seen_guide", false)) {
-                    preferences.edit().putBoolean("seen_guide", true).apply();
-                    showGuide();
-                }
+            }
+            if (active && activity.hasWindowFocus() && !preferences.getBoolean("seen_guide", false)) {
+                preferences.edit().putBoolean("seen_guide", true).apply();
+                showGuide();
             }
             handler.postDelayed(this, 200);
         }
@@ -320,7 +320,7 @@ public final class GameControls {
     public void showGuide() {
         input.release();
         new AlertDialog.Builder(theme).setTitle("A few easy controls")
-                .setMessage("Tap: left click or advance dialogue.\nDrag: hold a finger and move an item.\nHold still: right click, often the game menu.\nTwo-finger tap: right click.\nTwo-finger slide: mouse wheel or backlog.\n\n"
+                .setMessage("Tap: left click or advance dialogue.\nDrag: touch and slide without lifting.\nHold still: right click, often the game menu.\nTwo-finger tap: right click.\nTwo-finger slide: mouse wheel or backlog.\nThree-finger tap: middle click.\n\n"
                         + "Touchpad mode moves a visible pointer relative to your finger. Tap to click; hold the Left button while sliding to drag.\n\n"
                         + "Connect a keyboard for letters, WASD, arrows, function keys and shortcuts. Use Show keyboard for on-screen game keys, or Type text for names and other text.\n\n"
                         + "Android Back opens Controls. Esc is sent to the game. Save in the game before returning to your library.")

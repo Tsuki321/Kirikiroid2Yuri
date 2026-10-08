@@ -102,6 +102,9 @@ def return_to_library():
 
 
 def main():
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "before-library-return-logcat.txt").write_bytes(adb("logcat", "-d").stdout)
+    adb("logcat", "-c")
     open_library()
     screenshot("library-last-played")
     scroll_to("+  Add game folder"); click("+  Add game folder")
@@ -132,6 +135,10 @@ def main():
         screenshot("library-relaunch-" + str(attempt + 1))
         return_to_library()
     screenshot("library-returned")
+    logs = adb("logcat", "-d").stdout.decode("utf-8", errors="replace")
+    (OUTPUT / "library-return-logcat.txt").write_text(logs, encoding="utf-8")
+    assert "Process: com.yuri.kirikiri2, PID:" not in logs, "Returning or switching games must not crash the app"
+    assert ">>> com.yuri.kirikiri2 <<<" not in logs, "Returning or switching games must not crash the native engine"
     print("PASS: cancel/switch games, two library relaunches, preserved controls and clean engine shutdown", flush=True)
 
 

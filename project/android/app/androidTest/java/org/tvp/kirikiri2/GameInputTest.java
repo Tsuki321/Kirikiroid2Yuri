@@ -138,6 +138,16 @@ public class GameInputTest {
         assertArrayEquals(new int[] {2, 0, 600, 320, 0}, movement);
     }); }
 
+    @Test public void threeFingerTapPreservesMiddleClick() { main(() -> {
+        setup(); finger(MotionEvent.ACTION_DOWN, 200, 150);
+        touch(MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[] {7, 21}, new float[] {200, 300}, new float[] {150, 160});
+        touch(MotionEvent.ACTION_POINTER_DOWN | (2 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[] {7, 21, 2}, new float[] {200, 300, 400}, new float[] {150, 160, 170});
+        touch(MotionEvent.ACTION_POINTER_UP | (2 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[] {7, 21, 2}, new float[] {200, 300, 400}, new float[] {150, 160, 170});
+        touch(MotionEvent.ACTION_POINTER_UP | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[] {7, 21}, new float[] {200, 300}, new float[] {150, 160});
+        finger(MotionEvent.ACTION_UP, 200, 150);
+        assertEquals(0, sink.count(0, 0)); assertEquals(0, sink.count(0, 1)); assertEquals(1, sink.count(0, 2)); assertEquals(1, sink.count(1, 2));
+    }); }
+
     @Test public void longPressRightClicksOnceWithoutAnInitialLeftPress() {
         main(() -> { setup(); finger(MotionEvent.ACTION_DOWN, 200, 150); });
         SystemClock.sleep(ViewConfiguration.getLongPressTimeout() + 120);

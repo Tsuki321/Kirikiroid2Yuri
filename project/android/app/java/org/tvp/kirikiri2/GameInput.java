@@ -53,7 +53,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     private final boolean[] physicalMouse = new boolean[3];
     private final float slop;
     private boolean trackpad, wasdArrows, touch, moved, multi, scrolled, longClick, drag;
-    private int primaryId = -1, deadAccent;
+    private int primaryId = -1, deadAccent, touchButton;
     private float originX, originY, lastX, lastY, scrollY, pointerX, pointerY;
     private float mouseOriginX, mouseOriginY;
     private boolean mouseMoved;
@@ -140,6 +140,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
         if (action == MotionEvent.ACTION_DOWN) {
             if (!sink.active()) return false;
             touch = true; moved = multi = scrolled = longClick = drag = false;
+            touchButton = 0;
             primaryId = event.getPointerId(0);
             originX = lastX = event.getX(); originY = lastY = event.getY();
             if (!trackpad) position(lastX, lastY);
@@ -152,6 +153,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
         if (action == MotionEvent.ACTION_POINTER_DOWN) {
             handler.removeCallbacks(hold);
             multi = true;
+            touchButton = event.getPointerCount() >= 3 ? 2 : 1;
             if (drag) { mouseUp(0, false); drag = false; }
             originX = averageX(event); originY = lastY = averageY(event); scrollY = 0;
             return true;
@@ -187,7 +189,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
             handler.removeCallbacks(hold);
             if (!multi && !trackpad && index >= 0) position(event.getX(index), event.getY(index));
             if (drag) mouseUp(0, false);
-            else if (!longClick && !scrolled && !moved) click(multi ? 1 : 0);
+            else if (!longClick && !scrolled && !moved) click(touchButton);
             touch = false; drag = false; primaryId = -1;
             view.performClick();
         }

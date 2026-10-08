@@ -3,12 +3,14 @@ package org.tvp.kirikiri2;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.SystemClock;
 import android.provider.DocumentsContract;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import com.yuri.kirikiri2.LibraryActivity;
@@ -86,6 +88,28 @@ public class NativeControlsTest {
 
     private void finger(int action, float px, float py) { touch(action, new int[] {7}, new float[] {px}, new float[] {py}); }
 
+    private void clickRenderedTarget() throws Exception {
+        Bitmap screenshot = UiChecks.automation().takeScreenshot(); assertNotNull(screenshot);
+        int width = screenshot.getWidth(), height = screenshot.getHeight();
+        int[] pixels = new int[width * height]; screenshot.getPixels(pixels, 0, width, 0, 0, width, height); screenshot.recycle();
+        int left = width, right = -1, top = height, bottom = -1;
+        for (int py = height / 5; py < height * 9 / 10; ++py) for (int px = 0; px < width; ++px) {
+            int color = pixels[py * width + px];
+            if (Math.abs(((color >> 16) & 255) - 37) + Math.abs(((color >> 8) & 255) - 47) + Math.abs((color & 255) - 72) <= 3) {
+                left = Math.min(left, px); right = Math.max(right, px); top = Math.min(top, py); bottom = Math.max(bottom, py);
+            }
+        }
+        assertTrue("The game’s rendered input target is visible", right - left > width / 4 && bottom - top > height / 4);
+        float px = left + (right - left) / 4f, py = top + (bottom - top) * 0.3f;
+        int before = count("CLICK ");
+        finger(MotionEvent.ACTION_DOWN, px, py); finger(MotionEvent.ACTION_UP, px, py);
+        waitCount("CLICK ", before + 1);
+        String last = ""; for (String line : log().split("\\r?\\n")) if (line.startsWith("CLICK ")) last = line;
+        String[] coordinates = last.split(" ");
+        assertEquals("Off-center touch x follows the rendered game", 176, Integer.parseInt(coordinates[1]), 6);
+        assertEquals("Off-center touch y follows the rendered game", 202, Integer.parseInt(coordinates[2]), 6);
+    }
+
     private void mouse(int action, int buttons, float scroll) {
         MotionEvent.PointerProperties property = new MotionEvent.PointerProperties(); property.id = 0; property.toolType = MotionEvent.TOOL_TYPE_MOUSE;
         MotionEvent.PointerCoords point = new MotionEvent.PointerCoords(); point.x = x; point.y = y; point.pressure = 1;
@@ -139,6 +163,7 @@ public class NativeControlsTest {
             assertNotNull(click); String[] coordinates = click.split(" ");
             assertEquals("Touch x reaches the game’s coordinates", 320, Integer.parseInt(coordinates[1]), 6);
             assertEquals("Touch y reaches the game’s coordinates", 240, Integer.parseInt(coordinates[2]), 6);
+            clickRenderedTarget();
             int clicks = count("CLICK ");
             finger(MotionEvent.ACTION_DOWN, x - 40, y); finger(MotionEvent.ACTION_MOVE, x + 80, y + 20);
             SystemClock.sleep(100); finger(MotionEvent.ACTION_CANCEL, x + 80, y + 20); SystemClock.sleep(150);
@@ -174,9 +199,17 @@ public class NativeControlsTest {
             int aDown = count("KD 65 "), aUp = count("KU 65 ");
             key(KeyEvent.KEYCODE_A, true, 0); waitCount("KD 65 ", aDown + 1);
             key(KeyEvent.KEYCODE_HOME, true, 0); key(KeyEvent.KEYCODE_HOME, false, 0);
-            waitCount("KU 65 ", aUp + 1);
+            long homeDeadline = SystemClock.uptimeMillis() + 10000;
+            boolean homeVisible = false;
+            while (SystemClock.uptimeMillis() < homeDeadline) {
+                AccessibilityNodeInfo root = UiChecks.automation().getRootInActiveWindow();
+                if (root != null && root.getPackageName() != null && !context.getPackageName().contentEquals(root.getPackageName())) { homeVisible = true; break; }
+                SystemClock.sleep(80);
+            }
+            assertTrue("Home backgrounds the game before resuming it", homeVisible);
             context.startActivity(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             UiChecks.waitFor("Open game controls");
+            waitCount("KU 65 ", aUp + 1);
             key(KeyEvent.KEYCODE_A, false, 0); SystemClock.sleep(150);
             assertEquals("Background/resume releases A without duplicating its later key-up", aUp + 1, count("KU 65 "));
             // The framework stops the test process after reporting success; do not finish the legacy activity here.

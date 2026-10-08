@@ -26,6 +26,7 @@ The classic file browser remains available at the bottom of the library.
 | Move a finger after touching | Left-button drag |
 | Hold a finger still | Right click |
 | Two-finger tap | Right click |
+| Three-finger tap | Middle click |
 | Two-finger vertical slide | Mouse wheel, commonly used for the backlog |
 | Physical mouse | Pointer movement, left/right/middle buttons and wheel |
 | Physical keyboard | Letters, WASD, arrows, modifiers, numbers, navigation, F1–F12 and numpad |

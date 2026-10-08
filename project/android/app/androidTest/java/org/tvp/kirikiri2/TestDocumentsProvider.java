@@ -87,7 +87,6 @@ public class TestDocumentsProvider extends DocumentsProvider {
         if (children != null) for (File child : children) add(result, child);
         return result;
     }
-    @Override public boolean isChildDocument(String parent, String child) { return child.startsWith(parent + "/"); }
     @Override public ParcelFileDescriptor openDocument(String id, String mode, CancellationSignal signal) throws FileNotFoundException {
         if (id.endsWith("/full.dat") && mode.contains("w")) {
             android.os.storage.StorageManager storage = (android.os.storage.StorageManager)
