@@ -4,12 +4,14 @@ import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
+import android.provider.DocumentsContract;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import com.yuri.kirikiri2.LibraryActivity;
 import com.yuri.kirikiri2.MainActivity;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -57,6 +59,12 @@ public class NativeControlsTest {
         int count = 0; for (String line : log().split("\\r?\\n")) if (line.startsWith(prefix)) ++count; return count;
     }
 
+    private void waitCount(String prefix, int expected) throws Exception {
+        long deadline = SystemClock.uptimeMillis() + 12000;
+        while (count(prefix) < expected && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(80);
+        assertEquals("Engine event count: " + prefix, expected, count(prefix));
+    }
+
     private void key(int code, boolean down, int meta) {
         long now = SystemClock.uptimeMillis();
         assertTrue(UiChecks.automation().injectInputEvent(new KeyEvent(now, now,
@@ -94,15 +102,23 @@ public class NativeControlsTest {
         String source = new String(bytes(instrumentation.getContext().getAssets().open("engine/input-startup.tjs")), StandardCharsets.UTF_8)
                 .replace("@@OUTPUT@@", folder.getPath());
         try (FileOutputStream output = new FileOutputStream(new File(folder, "startup.tjs"))) { output.write(source.getBytes(StandardCharsets.UTF_8)); }
+        StorageAccessTest.setup();
+        String game = StorageAccess.pathForTree(context, DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games")) + "/Controls playground";
+        assertTrue(StorageAccess.mkdirs(context, game));
+        assertTrue(StorageAccess.write(context, game + "/startup.tjs", source.getBytes(StandardCharsets.UTF_8)));
+        String secondGame = StorageAccess.pathForTree(context, DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games")) + "/Second controls playground";
+        assertTrue(StorageAccess.mkdirs(context, secondGame));
+        assertTrue(StorageAccess.write(context, secondGame + "/startup.tjs", source.getBytes(StandardCharsets.UTF_8)));
         context.getSharedPreferences("game_controls", 0).edit().clear().commit();
-        MainActivity activity = (MainActivity)instrumentation.startActivitySync(new Intent(context, MainActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("startupPath", folder.getPath()));
+        context.startActivity(new Intent(context, LibraryActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
         try {
+            UiChecks.waitFor("Your library"); UiChecks.addFolder("Controls playground");
+            UiChecks.scrollTo("Play Controls playground"); UiChecks.click("Play Controls playground");
             waitLog("READY");
             UiChecks.waitFor("A few easy controls"); UiChecks.screenshot("controls-first-use"); UiChecks.click("Let’s play");
             UiChecks.waitFor("Open game controls");
             instrumentation.runOnMainSync(() -> {
-                View surface = activity.getGLSurfaceView(); int[] origin = new int[2]; surface.getLocationOnScreen(origin);
+                View surface = KR2Activity.sInstance.getGLSurfaceView(); int[] origin = new int[2]; surface.getLocationOnScreen(origin);
                 x = origin[0] + surface.getWidth() / 2f; y = origin[1] + surface.getHeight() / 2f;
                 surface.requestFocus();
             });
@@ -155,6 +171,14 @@ public class NativeControlsTest {
             int w = count("KD 87 "); UiChecks.click("Game key W"); SystemClock.sleep(150);
             assertEquals("On-screen W reaches TJS", w + 1, count("KD 87 "));
             UiChecks.click("Hide keys");
+            int aDown = count("KD 65 "), aUp = count("KU 65 ");
+            key(KeyEvent.KEYCODE_A, true, 0); waitCount("KD 65 ", aDown + 1);
+            key(KeyEvent.KEYCODE_HOME, true, 0); key(KeyEvent.KEYCODE_HOME, false, 0);
+            waitCount("KU 65 ", aUp + 1);
+            context.startActivity(new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            UiChecks.waitFor("Open game controls");
+            key(KeyEvent.KEYCODE_A, false, 0); SystemClock.sleep(150);
+            assertEquals("Background/resume releases A without duplicating its later key-up", aUp + 1, count("KU 65 "));
             // The framework stops the test process after reporting success; do not finish the legacy activity here.
         } finally {
             UiChecks.screenshot("controls-final");

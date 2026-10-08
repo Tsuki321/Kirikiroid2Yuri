@@ -63,10 +63,17 @@ public class TestDocumentsProvider extends DocumentsProvider {
             if (column.equals(DocumentsContract.Root.COLUMN_ROOT_ID)) row.add("games");
             else if (column.equals(DocumentsContract.Root.COLUMN_DOCUMENT_ID)) row.add("root/Games");
             else if (column.equals(DocumentsContract.Root.COLUMN_TITLE)) row.add("Kirikiri test games");
-            else if (column.equals(DocumentsContract.Root.COLUMN_FLAGS)) row.add(DocumentsContract.Root.FLAG_SUPPORTS_CREATE | DocumentsContract.Root.FLAG_LOCAL_ONLY);
+            else if (column.equals(DocumentsContract.Root.COLUMN_FLAGS)) row.add(DocumentsContract.Root.FLAG_SUPPORTS_CREATE
+                    | DocumentsContract.Root.FLAG_LOCAL_ONLY | DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD);
             else row.add(null);
         }
         return result;
+    }
+
+    @Override public boolean isChildDocument(String parent, String child) {
+        try {
+            return file(child).getCanonicalPath().startsWith(file(parent).getCanonicalPath() + File.separator);
+        } catch (IOException error) { return false; }
     }
     @Override public Cursor queryDocument(String documentId, String[] projection) throws FileNotFoundException {
         MatrixCursor result = new MatrixCursor(projection == null ? COLUMNS : projection);

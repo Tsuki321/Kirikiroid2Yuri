@@ -2321,7 +2321,9 @@ void TVPMainScene::onAndroidKey(unsigned int key, bool down, bool repeat) {
 			if (++_androidHolds[code] > 1) return;
 		} else if (!repeat) return;
 		_scancode[code] = 0x11;
-		_currentWindowLayer->InternalKeyDown(code, TVPGetCurrentShiftKeyState());
+		tjs_uint32 shift = TVPGetCurrentShiftKeyState();
+		if (repeat) shift |= ssRepeat;
+		_currentWindowLayer->InternalKeyDown(code, shift);
 	} else if (_androidPressed[key]) {
 		unsigned int code = _androidMapped[key];
 		_androidPressed[key] = false;
@@ -2516,7 +2518,7 @@ tjs_uint32 TVPGetCurrentShiftKeyState()
 	if (_scancode[VK_CONTROL] & 1) f |= ssCtrl;
 	if (_scancode[VK_LBUTTON] & 1) f |= ssLeft;
 	if (_scancode[VK_RBUTTON] & 1) f |= ssRight;
-	//if (_scancode[VK_MBUTTON] & 1) f |= TVP_SS_MIDDLE;
+	if (_scancode[VK_MBUTTON] & 1) f |= ssMiddle;
 
 	return f;
 }

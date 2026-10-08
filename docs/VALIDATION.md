@@ -1,5 +1,9 @@
 # Runtime fixes and validation
 
+The Android game library, keyboard and touch controls are covered by the
+[library and controls checks](CONTROLS_AND_LIBRARY.md#verification), including
+the system folder picker and live TJS input delivery.
+
 Hxv4 companion preparation and reader coverage are described in [HXV4.md](HXV4.md).
 PSB scene data and PIMG resource support are described in [PSB.md](PSB.md).
 Game files, recovered keys, and companions are excluded from CI; its Hxv4 inputs

@@ -25,7 +25,9 @@
         tools:targetApi="n">
         <meta-data android:name="android.app.lib_name"
                    android:value="krkr2yuri" />
+        <receiver android:name=".LibraryHistoryReceiver" android:process=":library" android:exported="false" />
         <activity android:name=".LibraryActivity"
+                  android:configChanges="keyboardHidden|orientation|screenSize"
                   android:theme="@style/LibraryTheme"
                   android:process=":library"
                   android:exported="true">

@@ -325,6 +325,7 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 		super.onCreate(savedInstanceState);
 		if (isFinishing() || getGLSurfaceView() == null) return;
 		gameControls = new GameControls(this, mFrameLayout);
+		recordLibraryLaunch(getIntent());
 	
 		Intent launchIntent = getIntent();
 		boolean needsLegacyStorage = needsLegacyStoragePermissionForStartup(this,
@@ -381,6 +382,37 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 
 	@Override public void onBackPressed() {
 		if (gameControls == null || !gameControls.showPanel()) super.onBackPressed();
+	}
+
+	@Override protected void onNewIntent(Intent intent) {
+		super.onNewIntent(intent);
+		String nextPath = intent.getStringExtra("startupPath");
+		String currentPath = getIntent().getStringExtra("startupPath");
+		boolean openBrowser = intent.getBooleanExtra("open_browser", false);
+		if (!openBrowser && (nextPath == null || nextPath.equals(currentPath))) {
+			recordLibraryLaunch(intent);
+			return;
+		}
+		if (gameControls != null) gameControls.release();
+		new AlertDialog.Builder(new android.view.ContextThemeWrapper(this, com.yuri.kirikiri2.R.style.LibraryTheme))
+			.setTitle(openBrowser ? "Open the file browser?" : "Switch to another game?")
+			.setMessage("A game is already running. Save from its menu first; switching games closes it and loses unsaved progress.")
+			.setNegativeButton("Keep playing", null)
+			.setPositiveButton("Switch game", (dialog, which) -> {
+				Intent library = new Intent(this, com.yuri.kirikiri2.LibraryActivity.class);
+				library.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+				library.putExtra("pending_game", openBrowser ? "" : nextPath);
+				library.putExtra("pending_entry", intent.getStringExtra("library_entry_id"));
+				library.putExtra("exiting_engine", android.os.Process.myPid());
+				startActivity(library);
+				finishAndRemoveTask();
+			}).show();
+	}
+
+	private void recordLibraryLaunch(Intent intent) {
+		String entry = intent.getStringExtra("library_entry_id");
+		if (entry != null) sendBroadcast(new Intent(this, com.yuri.kirikiri2.LibraryHistoryReceiver.class)
+			.putExtra("library_entry_id", entry));
 	}
 	
 	@Override

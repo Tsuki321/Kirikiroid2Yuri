@@ -117,5 +117,9 @@ adb shell am force-stop com.yuri.kirikiri2
 # engine activity, whose onDestroy intentionally exits its process.
 adb shell am instrument -w -r -e waitForActivitiesToComplete false -e class org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/native-controls.txt
-grep -E '^OK \([0-9]+ tests?\)' test-results/android/native-controls.txt || failures=$((failures + 1))
+if grep -E '^OK \([0-9]+ tests?\)' test-results/android/native-controls.txt; then
+  python3 tests/android/library_return.py | tee test-results/android/library-return.txt || failures=$((failures + 1))
+else
+  failures=$((failures + 1))
+fi
 exit "$failures"

@@ -70,7 +70,9 @@ public final class GameControls {
         overlay.requestApplyInsets();
         pointer = new PointerView(activity);
         input = new GameInput(activity.getGLSurfaceView(), GameInput.engine());
-        input.setCursor((x, y) -> { pointer.x = x; pointer.y = y; pointer.invalidate(); });
+        input.setCursor((x, y) -> {
+            pointer.x = x - overlay.getPaddingLeft(); pointer.y = y - overlay.getPaddingTop(); pointer.invalidate();
+        });
         input.setTrackpad(preferences.getBoolean("trackpad", false));
         input.setWasdArrows(preferences.getBoolean("wasd_arrows", false));
         input.setSensitivity(preferences.getInt("sensitivity", 120) / 100f);
@@ -210,9 +212,20 @@ public final class GameControls {
     }
 
     private void addKeyboard() {
+        LinearLayout container = column(theme, 6);
+        container.setBackground(shape(theme, BACKGROUND, 16));
+        container.setAlpha(Math.max(0.85f, opacity / 100f));
+        LinearLayout header = row(theme);
+        TextView label = text(theme, "GAME KEYS", 11, ACCENT);
+        header.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        Button text = button(theme, "Type text", false); text.setOnClickListener(view -> typeText());
+        header.addView(text);
+        Button hide = button(theme, "Hide keys", true); hide.setOnClickListener(view -> { keyboard = false; rebuild(); });
+        LinearLayout.LayoutParams hideParams = new LinearLayout.LayoutParams(-2, dp(activity, 48));
+        hideParams.leftMargin = dp(activity, 8);
+        header.addView(hide, hideParams);
+        container.addView(header, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
         LinearLayout keyboardView = column(theme, 6);
-        keyboardView.setBackground(shape(theme, BACKGROUND, 16));
-        keyboardView.setAlpha(Math.max(0.85f, opacity / 100f));
         String[] rows = {"1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"};
         for (String labels : rows) {
             LinearLayout strip = row(theme);
@@ -228,13 +241,13 @@ public final class GameControls {
         keyboardView.addView(functions);
         LinearLayout navigation = row(theme);
         addKey(navigation, "←", 0x25); addKey(navigation, "↑", 0x26); addKey(navigation, "↓", 0x28); addKey(navigation, "→", 0x27);
-        Button text = button(theme, "Type text", false); text.setOnClickListener(view -> typeText()); addWeighted(navigation, text);
-        Button hide = button(theme, "Hide keys", true); hide.setOnClickListener(view -> { keyboard = false; rebuild(); }); addWeighted(navigation, hide);
+        addKey(navigation, "PgUp", 0x21); addKey(navigation, "PgDn", 0x22);
         keyboardView.addView(navigation);
         ScrollView scroll = new ScrollView(theme);
         scroll.addView(keyboardView);
-        int height = Math.min(dp(activity, 360), Math.max(dp(activity, 180), activity.getResources().getDisplayMetrics().heightPixels * 2 / 3));
-        overlay.addView(scroll, anchored(-1, height, Gravity.BOTTOM));
+        container.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        int height = Math.min(dp(activity, 380), Math.max(dp(activity, 180), activity.getResources().getDisplayMetrics().heightPixels * 3 / 4));
+        overlay.addView(container, anchored(-1, height, Gravity.BOTTOM));
     }
 
     private void addAction(LinearLayout parent, String label, Runnable action) {

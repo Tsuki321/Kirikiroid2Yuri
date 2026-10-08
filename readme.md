@@ -37,7 +37,14 @@ Implementation and CI coverage: [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## 1. usage  
 
-Although now the apk build from source is runable, it is not perfect. Beta version has some problems due to the cocos version change, incomplecate of some code. Currently the beta version is only aimed for debug. Please use [Kirikiroid2_yuri_1.3.9.apk](https://github.com/YuriSizuku/Kirikiroid2Yuri/releases/download/1.3.9_yuri/Kirikiroid2_yuri_1.3.9.apk) instead.  
+Install a current APK from GitHub Actions, open **Add game folder**, and select
+your extracted Kirikiri game directory. The library remembers it for later.
+Tap **Play** to launch, and use **Controls** in the game for touchpad mode,
+WASD/arrows, a keyboard, and the gesture guide.
+
+See [the game library and controls guide](docs/CONTROLS_AND_LIBRARY.md) for
+setup, saving, input options and troubleshooting folder access. Some games
+still require compatibility patches.
 
 ## 2. Build  
 

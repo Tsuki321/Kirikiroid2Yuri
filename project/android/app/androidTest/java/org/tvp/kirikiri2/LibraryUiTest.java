@@ -26,12 +26,7 @@ public class LibraryUiTest {
         context.startActivity(new Intent(context, LibraryActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
         try {
             UiChecks.waitFor("Your library"); UiChecks.screenshot("library-empty");
-            UiChecks.click("+  Add game folder");
-            // The picker starts at its own last directory; open its roots drawer explicitly.
-            if (UiChecks.find("Kirikiri test games") == null) UiChecks.click("Show roots");
-            UiChecks.click("Kirikiri test games");
-            UiChecks.scrollTo("Library UI Story"); UiChecks.click("Library UI Story");
-            UiChecks.click("Use this folder"); UiChecks.click("Allow");
+            UiChecks.addFolder("Library UI Story");
             UiChecks.waitFor("Library UI Story");
             UiChecks.click("Options for Library UI Story"); UiChecks.click("Add to favorites");
             UiChecks.click("Options for Library UI Story"); UiChecks.click("Rename");

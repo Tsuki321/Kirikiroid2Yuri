@@ -147,6 +147,24 @@ public class GameInputTest {
         });
     }
 
+    @Test public void holdingTheTouchpadMouseButtonCanDragWithoutAnExtraClick() { main(() -> {
+        setup(); input.setTrackpad(true);
+        input.mouseDown(0);
+        finger(MotionEvent.ACTION_DOWN, 100, 100); finger(MotionEvent.ACTION_MOVE, 300, 150);
+        finger(MotionEvent.ACTION_UP, 300, 150);
+        input.mouseUp(0, true);
+        assertEquals(1, sink.count(0, 0)); assertEquals(1, sink.count(1, 0)); assertEquals(0, sink.count(4, 0));
+    }); }
+
+    @Test public void aTwoFingerSwipeDoesNotTurnIntoARightClick() { main(() -> {
+        setup(); finger(MotionEvent.ACTION_DOWN, 200, 150);
+        touch(MotionEvent.ACTION_POINTER_DOWN | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[] {7, 21}, new float[] {200, 300}, new float[] {150, 160});
+        touch(MotionEvent.ACTION_MOVE, new int[] {7, 21}, new float[] {400, 500}, new float[] {150, 160});
+        touch(MotionEvent.ACTION_POINTER_UP | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), new int[] {7, 21}, new float[] {400, 500}, new float[] {150, 160});
+        finger(MotionEvent.ACTION_UP, 400, 150);
+        assertEquals(0, sink.count(0, 0)); assertEquals(0, sink.count(0, 1));
+    }); }
+
     @Test public void mouseWheelCarriesItsLocationAndButtonsAreNotDuplicated() { main(() -> {
         setup();
         MotionEvent.PointerProperties property = new MotionEvent.PointerProperties(); property.id = 0; property.toolType = MotionEvent.TOOL_TYPE_MOUSE;

@@ -48,6 +48,8 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     private final Map<Long, Integer> physicalKeys = new HashMap<>();
     private final Set<Long> cancelledKeys = new HashSet<>();
     private final int[] mouseHolds = new int[3];
+    private final float[] buttonX = new float[3], buttonY = new float[3];
+    private final boolean[] buttonMoved = new boolean[3];
     private final boolean[] physicalMouse = new boolean[3];
     private final float slop;
     private boolean trackpad, wasdArrows, touch, moved, multi, scrolled, longClick, drag;
@@ -79,6 +81,9 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     private void position(float x, float y) {
         pointerX = Math.max(0, Math.min(Math.max(0, surface.getWidth() - 1), x));
         pointerY = Math.max(0, Math.min(Math.max(0, surface.getHeight() - 1), y));
+        for (int button = 0; button < 3; ++button)
+            if (mouseHolds[button] > 0 && Math.hypot(pointerX - buttonX[button], pointerY - buttonY[button]) > slop)
+                buttonMoved[button] = true;
         if (cursor != null) cursor.move(pointerX, pointerY);
     }
 
@@ -102,13 +107,16 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
 
     public void mouseDown(int button) {
         if (!sink.active()) return;
-        if (mouseHolds[button]++ == 0) pointer(0, button, 0);
+        if (mouseHolds[button]++ == 0) {
+            buttonX[button] = pointerX; buttonY[button] = pointerY; buttonMoved[button] = false;
+            pointer(0, button, 0);
+        }
     }
 
     public void mouseUp(int button, boolean click) {
         if (mouseHolds[button] == 0) return;
         if (--mouseHolds[button] == 0) {
-            if (click) pointer(4, button, 0);
+            if (click && !buttonMoved[button]) pointer(4, button, 0);
             pointer(1, button, 0);
         }
     }

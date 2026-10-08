@@ -1,12 +1,17 @@
 package com.yuri.kirikiri2;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.DocumentsContract;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -44,15 +49,20 @@ public class LibraryActivity extends Activity {
     private Button add, sort;
     private TextView status;
     private ProgressBar progress;
+    private ScrollView scroll;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean launchedGame;
     private String query = "";
     private int order;
     private GameLibrary.Entry relocating;
     private boolean busy;
+    private String busyMessage;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         ModernUi.systemBars(this);
         library = new GameLibrary(this);
+        order = getPreferences(MODE_PRIVATE).getInt("order", 0);
         if (state != null) {
             query = state.getString("query", "");
             order = state.getInt("order");
@@ -62,9 +72,14 @@ public class LibraryActivity extends Activity {
         }
         buildView();
         render();
+        handlePendingGame(getIntent());
     }
 
-    @Override protected void onResume() { super.onResume(); if (library != null) render(); }
+    @Override protected void onResume() {
+        super.onResume();
+        if (library != null) render();
+        if (launchedGame) { launchedGame = false; scroll.post(() -> scroll.scrollTo(0, 0)); }
+    }
 
     @Override protected void onSaveInstanceState(Bundle state) {
         state.putString("query", query);
@@ -73,10 +88,48 @@ public class LibraryActivity extends Activity {
         super.onSaveInstanceState(state);
     }
 
-    @Override protected void onDestroy() { worker.shutdownNow(); super.onDestroy(); }
+    @Override protected void onDestroy() { worker.shutdownNow(); handler.removeCallbacksAndMessages(null); super.onDestroy(); }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); handlePendingGame(intent);
+        scroll.post(() -> scroll.scrollTo(0, 0));
+    }
+
+    private void handlePendingGame(Intent intent) {
+        String path = intent.getStringExtra("pending_game");
+        String entryId = intent.getStringExtra("pending_entry");
+        int previousPid = intent.getIntExtra("exiting_engine", -1);
+        intent.removeExtra("pending_game"); intent.removeExtra("exiting_engine"); intent.removeExtra("pending_entry");
+        if (path == null || previousPid <= 0) return;
+        busy = true; busyMessage = "Closing the previous game…";
+        add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setText(busyMessage);
+        long deadline = SystemClock.uptimeMillis() + 10000;
+        handler.post(new Runnable() {
+            @Override public void run() {
+                if (isFinishing() || isDestroyed()) return;
+                ActivityManager manager = (ActivityManager)getSystemService(ACTIVITY_SERVICE);
+                List<ActivityManager.RunningAppProcessInfo> processes = manager.getRunningAppProcesses();
+                boolean running = processes == null;
+                if (processes != null) for (ActivityManager.RunningAppProcessInfo process : processes)
+                    if (process.pid == previousPid) running = true;
+                if (running && SystemClock.uptimeMillis() < deadline) { handler.postDelayed(this, 100); return; }
+                busy = false; add.setEnabled(true); progress.setVisibility(View.GONE); render();
+                if (running) showError("The previous game is still closing", "Wait a moment, then tap Play again.");
+                else startPlayer(path.isEmpty() ? null : path, entryId);
+            }
+        });
+    }
+
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        buildView(); render();
+        add.setEnabled(!busy);
+        progress.setVisibility(busy ? View.VISIBLE : View.GONE);
+        if (busy) status.setText(busyMessage);
+    }
 
     private void buildView() {
-        ScrollView scroll = new ScrollView(this);
+        scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BACKGROUND);
         FrameLayout center = new FrameLayout(this);
@@ -132,7 +185,10 @@ public class LibraryActivity extends Activity {
             PopupMenu menu = new PopupMenu(this, sort);
             String[] labels = {"Recent", "A–Z", "Favorites"};
             for (int i = 0; i < labels.length; ++i) menu.getMenu().add(0, i, i, labels[i]);
-            menu.setOnMenuItemClickListener(item -> { order = item.getItemId(); sort.setText(sortLabel()); render(); return true; });
+            menu.setOnMenuItemClickListener(item -> {
+                order = item.getItemId(); getPreferences(MODE_PRIVATE).edit().putInt("order", order).apply();
+                sort.setText(sortLabel()); render(); return true;
+            });
             menu.show();
         });
         content.addView(filters);
@@ -344,17 +400,22 @@ public class LibraryActivity extends Activity {
                 throw new IOException("The game folder or launch file is unavailable. If it moved, use Locate folder again in the game’s options.");
             return path;
         }, path -> {
-            entry.lastPlayed = System.currentTimeMillis();
-            library.put(entry);
-            startPlayer(path);
+            startPlayer(path, entry.id());
         });
     }
 
     private void startPlayer(String path) {
+        startPlayer(path, null);
+    }
+
+    private void startPlayer(String path, String entryId) {
         if (busy) return;
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (path != null) intent.putExtra("startupPath", path);
+        else intent.putExtra("open_browser", true);
+        if (entryId != null) intent.putExtra("library_entry_id", entryId);
+        launchedGame = true;
         startActivity(intent);
     }
 
@@ -363,7 +424,7 @@ public class LibraryActivity extends Activity {
 
     private <T> void runWork(String message, Work<T> work, Done<T> done) {
         if (busy) return;
-        busy = true; add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setText(message);
+        busy = true; busyMessage = message; add.setEnabled(false); progress.setVisibility(View.VISIBLE); status.setText(message);
         worker.execute(() -> {
             T value = null; String error = null;
             try { value = work.run(); } catch (Exception exception) {
