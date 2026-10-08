@@ -150,7 +150,9 @@ public class NativeControlsTest {
             assertFalse("Applied preferences are visible", preferenceText.isEmpty());
             String report = preferenceText.get(0).getText().toString();
             assertTrue(report.contains("Game preferences: Loaded"));
-            assertTrue(report.contains(game + "/Kirikiroid2Preference.xml"));
+            String launchedFolder = StorageAccess.pathForTree(context,
+                DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games/Controls playground"));
+            assertTrue(report.contains(launchedFolder + "/Kirikiroid2Preference.xml"));
             assertTrue(report.contains("-debugwin=no") && report.contains("-used2d=no"));
             UiChecks.screenshot("game-preferences-loaded"); UiChecks.click("OK");
             UiChecks.waitFor("A few easy controls"); UiChecks.screenshot("controls-first-use"); UiChecks.click("Let’s play");
