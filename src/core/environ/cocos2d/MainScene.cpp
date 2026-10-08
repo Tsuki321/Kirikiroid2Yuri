@@ -57,6 +57,13 @@ static Vec2 _mouseTouchPoint, _mouseBeginPoint;
 static std::set<Touch*> _mouseTouches;
 static tTVPMouseButton _mouseBtn;
 static int _touchBeginTick;
+#include <atomic>
+static std::atomic<bool> _androidInputActive{false};
+static bool _androidControls = false;
+static bool _androidPressed[0x200] = {};
+static tjs_uint16 _androidMapped[0x200] = {};
+static unsigned int _androidHolds[0x200] = {};
+static bool _androidMousePressed[3] = {};
 static bool _virutalMouseMode = false;
 static bool _mouseMoved, _mouseClickedDown;
 static tjs_uint8 _scancode[0x200];
@@ -1798,6 +1805,11 @@ void TVPOnError();
 tjs_uint TVPGetGraphicCacheTotalBytes();
 void TVPMainScene::update(float delta) {
 	::Application->Run();
+	const bool androidInput = _currentWindowLayer && _currentWindowLayer->TJSNativeInstance
+		&& UINode->getChildren().empty() && !_windowMgrOverlay
+		&& (!_gameMenu || _gameMenu->isShrinked());
+	if (_androidInputActive.exchange(androidInput) && !androidInput) releaseAndroidInput();
+	if (_androidControls && _gameMenu) _gameMenu->setVisible(!_gameMenu->isShrinked());
 //	if (_currentWindowLayer) _currentWindowLayer->UpdateOverlay();
 	iTVPTexture2D::RecycleProcess();
 	//_ResotreGLStatues();
@@ -2241,10 +2253,11 @@ void TVPMainScene::insertText(const char * text, size_t len)
 }
 
 void TVPMainScene::onCharInput(int keyCode) {
-	_currentWindowLayer->OnKeyPress((tjs_char)keyCode, 0, false, false);
+	if (_currentWindowLayer) _currentWindowLayer->OnKeyPress((tjs_char)keyCode, 0, false, false);
 }
 
 void TVPMainScene::onTextInput(const std::string &text) {
+	if (!_currentWindowLayer) return;
 	std::u16string buf;
 	if (StringUtils::UTF8ToUTF16(text, buf)) {
 		for (int i = 0; i < buf.size(); ++i) {
@@ -2286,6 +2299,97 @@ void TVPMainScene::onAxisEvent(cocos2d::Controller* ctrl, int keyCode, cocos2d::
 	else if (pt.y > size.height) newpt.y = size.height;
 	_mouseCursor->setPosition(newpt);
 	_currentWindowLayer->onMouseMove(GameNode->convertToWorldSpace(newpt));
+}
+
+bool TVPMainScene::isAndroidInputActive() {
+	return _androidInputActive.load();
+}
+
+void TVPMainScene::setAndroidControls() {
+	_androidControls = true;
+}
+
+void TVPMainScene::onAndroidKey(unsigned int key, bool down, bool repeat) {
+	if (!key || key >= 0x200) return;
+	if (down) {
+		if (!_androidInputActive || !_currentWindowLayer) return;
+		unsigned int code = _androidPressed[key] ? _androidMapped[key] : _keymap[key];
+		if (!code || code >= 0x200) return;
+		if (!_androidPressed[key]) {
+			_androidPressed[key] = true;
+			_androidMapped[key] = code;
+			if (++_androidHolds[code] > 1) return;
+		} else if (!repeat) return;
+		_scancode[code] = 0x11;
+		_currentWindowLayer->InternalKeyDown(code, TVPGetCurrentShiftKeyState());
+	} else if (_androidPressed[key]) {
+		unsigned int code = _androidMapped[key];
+		_androidPressed[key] = false;
+		if (--_androidHolds[code]) return;
+		_scancode[code] &= 0x10;
+		if (_currentWindowLayer) _currentWindowLayer->OnKeyUp(code, TVPGetCurrentShiftKeyState());
+	}
+}
+
+void TVPMainScene::onAndroidPointer(int action, int button, float x, float y, float scroll) {
+	if (button < 0 || button > 2 || !_currentWindowLayer || !_currentWindowLayer->TJSNativeInstance) return;
+	if (!_androidInputActive && action != 1 && action != 3) return;
+	auto *window = _currentWindowLayer;
+	if (!window->PrimaryLayerArea) return;
+	auto *view = cocos2d::Director::getInstance()->getOpenGLView();
+	const auto viewport = view->getViewPortRect();
+	Vec2 position((x - viewport.origin.x) / view->getScaleX(),
+		(viewport.origin.y + viewport.size.height - y) / view->getScaleY());
+	Vec2 point = window->PrimaryLayerArea->convertToNodeSpace(position);
+	const Size size = window->PrimaryLayerArea->getContentSize();
+	if (size.width <= 0 || size.height <= 0) return;
+	if (action == 0 && (point.x < 0 || point.y < 0 || point.x >= size.width || point.y >= size.height)) return;
+	const int px = std::max(0, std::min(static_cast<int>(size.width) - 1, static_cast<int>(point.x)));
+	const int py = std::max(0, std::min(static_cast<int>(size.height) - 1, static_cast<int>(size.height - point.y)));
+	window->_LastMouseX = px;
+	window->_LastMouseY = py;
+	const tTVPMouseButton buttons[] = {mbLeft, mbRight, mbMiddle};
+	const tTVPMouseButton mouseButton = buttons[button];
+	const auto code = TVPConvertMouseBtnToVKCode(mouseButton);
+	switch (action) {
+	case 0:
+		if (_androidMousePressed[button]) break;
+		_androidMousePressed[button] = true;
+		_scancode[code] = 0x11;
+		TVPPostInputEvent(new tTVPOnMouseMoveInputEvent(window->TJSNativeInstance, px, py, TVPGetCurrentShiftKeyState()));
+		TVPPostInputEvent(new tTVPOnMouseDownInputEvent(window->TJSNativeInstance, px, py, mouseButton, TVPGetCurrentShiftKeyState()));
+		break;
+	case 1:
+	case 3:
+		if (!_androidMousePressed[button]) break;
+		_androidMousePressed[button] = false;
+		_scancode[code] &= 0x10;
+		TVPPostInputEvent(new tTVPOnMouseUpInputEvent(window->TJSNativeInstance, px, py, mouseButton, TVPGetCurrentShiftKeyState()));
+		break;
+	case 2:
+		TVPPostInputEvent(new tTVPOnMouseMoveInputEvent(window->TJSNativeInstance, px, py, TVPGetCurrentShiftKeyState()), TVP_EPT_DISCARDABLE);
+		break;
+	case 4:
+		if (button == 0 && _androidMousePressed[0]) TVPPostInputEvent(new tTVPOnClickInputEvent(window->TJSNativeInstance, px, py));
+		break;
+	case 5:
+		if (scroll != 0) window->TJSNativeInstance->OnMouseWheel(TVPGetCurrentShiftKeyState(), static_cast<int>(scroll * 120), px, py);
+		break;
+	}
+}
+
+void TVPMainScene::releaseAndroidInput() {
+	for (unsigned int key = 1; key < 0x200; ++key) onAndroidKey(key, false, false);
+	const tTVPMouseButton buttons[] = {mbLeft, mbRight, mbMiddle};
+	for (int button = 0; button < 3; ++button) {
+		if (!_androidMousePressed[button]) continue;
+		_androidMousePressed[button] = false;
+		_scancode[TVPConvertMouseBtnToVKCode(buttons[button])] &= 0x10;
+		if (_currentWindowLayer && _currentWindowLayer->TJSNativeInstance) {
+			TVPPostInputEvent(new tTVPOnMouseUpInputEvent(_currentWindowLayer->TJSNativeInstance,
+				_currentWindowLayer->_LastMouseX, _currentWindowLayer->_LastMouseY, buttons[button], TVPGetCurrentShiftKeyState()));
+		}
+	}
 }
 
 void TVPMainScene::onPadKeyDown(cocos2d::Controller* ctrl, int keyCode, cocos2d::Event *e) {

@@ -26,6 +26,7 @@ void TVPAppDelegate::applicationWillEnterForeground() {
 }
 
 void TVPAppDelegate::applicationDidEnterBackground() {
+	if (auto *scene = TVPMainScene::GetInstance()) scene->releaseAndroidInput();
 	::Application->OnDeactivate();
 	Director::getInstance()->stopAnimation();
 }

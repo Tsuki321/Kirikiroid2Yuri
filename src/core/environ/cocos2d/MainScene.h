@@ -66,6 +66,12 @@ private:
 	void onKeyPressed(cocos2d::EventKeyboard::KeyCode keyCode, cocos2d::Event* event);
 	void onKeyReleased(cocos2d::EventKeyboard::KeyCode keyCode, cocos2d::Event* event);
 
+	static bool isAndroidInputActive();
+	void setAndroidControls();
+	void onAndroidKey(unsigned int key, bool down, bool repeat);
+	void onAndroidPointer(int action, int button, float x, float y, float scroll);
+	void releaseAndroidInput();
+
 	bool onTouchBegan(cocos2d::Touch *touch, cocos2d::Event *event);
 	void onTouchMoved(cocos2d::Touch *touch, cocos2d::Event *event);
 	void onTouchEnded(cocos2d::Touch *touch, cocos2d::Event *event);

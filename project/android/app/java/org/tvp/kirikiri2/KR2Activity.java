@@ -118,15 +118,7 @@ class DummyEdit extends View implements View.OnKeyListener {
 
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
-
-        // This handles the hardware keyboard input
-        if (event.isPrintingKey()) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                ic.commitText(String.valueOf((char) event.getUnicodeChar()), 1);
-            }
-            return true;
-        }
-        return false;
+        return KR2Activity.dispatchGameKey(event);
     }
         
     //
@@ -167,27 +159,7 @@ class SDLInputConnection extends BaseInputConnection {
 
     @Override
     public boolean sendKeyEvent(KeyEvent event) {
-        /*
-         * This handles the keycodes from soft keyboard (and IME-translated
-         * input from hardkeyboard)
-         */
-        int keyCode = event.getKeyCode();
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (event.isPrintingKey()) {
-                commitText(String.valueOf((char) event.getUnicodeChar()), 1);
-                KR2Activity.nativeCharInput(keyCode);
-            } else if(keyCode == KeyEvent.KEYCODE_DEL) {
-            	KR2Activity.nativeKeyAction(keyCode, true);
-            }
-            return true;
-        } else if (event.getAction() == KeyEvent.ACTION_UP) {
-        	if(keyCode == KeyEvent.KEYCODE_DEL) {
-            	KR2Activity.nativeKeyAction(keyCode, false);
-            }
-        	//KR2Activity.nativeKeyAction(keyCode, false);
-            return true;
-        }
-        return super.sendKeyEvent(event);
+        return KR2Activity.dispatchGameKey(event) || super.sendKeyEvent(event);
     }
 
     @Override
@@ -213,8 +185,8 @@ class SDLInputConnection extends BaseInputConnection {
         // Workaround to capture backspace key. Ref: http://stackoverflow.com/questions/14560344/android-backspace-in-webview-baseinputconnection
         if (beforeLength == 1 && afterLength == 0) {
             // backspace
-            return super.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
-                && super.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
+            return sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+                && sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
         }
 
         return super.deleteSurroundingText(beforeLength, afterLength);
@@ -301,6 +273,7 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 	}
 
 	static public KR2Activity sInstance;
+	private GameControls gameControls;
 	static public KR2Activity GetInstance() {return sInstance;}
 
     private static boolean isUnderDirectory(String path, File directory) throws IOException {
@@ -350,6 +323,8 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 		sInstance = this;
 		Sp = PreferenceManager.getDefaultSharedPreferences(this);
 		super.onCreate(savedInstanceState);
+		if (isFinishing() || getGLSurfaceView() == null) return;
+		gameControls = new GameControls(this, mFrameLayout);
 	
 		Intent launchIntent = getIntent();
 		boolean needsLegacyStorage = needsLegacyStoragePermissionForStartup(this,
@@ -372,8 +347,40 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 	
 	@Override
 	public void onDestroy() {
+		if (gameControls != null) gameControls.destroy();
 		super.onDestroy();
 		System.exit(0);
+	}
+
+	@Override protected void onResume() {
+		super.onResume();
+		if (gameControls != null) gameControls.resume();
+	}
+
+	@Override protected void onPause() {
+		if (gameControls != null) gameControls.pause();
+		super.onPause();
+	}
+
+	static boolean dispatchGameKey(KeyEvent event) {
+		return sInstance != null && sInstance.gameControls != null && sInstance.gameControls.input().onKey(event);
+	}
+
+	@Override public boolean dispatchKeyEvent(KeyEvent event) {
+		// Real Android editors (including dialogs) own their text and shortcuts.
+		if (!(getCurrentFocus() instanceof EditText) && gameControls != null) {
+			if ((event.getKeyCode() == KeyEvent.KEYCODE_BACK || event.getKeyCode() == KeyEvent.KEYCODE_MENU)
+					&& GameInput.nativeIsActive() && (mTextEdit == null || mTextEdit.getVisibility() != View.VISIBLE)) {
+				if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) gameControls.showPanel();
+				return true;
+			}
+			if (dispatchGameKey(event)) return true;
+		}
+		return super.dispatchKeyEvent(event);
+	}
+
+	@Override public void onBackPressed() {
+		if (gameControls == null || !gameControls.showPanel()) super.onBackPressed();
 	}
 	
 	@Override
@@ -1056,6 +1063,7 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+		if (!hasFocus && gameControls != null) gameControls.release();
 
         //SDLActivity.mHasFocus = hasFocus;
         if (hasFocus) {

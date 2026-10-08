@@ -72,6 +72,17 @@ public final class StorageAccess {
         return result.toArray(new String[0]);
     }
 
+    /** Stable engine path for a granted tree, without relying on grant ordering. */
+    public static String pathForTree(Context context, Uri uri) throws IOException {
+        for (UriPermission grant : context.getContentResolver().getPersistedUriPermissions()) {
+            if (grant.isReadPermission() && grant.getUri().equals(uri)) {
+                try { return new Tree(context, uri).mount; }
+                catch (Exception error) { throw new IOException("Cannot open the selected folder", error); }
+            }
+        }
+        throw new IOException("Folder permission was removed. Choose the folder again to restore access.");
+    }
+
     private static boolean under(String path, String root) {
         return path.equalsIgnoreCase(root) || path.regionMatches(true, 0, root + "/", 0, root.length() + 1);
     }

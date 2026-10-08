@@ -25,15 +25,23 @@
         tools:targetApi="n">
         <meta-data android:name="android.app.lib_name"
                    android:value="krkr2yuri" />
-        <activity android:name=".MainActivity"
-            android:screenOrientation="sensorLandscape"
-                  android:configChanges="keyboardHidden|orientation|screenSize"
-                  android:windowSoftInputMode="adjustPan" android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
-            android:exported="true">
+        <activity android:name=".LibraryActivity"
+                  android:theme="@style/LibraryTheme"
+                  android:process=":library"
+                  android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity android:name=".MainActivity"
+            android:taskAffinity="com.yuri.kirikiri2.player"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
+                  android:configChanges="keyboardHidden|orientation|screenSize"
+                  android:windowSoftInputMode="adjustPan" android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:exported="true">
         </activity>
     </application>
 </manifest> 

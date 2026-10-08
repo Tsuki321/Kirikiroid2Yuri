@@ -204,6 +204,26 @@ extern "C" {
 		return JNI_TRUE;
 	}
 
+	JNIEXPORT jboolean JNICALL Java_org_tvp_kirikiri2_GameInput_nativeIsActive(JNIEnv*, jclass) {
+		return TVPMainScene::isAndroidInputActive();
+	}
+
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_GameInput_nativeEnableControls(JNIEnv*, jclass) {
+		Android_PushEvents([] { if (auto *scene = TVPMainScene::GetInstance()) scene->setAndroidControls(); });
+	}
+
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_GameInput_nativeKey(JNIEnv*, jclass, jint key, jboolean down, jboolean repeat) {
+		Android_PushEvents([key, down, repeat] { if (auto *scene = TVPMainScene::GetInstance()) scene->onAndroidKey(key, down, repeat); });
+	}
+
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_GameInput_nativePointer(JNIEnv*, jclass, jint action, jint button, jfloat x, jfloat y, jfloat scroll) {
+		Android_PushEvents([action, button, x, y, scroll] { if (auto *scene = TVPMainScene::GetInstance()) scene->onAndroidPointer(action, button, x, y, scroll); });
+	}
+
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_GameInput_nativeRelease(JNIEnv*, jclass) {
+		Android_PushEvents([] { if (auto *scene = TVPMainScene::GetInstance()) scene->releaseAndroidInput(); });
+	}
+
 	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeInsertText(JNIEnv* env, jclass cls, jstring text) {
 		const char* pszText = env->GetStringUTFChars(text, NULL);
 		if (pszText && *pszText) {
@@ -221,21 +241,21 @@ extern "C" {
 	}
 
 	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeCharInput(JNIEnv* env, jclass cls, jint keyCode) {
-		TVPMainScene *pScene = TVPMainScene::GetInstance();
-		if (!pScene) return;
-		pScene->getScheduler()->performFunctionInCocosThread(std::bind(&TVPMainScene::onCharInput, keyCode));
+		Android_PushEvents([keyCode] { TVPMainScene::onCharInput(keyCode); });
 	}
 
 	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeCommitText(
 		JNIEnv* env, jclass cls,
 		jstring text, jint newCursorPosition)
 	{
-		TVPMainScene *pScene = TVPMainScene::GetInstance();
-		if (!pScene) return;
-		const char *utftext = env->GetStringUTFChars(text, NULL);
-		std::string str(utftext);
-		pScene->getScheduler()->performFunctionInCocosThread(std::bind(&TVPMainScene::onTextInput, str));
-		env->ReleaseStringUTFChars(text, utftext);
+		if (!text) return;
+		const jchar *characters = env->GetStringChars(text, nullptr);
+		if (!characters) return;
+		std::u16string utf16(reinterpret_cast<const char16_t *>(characters), env->GetStringLength(text));
+		env->ReleaseStringChars(text, characters);
+		std::string utf8;
+		if (cocos2d::StringUtils::UTF16ToUTF8(utf16, utf8))
+			Android_PushEvents([utf8] { TVPMainScene::onTextInput(utf8); });
 	}
 
 	JNIEXPORT jboolean JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeGetHideSystemButton(JNIEnv* env, jclass cls)

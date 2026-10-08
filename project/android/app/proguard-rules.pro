@@ -14,6 +14,10 @@
 -keep class org.tvp.kirikiri2.KR2Activity { *; }
 -keep class org.tvp.kirikiri2.LayerPainter { *; }
 -keep class org.tvp.kirikiri2.StorageAccess { *; }
+-keep class org.tvp.kirikiri2.GameInput { *; }
+-keep class org.tvp.kirikiri2.GameInput$* { *; }
+-keep class org.tvp.kirikiri2.GameLibrary { *; }
+-keep class org.tvp.kirikiri2.GameLibrary$* { *; }
 -keep class org.libsdl.app.** { *; }
 
 # If your project uses WebView with JS, uncomment the following
