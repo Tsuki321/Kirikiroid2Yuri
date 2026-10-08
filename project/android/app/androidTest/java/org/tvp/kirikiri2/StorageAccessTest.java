@@ -164,6 +164,7 @@ public class StorageAccessTest {
             + "<Custom key=\"debugwin\" value=\"no\"/></GlobalPreference>");
         StringBuilder manifest = new StringBuilder();
         String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents",
+                "archive-launch-local", "archive-launch-documents",
                 "transitions", "transitions-documents", "transitions-opengl", "transitions-opengl-documents",
                 "audio-local", "audio-documents", "dialogs-local", "dialogs-documents",
                 "preferences-missing-local", "preferences-invalid-local", "preferences-invalid-documents", "preferences-root-local"};
@@ -178,6 +179,7 @@ public class StorageAccessTest {
                 + "<Custom key=\"ci-launch\" value=\"overridden preference\"/>"
                 + "<Custom key=\"debugwin\" value=\"no\"/><Custom key=\"gpredetect\" value=\"0\"/>"
                 + "<Custom key=\"used2d\" value=\"no\"/>"
+                + "<Custom key=\"ci-archive-output\" value=\"" + output + "\"/>"
                 + "</GlobalPreference>\n");
             if (name.startsWith("preferences-invalid")) write(storage + "/Kirikiroid2Preference.xml",
                 "<GlobalPreference><Custom key=\"ci-preference\" value=\"must not leak\"/>");
@@ -242,7 +244,9 @@ public class StorageAccessTest {
             assertTrue(StorageAccess.write(context, storage + "/broken.tjb", new byte[] {'T','J','S','2','1','0','0',0}));
             write(storage + "/unsafe.txt", "(global.ciSideEffect = 1, %[]) ");
             write(storage + "/preprocessor.txt", "@set(ciSideEffect=1) (const) %[]");
-            manifest.append(name).append('\t').append(storage).append('\t').append(output).append('\n');
+            manifest.append(name).append('\t').append(storage)
+                .append(name.startsWith("archive-launch") ? "/launch-path.xp3" : "")
+                .append('\t').append(output).append('\n');
             if (name.equals("local") || name.equals("documents"))
                 manifest.append("compiled-").append(name).append('\t').append(storage).append('\t').append(output).append('\n');
         }

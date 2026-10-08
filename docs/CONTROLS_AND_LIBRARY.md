@@ -65,6 +65,10 @@ engine regression fixtures. Document-provider preference files are served
 through non-seekable pipes to exercise the same loading path as provider-backed
 game folders.
 
+Archive-launch fixtures check that `System.exePath` still identifies the game
+folder, so preferences, plugins and sibling patch archives remain accessible
+after the engine enters the startup archive.
+
 - `GameInputTest` checks chords, repeat events, shared holds, focus loss, pointer
   IDs, cancellation, touchpad movement, mouse buttons, wheel coordinates and
   long press.

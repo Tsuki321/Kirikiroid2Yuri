@@ -143,7 +143,9 @@ public class NativeControlsTest {
             UiChecks.waitFor("Your library"); UiChecks.addFolder("Controls playground");
             UiChecks.scrollTo("Play Controls playground"); UiChecks.click("Play Controls playground");
             waitLog("READY");
-            UiChecks.click("Controls"); UiChecks.scrollTo("Game preferences"); UiChecks.click("Game preferences");
+            UiChecks.waitFor("A few easy controls"); UiChecks.screenshot("controls-first-use"); UiChecks.click("Let’s play");
+            UiChecks.waitFor("Open game controls");
+            UiChecks.click("Open game controls"); UiChecks.scrollTo("Game preferences"); UiChecks.click("Game preferences");
             UiChecks.waitFor("Game preferences");
             List<AccessibilityNodeInfo> preferenceText = UiChecks.automation().getRootInActiveWindow()
                 .findAccessibilityNodeInfosByText("-gpredetect=0");
@@ -155,8 +157,6 @@ public class NativeControlsTest {
             assertTrue(report.contains(launchedFolder + "/Kirikiroid2Preference.xml"));
             assertTrue(report.contains("-debugwin=no") && report.contains("-used2d=no"));
             UiChecks.screenshot("game-preferences-loaded"); UiChecks.click("OK");
-            UiChecks.waitFor("A few easy controls"); UiChecks.screenshot("controls-first-use"); UiChecks.click("Let’s play");
-            UiChecks.waitFor("Open game controls");
             instrumentation.runOnMainSync(() -> {
                 View surface = KR2Activity.sInstance.getGLSurfaceView(); int[] origin = new int[2]; surface.getLocationOnScreen(origin);
                 x = origin[0] + surface.getWidth() / 2f; y = origin[1] + surface.getHeight() / 2f;

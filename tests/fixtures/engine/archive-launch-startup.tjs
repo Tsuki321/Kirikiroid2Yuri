@@ -1,0 +1,19 @@
+var ciOutput = System.getArgument("-ci-archive-output") + "/";
+var ciMessages = ["ENGINE_CI_STARTED"];
+ciMessages.save(ciOutput + "started.txt");
+try {
+    if (System.getArgument("-ci-launch") !== "kept") throw "lost archive launch option";
+    if (System.getArgument("-debugwin") !== "no" || System.getArgument("-gpredetect") !== "0"
+        || System.getArgument("-used2d") !== "no") throw "archive did not use sibling preferences";
+    if (System.exePath.indexOf(">") != -1) throw "executable path points inside startup archive";
+    if (!Storages.isExistentStorage(System.exePath + "Kirikiroid2Preference.xml"))
+        throw "executable path lost the game's preference file";
+    var sibling = [];
+    sibling.load(System.exePath + "valid-raw.xp3>hello.txt");
+    if (sibling.join("\n").indexOf("archive fixture OK") != 0) throw "could not load sibling archive";
+    ciMessages.add("PASS archive launches retain sibling preferences and patch archive access");
+    ciMessages.add("ENGINE_CI_PASS");
+} catch (error) {
+    ciMessages.add("ENGINE_CI_FAIL " + error);
+}
+ciMessages.save(ciOutput + "result.txt");

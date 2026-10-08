@@ -42,6 +42,9 @@ def container(index, payload=TEXT, compressed=False, chained=False):
 
 def fixtures():
     result = {"valid-raw.xp3": container(file_index())}
+    startup = (Path(__file__).resolve().parents[1] / "tests/fixtures/engine/archive-launch-startup.tjs").read_text(encoding="utf-8")
+    startup = b"\xff\xfe" + startup.encode("utf-16le")
+    result["launch-path.xp3"] = container(file_index(startup, name="startup.tjs"), startup)
     packed = zlib.compress(TEXT)
     result["valid-compressed.xp3"] = container(
         file_index(segments=[(1, 19, len(TEXT), len(packed))]), packed, compressed=True)

@@ -34,7 +34,7 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
 failures=0
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -eq 20
+test "$expected" -eq 22
 # adb shell reads stdin. Keep the manifest on another descriptor so starting
 # the first activity cannot consume the remaining fixture rows.
 while IFS=$'\t' read -r -u 3 name storage output; do

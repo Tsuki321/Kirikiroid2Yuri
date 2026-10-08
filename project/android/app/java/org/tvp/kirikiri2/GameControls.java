@@ -264,6 +264,7 @@ public final class GameControls {
         LinearLayout body = column(theme, 20);
         body.addView(text(theme, "Touch to click. Make the controls yours.", 14, MUTED));
         gap(body, 16);
+        addAction(body, "Game preferences", activity::showGamePreferences);
         addAction(body, keyboard ? "Hide keyboard" : "Show keyboard", () -> { keyboard = !keyboard; rebuild(); });
         addAction(body, "Type text into the game", this::typeText);
         addAction(body, "Direction keys: " + new String[] {"Hidden", "WASD", "Arrows"}[Math.max(0, Math.min(layout, 2))], () -> {
@@ -283,7 +284,6 @@ public final class GameControls {
         slider(body, "Pointer speed", 50, 250, preferences.getInt("sensitivity", 120), value -> { preferences.edit().putInt("sensitivity", value).apply(); input.setSensitivity(value / 100f); });
         gap(body, 12);
         addAction(body, "Touch and keyboard guide", this::showGuide);
-        addAction(body, "Game preferences", activity::showGamePreferences);
         addAction(body, "Advanced engine options", () -> { input.release(); KR2Activity.nativeKeyAction(android.view.KeyEvent.KEYCODE_MENU, true); KR2Activity.nativeKeyAction(android.view.KeyEvent.KEYCODE_MENU, false); });
         addAction(body, "Return to library", this::confirmExit);
         ScrollView scroll = new ScrollView(theme); scroll.addView(body);
