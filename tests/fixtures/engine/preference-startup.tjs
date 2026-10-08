@@ -1,0 +1,13 @@
+var ciOutput = "@@OUTPUT@@/";
+var ciMessages = ["ENGINE_CI_STARTED"];
+ciMessages.save(ciOutput + "started.txt");
+try {
+    if (System.getArgument("-ci-launch") !== "kept") throw "lost explicit launch option";
+    if (System.getArgument("-ci-global-only") !== "inherited") throw "lost global option";
+    if (System.getArgument("-ci-preference") !== "global fallback") throw "invalid game preferences leaked values";
+    ciMessages.add("PASS missing and invalid preferences fall back without partial values");
+    ciMessages.add("ENGINE_CI_PASS");
+} catch (error) {
+    ciMessages.add("ENGINE_CI_FAIL " + error);
+}
+ciMessages.save(ciOutput + "result.txt");

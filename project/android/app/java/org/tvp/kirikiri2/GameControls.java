@@ -283,6 +283,7 @@ public final class GameControls {
         slider(body, "Pointer speed", 50, 250, preferences.getInt("sensitivity", 120), value -> { preferences.edit().putInt("sensitivity", value).apply(); input.setSensitivity(value / 100f); });
         gap(body, 12);
         addAction(body, "Touch and keyboard guide", this::showGuide);
+        addAction(body, "Game preferences", activity::showGamePreferences);
         addAction(body, "Advanced engine options", () -> { input.release(); KR2Activity.nativeKeyAction(android.view.KeyEvent.KEYCODE_MENU, true); KR2Activity.nativeKeyAction(android.view.KeyEvent.KEYCODE_MENU, false); });
         addAction(body, "Return to library", this::confirmExit);
         ScrollView scroll = new ScrollView(theme); scroll.addView(body);

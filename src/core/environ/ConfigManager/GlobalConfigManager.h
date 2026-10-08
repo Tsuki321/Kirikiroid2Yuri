@@ -11,12 +11,14 @@ protected:
 	std::map<int, int> KeyMap;
 
 	bool ConfigUpdated;
+	std::string LoadStatus = "Not loaded";
 
 	virtual std::string GetFilePath() = 0;
 
-	void Initialize();
+	bool Initialize();
 
 public:
+	const std::string &GetLoadStatus() const { return LoadStatus; }
 	void SaveToFile();
 
 	bool IsValueExist(const std::string &name);

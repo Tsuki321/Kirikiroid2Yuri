@@ -12,12 +12,14 @@ class IndividualConfigManager : public iSysConfigManager {
 	void Clear();
 
 	std::string CurrentPath;
+	std::string PreferencePath;
 
 public:
 	static IndividualConfigManager* GetInstance();
 	static bool CheckExistAt(const std::string &folder);
 	bool CreatePreferenceAt(const std::string &folder);
-	bool UsePreferenceAt(const std::string &folder);
+	bool UsePreferenceAt(const std::string &folder, bool reload = false);
+	const std::string &GetPreferencePath() const { return PreferencePath; }
 
 	template<typename T>
 	T GetValue(const std::string &name, const T& defVal);

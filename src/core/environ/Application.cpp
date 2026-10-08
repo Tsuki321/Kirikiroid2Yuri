@@ -571,6 +571,7 @@ bool tTVPApplication::StartApplication(ttstr path) {
 //		if(TVPCheckProcessLog()) return true; // sub-process for processing object hash map log
 
 		TVPProjectDir = TVPNormalizeStorageName(path);
+		TVPApplyStartupPreferences();
 
 		TVPInitScriptEngine();
 		TVPInitFontNames();

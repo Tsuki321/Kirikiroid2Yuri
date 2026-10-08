@@ -5,6 +5,7 @@
 #include "UtilStreams.h"
 #include "LocaleConfigManager.h"
 #include <vector>
+#include <cstring>
 #ifdef __ANDROID__
 #include "android/AndroidStorage.h"
 #include <unistd.h>
@@ -50,7 +51,7 @@ GlobalConfigManager* GlobalConfigManager::GetInstance() {
 	return &instance;
 }
 
-void iSysConfigManager::Initialize() {
+bool iSysConfigManager::Initialize() {
 	AllConfig.clear();
     CustomArguments.clear();
     KeyMap.clear();
@@ -71,7 +72,31 @@ void iSysConfigManager::Initialize() {
 #endif
 #endif
 
-	if (fp && !doc.LoadFile(fp)) {
+	if (!fp) {
+		LoadStatus = "Could not read the preference file";
+		return false;
+	}
+	// Document providers may return pipes, but XMLDocument::LoadFile seeks.
+	std::string contents;
+	char buffer[4096];
+	size_t count;
+	const size_t maxBytes = 1024 * 1024;
+	while ((count = fread(buffer, 1, sizeof(buffer), fp)) != 0) {
+		contents.append(buffer, count);
+		if (contents.size() > maxBytes) break;
+	}
+	const bool readFailed = ferror(fp) != 0;
+	fclose(fp);
+	if (readFailed || contents.size() > maxBytes) {
+		LoadStatus = readFailed ? "Could not read the preference file" : "Preference file is too large";
+		return false;
+	}
+	if (doc.Parse(contents.c_str(), contents.size()) != tinyxml2::XML_SUCCESS ||
+		!doc.RootElement() || strcmp(doc.RootElement()->Name(), "GlobalPreference") != 0) {
+		LoadStatus = "Invalid preference XML (expected GlobalPreference)";
+		return false;
+	}
+	{
 		tinyxml2::XMLElement *rootElement = doc.RootElement();
 		if (rootElement) {
 			for (tinyxml2::XMLElement *item = rootElement->FirstChildElement("Item"); item; item = item->NextSiblingElement("Item")) {
@@ -98,7 +123,8 @@ void iSysConfigManager::Initialize() {
 			}
 		}
 	}
-	if (fp) fclose(fp);
+	LoadStatus = "Loaded";
+	return true;
 }
 
 void iSysConfigManager::SaveToFile() {
@@ -219,4 +245,3 @@ std::vector<std::string> iSysConfigManager::GetCustomArgumentsForPush() {
 	}
 	return ret;
 }
-

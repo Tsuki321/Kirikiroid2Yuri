@@ -735,6 +735,19 @@ bool TVPCheckStartupPath(const std::string &path) {
     return TVPCheckExistentLocalFolder(ttstr(path)) || TVPCheckExistentLocalFile(ttstr(path));
 }
 
+void TVPReportStartupPreferences(const ttstr &report, const ttstr &summary) {
+    JniMethodInfo method;
+    if (!JniHelper::getStaticMethodInfo(method, "org/tvp/kirikiri2/KR2Activity",
+            "reportStartupPreferences", "(Ljava/lang/String;Ljava/lang/String;)V")) return;
+    jstring reportText = method.env->NewString(reinterpret_cast<const jchar *>(report.c_str()), report.length());
+    jstring summaryText = method.env->NewString(reinterpret_cast<const jchar *>(summary.c_str()), summary.length());
+    if (reportText && summaryText) method.env->CallStaticVoidMethod(method.classID, method.methodID, reportText, summaryText);
+    if (method.env->ExceptionCheck()) method.env->ExceptionClear();
+    if (reportText) method.env->DeleteLocalRef(reportText);
+    if (summaryText) method.env->DeleteLocalRef(summaryText);
+    method.env->DeleteLocalRef(method.classID);
+}
+
 
 bool TVPCreateFolders(const ttstr &folder)
 {

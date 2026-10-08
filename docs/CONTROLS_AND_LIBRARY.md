@@ -44,14 +44,26 @@ screen-awake behavior and optional physical WASD-to-arrow mapping. Settings are
 remembered between games. **Advanced engine options** opens the original engine
 menu.
 
+Place `Kirikiroid2Preference.xml` beside the game's `data.xp3` or `startup.tjs`.
+The engine reloads it when the game starts, including when launching an archive.
+A startup notification confirms the load; **Controls > Game preferences** shows
+the file path, load status and effective startup options. Missing, unreadable or
+invalid XML is reported there. Startup options take priority in this order:
+explicit launch options, game preferences, then global preferences. Restart the
+game after editing startup options. Saved touch and keyboard controls are
+separate from these engine options.
+
 Save in the game before choosing **Return to library**. The confirmation closes
 the engine; unsaved game progress is not restored automatically. The library
 uses a separate Android process so it survives the engine’s shutdown.
 
 # Verification
 
-Builds run in GitHub Actions. The Android matrix exercises API 30 and 35 with
-debug and release APKs, including the existing engine regression fixtures.
+Builds run in GitHub Actions. The Android matrix targets Android 16 (API 36),
+with 4 KB and 16 KB page images and debug/release APKs, including the existing
+engine regression fixtures. Document-provider preference files are served
+through non-seekable pipes to exercise the same loading path as provider-backed
+game folders.
 
 - `GameInputTest` checks chords, repeat events, shared holds, focus loss, pointer
   IDs, cancellation, touchpad movement, mouse buttons, wheel coordinates and
@@ -63,6 +75,8 @@ debug and release APKs, including the existing engine regression fixtures.
 - `NativeControlsTest` injects keyboard, touch and mouse input into a running
   Kirikiri window. Its TJS event log verifies held keys, game coordinates,
   cancellation, Unicode input and release when the control panel opens.
+  It also opens **Game preferences** and verifies the applied XML path and
+  compatibility options in the rendered dialog.
 
 The emulator artifacts contain `ui-evidence/*.png`, instrumentation results,
 `input-events.raw` and the existing engine logs. The native input test runs in a

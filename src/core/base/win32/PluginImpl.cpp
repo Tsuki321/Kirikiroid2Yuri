@@ -444,6 +444,7 @@ tTVPAtExit TVPDestroyPluginVectorAtExit
 #endif
 //---------------------------------------------------------------------------
 bool TVPLoadInternalPlugin(const ttstr &_name);
+bool TVPIsInternalPluginAvailable(const ttstr &name);
 ttstr TVPNormalizeInternalPluginName(const ttstr &name);
 extern std::set<ttstr> TVPRegisteredPlugins;
 static bool TVPPluginLoading = false;
@@ -987,6 +988,15 @@ tTJSNativeClass * TVPCreateNativeClass_Plugins()
 
 //-- methods
 
+// Query built-in support without loading a module or executing its registration.
+TJS_BEGIN_NATIVE_METHOD_DECL(isAvailable)
+{
+	if(numparams < 1) return TJS_E_BADPARAMCOUNT;
+	if(result) *result = (tjs_int)TVPIsInternalPluginAvailable(ttstr(*param[0]));
+	return TJS_S_OK;
+}
+TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(cls, isAvailable)
+
 //----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/link)
 {
@@ -1053,6 +1063,5 @@ TJS_END_NATIVE_STATIC_METHOD_DECL_OUTER(cls, getList)
 	return cls;
 }
 //---------------------------------------------------------------------------
-
 
 

@@ -18,6 +18,7 @@
 // #include <commdlg.h>
 
 #include "SysInitImpl.h"
+#include <algorithm>
 #include "StorageIntf.h"
 #include "StorageImpl.h"
 #include "MsgIntf.h"
@@ -1635,6 +1636,7 @@ static ttstr TVPParseCommandLineOne(const ttstr &i)
 }
 //---------------------------------------------------------------------------
 std::vector <ttstr> TVPProgramArguments;
+static std::vector<ttstr> TVPExplicitProgramArguments;
 static bool TVPProgramArgumentsInit = false;
 static tjs_int TVPCommandLineArgumentGeneration = 0;
 static bool TVPDataPathDirectoryEnsured = false;
@@ -1716,7 +1718,7 @@ static void TVPInitProgramArgumentsAndDataPath(bool stop_after_datapath_got)
 
 		// Platform launchers set options before the engine has a project/data
 		// path. Keep those overrides when rebuilding the configuration layers.
-		const std::vector<ttstr> launch_arguments = TVPProgramArguments;
+		const std::vector<ttstr> launch_arguments = TVPExplicitProgramArguments;
 
 		// find options from self executable image
 		const int num_option_layers = 3;
@@ -1827,29 +1829,51 @@ bool TVPGetCommandLine(const tjs_char * name, tTJSVariant *value)
 //---------------------------------------------------------------------------
 void TVPSetCommandLine(const tjs_char * name, const ttstr & value)
 {
-//	TVPInitProgramArgumentsAndDataPath(false);
+    // Keep caller-supplied overrides separate from preferences cached before
+    // the user selected a game. This also preserves Android intent arguments.
+    const ttstr prefix = ttstr(name) + TJS_W("=");
+    auto setArgument = [&](std::vector<ttstr> &arguments) {
+        for (auto &argument : arguments) {
+            if (argument == name || argument.StartsWith(prefix)) {
+                argument = prefix + value;
+                return;
+            }
+        }
+        arguments.insert(arguments.begin(), prefix + value);
+    };
+    setArgument(TVPExplicitProgramArguments);
+    setArgument(TVPProgramArguments);
+    TVPCommandLineArgumentGeneration ++;
+    if(TVPCommandLineArgumentGeneration == 0) TVPCommandLineArgumentGeneration = 1;
+}
 
-	tjs_int namelen = (tjs_int)TJS_strlen(name);
-	std::vector<ttstr>::iterator i;
-	for(i = TVPProgramArguments.begin(); i != TVPProgramArguments.end(); i++)
-	{
-		if(!TJS_strncmp(i->c_str(), name, namelen))
-		{
-			if(i->c_str()[namelen] == TJS_W('=') || i->c_str()[namelen] == 0)
-			{
-				// value found
-				*i = ttstr(i->c_str(), namelen) + TJS_W("=") + value;
-				TVPCommandLineArgumentGeneration ++;
-				if(TVPCommandLineArgumentGeneration == 0) TVPCommandLineArgumentGeneration = 1;
-				return;
-			}
-		}
-	}
-
-	// value not found; insert argument into front
-	TVPProgramArguments.insert(TVPProgramArguments.begin(), ttstr(name) + TJS_W("=") + value);
-	TVPCommandLineArgumentGeneration ++;
-	if(TVPCommandLineArgumentGeneration == 0) TVPCommandLineArgumentGeneration = 1;
+//---------------------------------------------------------------------------
+void TVPApplyStartupPreferences()
+{
+    TVPProgramArguments = TVPExplicitProgramArguments;
+    TVPProgramArgumentsInit = false;
+    TVPInitProgramArgumentsAndDataPath(false);
+    auto *preferences = IndividualConfigManager::GetInstance();
+    std::string report = "Game preferences: " + preferences->GetLoadStatus() +
+        "\nFile: " + preferences->GetPreferencePath() + "\n\nEffective startup options:\n";
+    std::vector<ttstr> reported;
+    for (const ttstr &argument : TVPProgramArguments) {
+        const tjs_int equal = argument.IndexOf(TJS_W('='));
+        const ttstr name = equal >= 0 ? argument.SubString(0, equal) : argument;
+        if (std::find(reported.begin(), reported.end(), name) != reported.end()) continue;
+        reported.push_back(name);
+        report += argument.AsStdString() + "\n";
+    }
+    if (reported.empty()) report += "Engine defaults (no custom startup options)\n";
+    report += "\nPriority: launch options, game preferences, global preferences.\n"
+        "Changes to startup options take effect when the game is restarted.";
+    TVPAddImportantLog(ttstr(report));
+#ifdef __ANDROID__
+    const std::string summary = preferences->GetLoadStatus() == "Loaded"
+        ? "Game preferences loaded. View applied options in Controls > Game preferences."
+        : "Game preferences: " + preferences->GetLoadStatus() + ". View details in Controls > Game preferences.";
+    TVPReportStartupPreferences(ttstr(report), ttstr(summary));
+#endif
 }
 //---------------------------------------------------------------------------
 

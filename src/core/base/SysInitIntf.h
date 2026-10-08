@@ -82,6 +82,9 @@ TJS_EXP_FUNC_DEF(void, TVPSetCommandLine, (const tjs_char * name, const ttstr & 
 	// sets command line to the specified value.
 	// note that this function does not check any consistency or correctness of the value.
 
+// Rebuild preferences after choosing a game, preserving explicit launch options.
+void TVPApplyStartupPreferences();
+
 //---------------------------------------------------------------------------
 
 #endif

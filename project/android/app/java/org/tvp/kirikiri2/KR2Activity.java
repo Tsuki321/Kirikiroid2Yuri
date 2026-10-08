@@ -274,6 +274,23 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 
 	static public KR2Activity sInstance;
 	private GameControls gameControls;
+	private volatile String startupPreferenceReport = "Game preferences have not been loaded yet.";
+
+	public static void reportStartupPreferences(String report, String summary) {
+		KR2Activity activity = sInstance;
+		if (activity == null) return;
+		activity.startupPreferenceReport = report;
+		activity.runOnUiThread(() -> {
+			if (!activity.isFinishing()) android.widget.Toast.makeText(activity, summary, android.widget.Toast.LENGTH_LONG).show();
+		});
+	}
+
+	void showGamePreferences() {
+		AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Game preferences")
+				.setMessage(startupPreferenceReport).setPositiveButton("OK", null).show();
+		android.widget.TextView message = dialog.findViewById(android.R.id.message);
+		if (message != null) message.setTextIsSelectable(true);
+	}
 	static public KR2Activity GetInstance() {return sInstance;}
 
     private static boolean isUnderDirectory(String path, File directory) throws IOException {

@@ -152,26 +152,40 @@ public class StorageAccessTest {
         String transitionScript = read(tests.getAssets().open("engine/transition-startup.tjs"));
         String audioScript = read(tests.getAssets().open("engine/audio-startup.tjs"));
         String dialogScript = read(tests.getAssets().open("engine/dialog-startup.tjs"));
+        String preferenceScript = read(tests.getAssets().open("engine/preference-startup.tjs"));
         String program = read(tests.getAssets().open("engine/compiled-source.tjs"));
         File base = new File(context.getFilesDir(), "engine-ci");
         assertTrue(StorageAccess.mkdirs(context, base.getPath()));
+        String globalPreferences = new File(context.getFilesDir(), ".preference").getPath();
+        assertTrue(StorageAccess.mkdirs(context, globalPreferences));
+        write(globalPreferences + "/GlobalPreference.xml", "<GlobalPreference>"
+            + "<Custom key=\"ci-global-only\" value=\"inherited\"/>"
+            + "<Custom key=\"ci-preference\" value=\"global fallback\"/>"
+            + "<Custom key=\"debugwin\" value=\"no\"/></GlobalPreference>");
         StringBuilder manifest = new StringBuilder();
         String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents",
                 "transitions", "transitions-documents", "transitions-opengl", "transitions-opengl-documents",
-                "audio-local", "audio-documents", "dialogs-local", "dialogs-documents"};
+                "audio-local", "audio-documents", "dialogs-local", "dialogs-documents",
+                "preferences-missing-local", "preferences-invalid-local", "preferences-invalid-documents", "preferences-root-local"};
         for (String name : names) {
             String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
             String output = new File(base, name + "-result").getPath();
             assertTrue(StorageAccess.mkdirs(context, storage));
             assertTrue(StorageAccess.mkdirs(context, output));
-            write(storage + "/Kirikiroid2Preference.xml", "<?xml version=\"1.0\"?>\n<GlobalPreference>"
+            if (!name.startsWith("preferences-missing")) write(storage + "/Kirikiroid2Preference.xml", "<?xml version=\"1.0\"?>\n<GlobalPreference>"
                 + "<Item key=\"renderer\" value=\"" + (name.contains("opengl") ? "opengl" : "software") + "\"/>"
                 + "<Custom key=\"ci-preference\" value=\"saved value=1 &amp; 2\"/>"
                 + "<Custom key=\"ci-launch\" value=\"overridden preference\"/>"
+                + "<Custom key=\"debugwin\" value=\"no\"/><Custom key=\"gpredetect\" value=\"0\"/>"
+                + "<Custom key=\"used2d\" value=\"no\"/>"
                 + "</GlobalPreference>\n");
+            if (name.startsWith("preferences-invalid")) write(storage + "/Kirikiroid2Preference.xml",
+                "<GlobalPreference><Custom key=\"ci-preference\" value=\"must not leak\"/>");
+            if (name.startsWith("preferences-root")) write(storage + "/Kirikiroid2Preference.xml",
+                "<Preferences><Custom key=\"ci-preference\" value=\"must not leak\"/></Preferences>");
             write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript
                 : name.startsWith("transitions") ? transitionScript : name.startsWith("audio-") ? audioScript
-                : name.startsWith("dialogs-") ? dialogScript : script)
+                : name.startsWith("dialogs-") ? dialogScript : name.startsWith("preferences-") ? preferenceScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
             if (name.equals("local") || name.equals("documents")) {
                 write(storage + "/engine-body.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));

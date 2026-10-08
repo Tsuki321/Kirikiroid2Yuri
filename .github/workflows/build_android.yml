@@ -163,12 +163,8 @@ jobs:
       fail-fast: false
       matrix:
         variant: [debug, release]
-        include:
-          - api: 30
-            target: google_apis
-          - api: 35
-            target: google_apis_ps16k
-        api: [30, 35]
+        api: [36]
+        target: [google_apis, google_apis_ps16k]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

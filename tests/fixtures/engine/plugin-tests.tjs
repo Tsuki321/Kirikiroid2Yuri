@@ -1,3 +1,15 @@
+var ciPluginsBeforeProbe = Plugins.getList().count;
+ciCheck(Plugins.isAvailable("plugin/GETLANGNAME.TPM") && Plugins.isAvailable("wuvorbis.dll"),
+    "plugin capabilities normalize paths, case and autoload suffixes");
+ciCheck(!Plugins.isAvailable("emoteplayer.dll") && !Plugins.isAvailable("motionplayer.dll")
+    && !Plugins.isAvailable("DrawDeviceD2Dm.dll") && !Plugins.isAvailable("missing.dll"),
+    "Windows-only plugin files cannot advertise Android support");
+ciCheck(Plugins.getList().count == ciPluginsBeforeProbe,
+    "plugin capability queries do not load modules");
+Plugins.link("plugin/WUVORBIS.TPM");
+Plugins.link("wuvorbis.dll");
+ciCheck(Plugins.getList().count == ciPluginsBeforeProbe + 1,
+    "built-in Vorbis satisfies legacy plugin links exactly once");
 Plugins.link("getLangName.dll");
 var ciLanguageFunction = System.getCurrentUILangName;
 Plugins.link("GETLANGNAME.DLL");

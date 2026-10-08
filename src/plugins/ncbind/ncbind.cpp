@@ -12,6 +12,11 @@ std::set<ttstr> TVPRegisteredPlugins;
 
 std::map<ttstr, ncbAutoRegister::INTERNAL_PLUGIN_LISTS > ncbAutoRegister::_internal_plugins;
 
+bool ncbAutoRegister::HasModule(const ttstr &name)
+{
+	return _internal_plugins.find(name.AsLowerCase()) != _internal_plugins.end();
+}
+
 bool ncbAutoRegister::LoadModule(const ttstr &_name)
 {
 	ttstr name = _name.AsLowerCase();

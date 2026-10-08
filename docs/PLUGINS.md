@@ -7,6 +7,13 @@ case and treats `.tpm` as the autoload spelling of `.dll`. Repeated links share 
 registration, and `Plugins.getList()` reports loaded canonical module names.
 Unknown names raise a script exception and remain absent from that list.
 
+`Plugins.isAvailable(name)` reports whether this Android build implements a
+module. It accepts the same path, case and suffix spellings as `link`, without
+loading the module. Compatibility patches should combine it with any game-side
+file check before enabling an optional plugin. A Windows DLL on disk does not
+provide Android support: `emoteplayer`, `motionplayer` and `DrawDeviceD2Dm` remain
+unavailable, and this query does not substitute empty classes for their APIs.
+
 Built-in modules remain resident for the engine lifetime. `Plugins.unlink`
 returns false for them and raises for an unloaded name, so scripts can correctly
 detect that the APIs still exist. The engine's static-library link retains plugin
@@ -19,6 +26,7 @@ registration objects, including modules that are only referenced by script names
 | `getLangName.dll` | `System.getCurrentUILangName` and `System.getCurrentLocaleName` return English language descriptions. Android locale/script information distinguishes Traditional and Simplified Chinese. |
 | `wfBasicEffect.dll` | `WaveSoundBuffer.GainLimit`, `DelayEffect`, `GraphicEqualizer` and `StkFreeVerb` process decoded PCM through `WaveSoundBuffer.filters`. |
 | `wfTypicalDSP.dll` | `WaveSoundBuffer.WaveDSPFilter` supplies the supported DSP filter families using the pinned DSPFilters implementation. |
+| `wuvorbis.dll` | Recognizes legacy plugin requests for the engine's existing Ogg Vorbis decoder. |
 
 See [audio effect APIs and limits](WAVE_EFFECTS.md) for constructor units,
 supported DSP combinations and filter ownership behavior.

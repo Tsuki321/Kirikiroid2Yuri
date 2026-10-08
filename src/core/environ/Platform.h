@@ -43,6 +43,9 @@ void TVPRelinquishCPU();
 void TVPPrintLog(const char *str);
 
 void TVPFetchSDCardPermission(); // for android only
+#ifdef __ANDROID__
+void TVPReportStartupPreferences(const ttstr &report, const ttstr &summary);
+#endif
 
 // POSIX macros alias timespec fields; this structure stores plain seconds.
 #undef st_atime

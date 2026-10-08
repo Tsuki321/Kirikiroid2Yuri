@@ -88,6 +88,20 @@ public class TestDocumentsProvider extends DocumentsProvider {
         return result;
     }
     @Override public ParcelFileDescriptor openDocument(String id, String mode, CancellationSignal signal) throws FileNotFoundException {
+        if (mode.equals("r") && id.endsWith("/Kirikiroid2Preference.xml")) {
+            try {
+                File source = file(id);
+                ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
+                new Thread(() -> {
+                    try (java.io.InputStream input = new java.io.FileInputStream(source);
+                         java.io.OutputStream output = new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
+                        byte[] buffer = new byte[4096]; int count;
+                        while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                    } catch (IOException error) { android.util.Log.e("PreferenceFixture", "Pipe failed", error); }
+                }, "PreferencePipe").start();
+                return pipe[0];
+            } catch (IOException error) { throw new FileNotFoundException(error.getMessage()); }
+        }
         if (id.endsWith("/full.dat") && mode.contains("w")) {
             android.os.storage.StorageManager storage = (android.os.storage.StorageManager)
                 getContext().getSystemService(android.content.Context.STORAGE_SERVICE);

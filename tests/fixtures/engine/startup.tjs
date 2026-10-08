@@ -24,6 +24,11 @@ try {
     ciCheck(System.getArgument("-ci-launch") === "kept", "launch arguments survive engine initialization");
     ciCheck(System.getArgument("-ci-preference") === "saved value=1 & 2",
         "game folder preferences supply literal engine arguments");
+    ciCheck(System.getArgument("-ci-global-only") === "inherited",
+        "unmodified global options survive game preference overrides");
+    ciCheck(System.getArgument("-debugwin") === "no" && System.getArgument("-gpredetect") === "0"
+        && System.getArgument("-used2d") === "no",
+        "compatibility preferences reach scripts without launch overrides");
     ciCheck(System.getArgument("-ci-zero") === "0" && System.getArgument("-ci-flag") === "yes"
         && System.getArgument("-ci-empty") === "" && System.getArgument("-ci-equals") === "left=right",
         "launch arguments preserve zero, flags, empty values, and equals signs");

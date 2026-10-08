@@ -1726,7 +1726,8 @@ bool TVPMainScene::startupFrom(const std::string &path) {
 	}
 	IndividualConfigManager *pGlobalCfgMgr = IndividualConfigManager::GetInstance();
 	pGlobalCfgMgr->UsePreferenceAt(TVPCheckExistentLocalFolder(path)
-		? path : TVPBaseFileSelectorForm::PathSplit(path).first);
+		? path : TVPBaseFileSelectorForm::PathSplit(path).first, true);
+
 	if (UINode->getChildrenCount()) {
 		popUIForm(nullptr);
 	}

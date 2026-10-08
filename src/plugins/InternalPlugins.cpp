@@ -32,3 +32,8 @@ bool TVPLoadInternalPlugin(const ttstr &name)
 {
     return ncbAutoRegister::LoadModule(TVPNormalizeInternalPluginName(name));
 }
+
+bool TVPIsInternalPluginAvailable(const ttstr &name)
+{
+    return ncbAutoRegister::HasModule(TVPNormalizeInternalPluginName(name));
+}

@@ -18,8 +18,11 @@ void IndividualConfigManager::Clear()
 {
 	AllConfig.clear();
 	CustomArguments.clear();
+	KeyMap.clear();
 	ConfigUpdated = false;
 	CurrentPath.clear();
+	PreferencePath.clear();
+	LoadStatus = "Not loaded";
 }
 
 bool IndividualConfigManager::CheckExistAt(const std::string &folder) {
@@ -43,18 +46,27 @@ bool IndividualConfigManager::CreatePreferenceAt(const std::string &folder) {
 // 		return false;
 // 	}
 	CurrentPath = fullpath;
+	PreferencePath = fullpath;
+	LoadStatus = "New preference file";
 	return true;
 }
 
-bool IndividualConfigManager::UsePreferenceAt(const std::string &folder)
+bool IndividualConfigManager::UsePreferenceAt(const std::string &folder, bool reload)
 {
-	std::string fullpath = folder + "/" FILENAME;
-	if (CurrentPath == fullpath) return true;
+	std::string fullpath = folder;
+	while (fullpath.size() > 1 && (fullpath.back() == '/' || fullpath.back() == '\\')) fullpath.pop_back();
+	fullpath += "/" FILENAME;
+	if (!reload && CurrentPath == fullpath) return true;
 	Clear();
-	if (!TVPCheckExistentLocalFile(ttstr(fullpath))) return false;
+	PreferencePath = fullpath;
+	if (!TVPCheckExistentLocalFile(ttstr(fullpath))) {
+		LoadStatus = "Not found";
+		return false;
+	}
 	CurrentPath = fullpath;
-	Initialize();
-	return true;
+	const bool loaded = Initialize();
+	if (!loaded) CurrentPath.clear();
+	return loaded;
 }
 
 template<>
@@ -80,8 +92,9 @@ std::string IndividualConfigManager::GetValue<std::string>(const std::string &na
 
 std::vector<std::string> IndividualConfigManager::GetCustomArgumentsForPush()
 {
-	if (CustomArguments.empty()) {
-		return GlobalConfigManager::GetInstance()->GetCustomArgumentsForPush();
-	}
-	return inherit::GetCustomArgumentsForPush();
+	std::vector<std::string> arguments = inherit::GetCustomArgumentsForPush();
+	const auto defaults = GlobalConfigManager::GetInstance()->GetCustomArgumentsForPush();
+	// First occurrence wins in TVPGetCommandLine, just like typed preferences.
+	arguments.insert(arguments.end(), defaults.begin(), defaults.end());
+	return arguments;
 }

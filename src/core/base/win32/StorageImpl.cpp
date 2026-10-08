@@ -536,7 +536,7 @@ ttstr TVPGetAppPath()
 	static ttstr exepath(TVPExtractStoragePath(TVPNormalizeStorageName(ExePath())));
 	return exepath;
 #endif
-	static ttstr apppath(TVPExtractStoragePath(TVPProjectDir));
+	const ttstr apppath(TVPExtractStoragePath(TVPProjectDir));
 	return apppath;
 }
 //---------------------------------------------------------------------------

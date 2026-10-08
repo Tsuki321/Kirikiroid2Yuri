@@ -130,6 +130,10 @@ public class NativeControlsTest {
         String game = StorageAccess.pathForTree(context, DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games")) + "/Controls playground";
         assertTrue(StorageAccess.mkdirs(context, game));
         assertTrue(StorageAccess.write(context, game + "/startup.tjs", source.getBytes(StandardCharsets.UTF_8)));
+        assertTrue(StorageAccess.write(context, game + "/Kirikiroid2Preference.xml",
+            ("<GlobalPreference><Custom key=\"debugwin\" value=\"no\"/>"
+            + "<Custom key=\"gpredetect\" value=\"0\"/><Custom key=\"used2d\" value=\"no\"/>"
+            + "</GlobalPreference>").getBytes(StandardCharsets.UTF_8)));
         String secondGame = StorageAccess.pathForTree(context, DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games")) + "/Second controls playground";
         assertTrue(StorageAccess.mkdirs(context, secondGame));
         assertTrue(StorageAccess.write(context, secondGame + "/startup.tjs", source.getBytes(StandardCharsets.UTF_8)));
@@ -139,6 +143,16 @@ public class NativeControlsTest {
             UiChecks.waitFor("Your library"); UiChecks.addFolder("Controls playground");
             UiChecks.scrollTo("Play Controls playground"); UiChecks.click("Play Controls playground");
             waitLog("READY");
+            UiChecks.click("Controls"); UiChecks.scrollTo("Game preferences"); UiChecks.click("Game preferences");
+            UiChecks.waitFor("Game preferences");
+            List<AccessibilityNodeInfo> preferenceText = UiChecks.automation().getRootInActiveWindow()
+                .findAccessibilityNodeInfosByText("-gpredetect=0");
+            assertFalse("Applied preferences are visible", preferenceText.isEmpty());
+            String report = preferenceText.get(0).getText().toString();
+            assertTrue(report.contains("Game preferences: Loaded"));
+            assertTrue(report.contains(game + "/Kirikiroid2Preference.xml"));
+            assertTrue(report.contains("-debugwin=no") && report.contains("-used2d=no"));
+            UiChecks.screenshot("game-preferences-loaded"); UiChecks.click("OK");
             UiChecks.waitFor("A few easy controls"); UiChecks.screenshot("controls-first-use"); UiChecks.click("Let’s play");
             UiChecks.waitFor("Open game controls");
             instrumentation.runOnMainSync(() -> {
