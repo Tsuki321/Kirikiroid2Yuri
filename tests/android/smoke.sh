@@ -26,12 +26,14 @@ adb logcat -c
 adb install -r -g "$(find apk -name '*.apk' -print -quit)"
 adb install -r -g "$(find test-apk -name '*.apk' -print -quit)"
 adb shell dumpsys package com.yuri.kirikiri2 > test-results/android/package.txt
+failures=0
 adb shell am instrument -w -r -e notClass org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/instrumentation.txt
-grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt
+if ! grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt; then
+  failures=$((failures + 1))
+fi
 adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
   | tr -d '\r' > test-results/android/cases.txt
-failures=0
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
 test "$expected" -eq 22

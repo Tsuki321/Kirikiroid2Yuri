@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.io.File;
@@ -44,7 +46,16 @@ final class UiChecks {
         AccessibilityNodeInfo node = waitFor(name);
         while (node != null && !node.isClickable()) node = node.getParent();
         assertNotNull("Clickable UI element: " + name, node);
-        assertTrue("Click " + name, node.performAction(AccessibilityNodeInfo.ACTION_CLICK));
+        Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
+        assertFalse("Visible bounds: " + name, bounds.isEmpty());
+        long now = SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, bounds.centerX(), bounds.centerY(), 0);
+        MotionEvent up = MotionEvent.obtain(now, now + 32, MotionEvent.ACTION_UP, bounds.centerX(), bounds.centerY(), 0);
+        down.setSource(InputDevice.SOURCE_TOUCHSCREEN); up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        try {
+            assertTrue("Touch down: " + name, automation().injectInputEvent(down, true));
+            assertTrue("Touch up: " + name, automation().injectInputEvent(up, true));
+        } finally { down.recycle(); up.recycle(); }
         SystemClock.sleep(150);
     }
 
@@ -91,11 +102,32 @@ final class UiChecks {
     }
 
     static void addFolder(String name) {
-        scrollTo("+  Add game folder"); click("+  Add game folder");
-        waitFor("Use this folder");
-        if (find("Show roots") != null || find("Kirikiri test games") == null) click("Show roots");
-        click("Kirikiri test games"); scrollTo(name); click(name);
-        click("Use this folder"); click("Allow"); waitFor(name);
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            scrollTo("+  Add game folder"); click("+  Add game folder");
+            waitFor("Use this folder"); settlePicker();
+            if (find("Show roots") != null || find("Kirikiri test games") == null) click("Show roots");
+            click("Kirikiri test games"); settlePicker();
+            try { scrollTo(name); }
+            catch (AssertionError error) {
+                // On first boot, DocumentsUI can deliver the preceding internal
+                // storage listing after changing the root title. Reopen only
+                // for that observed state; do not retry a missing fixture.
+                int oldRows = 0;
+                for (String item : new String[] {"Alarms", "Android", "DCIM", "Download", "Movies", "Music", "Pictures", "Podcasts", "Recordings", "Ringtones"})
+                    if (find(item) != null) ++oldRows;
+                if (attempt != 0 || find("Kirikiri test games") == null || oldRows < 2) throw error;
+                android.util.Log.w("UiChecks", "Reopening picker after stale internal-storage listing");
+                back(); waitFor("Your library"); continue;
+            }
+            click(name); click("Use this folder"); click("Allow"); waitFor(name);
+            return;
+        }
+        fail("Could not select game folder: " + name);
+    }
+
+    private static void settlePicker() {
+        try { automation().waitForIdle(750, 10000); }
+        catch (java.util.concurrent.TimeoutException busySystem) { /* Content assertions below still apply. */ }
     }
 
     static void scrollTo(String name) {
