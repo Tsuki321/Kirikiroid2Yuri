@@ -1,0 +1,29 @@
+var inputOutput = "@@OUTPUT@@/events.txt";
+var inputEvents = [];
+function inputLog(value) { inputEvents.add(value); inputEvents.save(inputOutput); }
+class InputWindow extends Window {
+    function InputWindow() { super.Window(); }
+    function onKeyDown(key, shift) {
+        inputLog("KD " + key + " held=" + System.getKeyState(key) + " shift=" + System.getKeyState(16));
+    }
+    function onKeyUp(key, shift) { inputLog("KU " + key + " held=" + System.getKeyState(key)); }
+    function onKeyPress(key) { inputLog("TEXT " + key); }
+    function onMouseDown(x, y, button, shift) { inputLog("MD " + button + " " + x + " " + y); }
+    function onMouseUp(x, y, button, shift) { inputLog("MU " + button + " " + x + " " + y); }
+    function onClick(x, y) { inputLog("CLICK " + x + " " + y); }
+    function onMouseWheel(shift, delta, x, y) { inputLog("WHEEL " + delta + " " + x + " " + y); }
+}
+var inputWindow = new InputWindow();
+inputWindow.caption = "Input playground";
+inputWindow.innerWidth = 640; inputWindow.innerHeight = 480;
+var inputLayer = new Layer(inputWindow, null);
+inputLayer.setSize(640, 480); inputLayer.setImageSize(640, 480);
+inputLayer.fillRect(0, 0, 640, 480, 0xff171e30);
+inputLayer.fillRect(32, 112, 576, 300, 0xff252f48);
+inputLayer.font.height = 24;
+inputLayer.drawText(32, 36, "Input playground", 0xffffff);
+inputLayer.font.height = 18;
+inputLayer.drawText(32, 76, "Keyboard, touch and mouse verification", 0xbab0ff);
+inputLayer.visible = true;
+inputWindow.visible = true;
+inputLog("READY");

@@ -10,7 +10,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** Routes Android input to Windows virtual keys and mouse events on the game thread. */
 public final class GameInput implements View.OnTouchListener, View.OnGenericMotionListener {
@@ -44,6 +46,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SparseIntArray heldKeys = new SparseIntArray();
     private final Map<Long, Integer> physicalKeys = new HashMap<>();
+    private final Set<Long> cancelledKeys = new HashSet<>();
     private final int[] mouseHolds = new int[3];
     private final boolean[] physicalMouse = new boolean[3];
     private final float slop;
@@ -113,13 +116,15 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     public void click(int button) { mouseDown(button); mouseUp(button, true); }
     public void scroll(float amount) { if (sink.active()) pointer(5, 0, amount); }
 
-    private final Runnable hold = () -> {
+    private final Runnable hold = this::longPress;
+
+    private void longPress() {
         if (touch && !moved && !multi && sink.active()) {
             longClick = true;
             click(1);
             surface.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
         }
-    };
+    }
 
     @Override public boolean onTouch(View view, MotionEvent event) {
         if (event.isFromSource(InputDevice.SOURCE_MOUSE)) return mouse(event);
@@ -229,7 +234,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
         long physical = ((long)event.getDeviceId() << 32) | (event.getKeyCode() & 0xffffffffL);
         if (event.getAction() == KeyEvent.ACTION_UP) {
             Integer held = physicalKeys.remove(physical);
-            if (held == null) return false;
+            if (held == null) return cancelledKeys.remove(physical);
             keyUp(held);
             return true;
         }
@@ -238,6 +243,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
             sink.text(event.getCharacters()); return true;
         }
         if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+        cancelledKeys.remove(physical);
         int key = windowsKey(event.getKeyCode());
         if (key == 0) return false;
         if (wasdArrows) {
@@ -267,7 +273,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     public void release() {
         cancelTouch();
         for (int i = 0; i < heldKeys.size(); ++i) sink.key(heldKeys.keyAt(i), false, false);
-        heldKeys.clear(); physicalKeys.clear(); deadAccent = 0;
+        heldKeys.clear(); cancelledKeys.addAll(physicalKeys.keySet()); physicalKeys.clear(); deadAccent = 0;
         for (int i = 0; i < 3; ++i) { mouseHolds[i] = 0; physicalMouse[i] = false; }
         sink.release();
     }

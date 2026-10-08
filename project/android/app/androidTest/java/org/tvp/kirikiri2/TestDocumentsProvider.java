@@ -53,7 +53,20 @@ public class TestDocumentsProvider extends DocumentsProvider {
         }
     }
     @Override public Cursor queryRoots(String[] projection) {
-        return new MatrixCursor(new String[] {DocumentsContract.Root.COLUMN_ROOT_ID});
+        String[] columns = projection == null ? new String[] {
+            DocumentsContract.Root.COLUMN_ROOT_ID, DocumentsContract.Root.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Root.COLUMN_TITLE, DocumentsContract.Root.COLUMN_FLAGS
+        } : projection;
+        MatrixCursor result = new MatrixCursor(columns);
+        MatrixCursor.RowBuilder row = result.newRow();
+        for (String column : columns) {
+            if (column.equals(DocumentsContract.Root.COLUMN_ROOT_ID)) row.add("games");
+            else if (column.equals(DocumentsContract.Root.COLUMN_DOCUMENT_ID)) row.add("root/Games");
+            else if (column.equals(DocumentsContract.Root.COLUMN_TITLE)) row.add("Kirikiri test games");
+            else if (column.equals(DocumentsContract.Root.COLUMN_FLAGS)) row.add(DocumentsContract.Root.FLAG_SUPPORTS_CREATE | DocumentsContract.Root.FLAG_LOCAL_ONLY);
+            else row.add(null);
+        }
+        return result;
     }
     @Override public Cursor queryDocument(String documentId, String[] projection) throws FileNotFoundException {
         MatrixCursor result = new MatrixCursor(projection == null ? COLUMNS : projection);

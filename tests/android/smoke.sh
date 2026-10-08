@@ -7,6 +7,8 @@ collect_diagnostics() {
   timeout 30s adb exec-out tar -C /data/user/0/com.yuri.kirikiri2 -cf - files/engine-ci files/dump \
     > test-results/android/runtime-files.tar 2>/dev/null || true
   timeout 30s adb pull /data/tombstones test-results/android/tombstones >/dev/null 2>&1 || true
+  timeout 30s adb pull /data/user/0/com.yuri.kirikiri2/files/ui-evidence test-results/android/ui-evidence >/dev/null 2>&1 || true
+  timeout 20s adb exec-out cat /data/user/0/com.yuri.kirikiri2/files/input-ci/events.txt > test-results/android/input-events.raw || true
 }
 trap collect_diagnostics EXIT
 # adbd disconnects when switching to root, including occasionally returning a
@@ -24,7 +26,7 @@ adb logcat -c
 adb install -r -g "$(find apk -name '*.apk' -print -quit)"
 adb install -r -g "$(find test-apk -name '*.apk' -print -quit)"
 adb shell dumpsys package com.yuri.kirikiri2 > test-results/android/package.txt
-adb shell am instrument -w -r com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
+adb shell am instrument -w -r -e notClass org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/instrumentation.txt
 grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt
 adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
@@ -110,4 +112,8 @@ done 3< test-results/android/cases.txt
 echo "Engine fixtures executed: $executed/$expected; failures: $failures" \
   | tee test-results/android/engine-summary.txt
 test "$executed" -eq "$expected"
+adb shell am force-stop com.yuri.kirikiri2
+adb shell am instrument -w -r -e class org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
+  | tee test-results/android/native-controls.txt
+grep -E '^OK \([0-9]+ tests?\)' test-results/android/native-controls.txt || failures=$((failures + 1))
 exit "$failures"
