@@ -145,7 +145,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
             handler.removeCallbacks(hold);
             multi = true;
             if (drag) { mouseUp(0, false); drag = false; }
-            lastY = averageY(event); scrollY = 0;
+            originX = averageX(event); originY = lastY = averageY(event); scrollY = 0;
             return true;
         }
         if (action == MotionEvent.ACTION_POINTER_UP) {
@@ -157,6 +157,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
         if (action == MotionEvent.ACTION_MOVE && multi) {
             if (event.getPointerCount() >= 2) {
                 float y = averageY(event);
+                if (Math.hypot(averageX(event) - originX, y - originY) > slop) moved = true;
                 scrollY += y - lastY; lastY = y;
                 float step = ModernUi.dp(view.getContext(), 24);
                 int steps = (int)(scrollY / step);
@@ -178,7 +179,7 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
             handler.removeCallbacks(hold);
             if (!multi && !trackpad && index >= 0) position(event.getX(index), event.getY(index));
             if (drag) mouseUp(0, false);
-            else if (!longClick && !scrolled && (!moved || multi)) click(multi ? 1 : 0);
+            else if (!longClick && !scrolled && !moved) click(multi ? 1 : 0);
             touch = false; drag = false; primaryId = -1;
             view.performClick();
         }
@@ -188,6 +189,12 @@ public final class GameInput implements View.OnTouchListener, View.OnGenericMoti
     private float averageY(MotionEvent event) {
         float result = 0;
         for (int i = 0; i < event.getPointerCount(); ++i) result += event.getY(i);
+        return result / event.getPointerCount();
+    }
+
+    private float averageX(MotionEvent event) {
+        float result = 0;
+        for (int i = 0; i < event.getPointerCount(); ++i) result += event.getX(i);
         return result / event.getPointerCount();
     }
 

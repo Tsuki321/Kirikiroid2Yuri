@@ -113,7 +113,9 @@ echo "Engine fixtures executed: $executed/$expected; failures: $failures" \
   | tee test-results/android/engine-summary.txt
 test "$executed" -eq "$expected"
 adb shell am force-stop com.yuri.kirikiri2
-adb shell am instrument -w -r -e class org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
+# Report assertions before the instrumentation runner tears down the legacy
+# engine activity, whose onDestroy intentionally exits its process.
+adb shell am instrument -w -r -e waitForActivitiesToComplete false -e class org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/native-controls.txt
 grep -E '^OK \([0-9]+ tests?\)' test-results/android/native-controls.txt || failures=$((failures + 1))
 exit "$failures"

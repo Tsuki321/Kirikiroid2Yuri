@@ -158,6 +158,8 @@ public class NativeControlsTest {
             // The framework stops the test process after reporting success; do not finish the legacy activity here.
         } finally {
             UiChecks.screenshot("controls-final");
+            key(KeyEvent.KEYCODE_HOME, true, 0); key(KeyEvent.KEYCODE_HOME, false, 0);
+            SystemClock.sleep(300);
         }
     }
 }

@@ -179,7 +179,7 @@ public final class GameLibrary {
         Folder folder = inspect(Uri.parse(entry.tree), directory, entry.folder);
         if (folder == null) throw new IOException("No startup.tjs, XP3 archive or game executable was found here.");
         List<String> result = new ArrayList<>(folder.candidates);
-        if (directory.findFile("startup.tjs") != null) result.add(0, "");
+        if ("".equals(folder.entry.launchFile)) result.add(0, "");
         return result;
     }
 }
