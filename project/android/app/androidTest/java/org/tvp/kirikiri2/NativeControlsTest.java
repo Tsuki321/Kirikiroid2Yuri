@@ -160,7 +160,6 @@ public class NativeControlsTest {
             instrumentation.runOnMainSync(() -> {
                 View surface = KR2Activity.sInstance.getGLSurfaceView(); int[] origin = new int[2]; surface.getLocationOnScreen(origin);
                 x = origin[0] + surface.getWidth() / 2f; y = origin[1] + surface.getHeight() / 2f;
-                surface.requestFocus();
             });
             key(KeyEvent.KEYCODE_SHIFT_LEFT, true, KeyEvent.META_SHIFT_ON);
             key(KeyEvent.KEYCODE_W, true, KeyEvent.META_SHIFT_ON);
@@ -206,6 +205,7 @@ public class NativeControlsTest {
             assertEquals("Canceled hardware release is not delivered twice", releases + 1, count("KU 87 "));
             UiChecks.waitFor("Hold left mouse button"); UiChecks.screenshot("controls-touchpad");
             UiChecks.click("Open game controls"); UiChecks.click("Type text into the game");
+            UiChecks.waitFor("Type in the game");
             int editorKeys = count("KD 66 ");
             key(KeyEvent.KEYCODE_B, true, 0); key(KeyEvent.KEYCODE_B, false, 0);
             UiChecks.waitFor("b");

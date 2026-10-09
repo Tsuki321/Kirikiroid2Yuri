@@ -67,17 +67,15 @@ final class UiChecks {
     }
 
     private static void clickPickerRoot(String name) {
+        // DocumentsUI can report a clickable ListView row whose accessibility
+        // ACTION_CLICK returns false. Settle the drawer before acquiring the
+        // row, since the active accessibility root can change during settling.
+        settlePicker();
         long deadline = SystemClock.uptimeMillis() + 15000;
         AccessibilityNodeInfo node;
         while ((node = listItem(automation().getRootInActiveWindow(), name)) == null
                 && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100);
         assertNotNull("Folder-picker root list item: " + name, node);
-        // DocumentsUI can report a clickable ListView row whose accessibility
-        // ACTION_CLICK returns false. Wait for its drawer to settle, then tap
-        // the current row bounds through the same input path as a finger.
-        settlePicker();
-        node = listItem(automation().getRootInActiveWindow(), name);
-        assertNotNull("Settled folder-picker root list item: " + name, node);
         tap(node, name);
     }
 

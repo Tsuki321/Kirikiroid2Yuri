@@ -121,6 +121,12 @@ public final class GameControls {
 
     public void release() { input.release(); }
 
+    public void onWindowFocusChanged(boolean focused) {
+        if (!focused) { input.release(); return; }
+        View editor = activity.getCurrentFocus();
+        if (active && (editor == null || !editor.isShown() || !editor.onCheckIsTextEditor())) restoreGameFocus();
+    }
+
     private void keepAwake(boolean value) {
         activity.getGLSurfaceView().setKeepScreenOn(value);
         if (value) activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

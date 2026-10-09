@@ -1112,7 +1112,7 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-		if (!hasFocus && gameControls != null) gameControls.release();
+		if (gameControls != null) gameControls.onWindowFocusChanged(hasFocus);
 
         //SDLActivity.mHasFocus = hasFocus;
         if (hasFocus) {
