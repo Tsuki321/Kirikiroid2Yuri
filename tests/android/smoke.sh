@@ -63,7 +63,13 @@ while IFS=$'\t' read -r -u 3 name storage output; do
   passed=false
   # Document-backed plugin/codec checks can take over two minutes under ARM64
   # translation. Keep a bounded wait while requiring the complete PASS result.
-  for attempt in $(seq 1 90); do
+  # Transition fixtures can spend several minutes in ARM64 translation on the
+  # 4 KB Android 16 release image. Keep the wait bounded, but do not classify a
+  # still-running fixture as failed at the shorter debug-time limit used by the
+  # other cases.
+  wait_attempts=90
+  if [[ "$name" == transitions* ]]; then wait_attempts=180; fi
+  for attempt in $(seq 1 "$wait_attempts"); do
     sleep 2
     if adb shell cat "$output/result.txt" > "test-results/android/$name-engine.raw" 2>/dev/null; then
       python3 tests/android/decode_result.py "test-results/android/$name-engine.raw" > "test-results/android/$name-engine.txt"

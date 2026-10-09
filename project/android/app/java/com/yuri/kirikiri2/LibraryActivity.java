@@ -442,7 +442,12 @@ public class LibraryActivity extends Activity {
     private void startPlayer(String path, String entryId) {
         if (busy) return;
         Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        // The player lives in its own task and Android 16 may freeze that task
+        // while the library is visible. Explicitly target the existing singleTask
+        // activity so a launch from this separate :library process thaws it and
+        // delivers onNewIntent reliably.
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         if (path != null) intent.putExtra("startupPath", path);
         else intent.putExtra("open_browser", true);
         if (entryId != null) intent.putExtra("library_entry_id", entryId);
