@@ -70,7 +70,7 @@ final class UiChecks {
         // DocumentsUI can report a clickable ListView row whose accessibility
         // ACTION_CLICK returns false. Settle the drawer before acquiring the
         // row, since the active accessibility root can change during settling.
-        settlePicker();
+        settleUi();
         long deadline = SystemClock.uptimeMillis() + 15000;
         AccessibilityNodeInfo node;
         while ((node = listItem(automation().getRootInActiveWindow(), name)) == null
@@ -141,11 +141,11 @@ final class UiChecks {
         // Grant the games root through the real system picker, then use the
         // app's chooser. DocumentsUI loads child listings asynchronously.
         scrollTo("+  Add game folder"); click("+  Add game folder");
-        waitFor("Use this folder"); settlePicker();
+        waitFor("Use this folder"); settleUi();
         if (find("Show roots") != null) click("Show roots");
         // The selected root name also appears in the toolbar; select the
         // drawer's list item specifically when reusing a previous grant.
-        clickPickerRoot("Kirikiri test games"); settlePicker();
+        clickPickerRoot("Kirikiri test games"); settleUi();
         long deadline = SystemClock.uptimeMillis() + 15000;
         boolean ready = false;
         do {
@@ -171,23 +171,34 @@ final class UiChecks {
         waitFor("Options for " + name);
     }
 
-    private static void settlePicker() {
+    private static void settleUi() {
         try { automation().waitForIdle(750, 10000); }
         catch (java.util.concurrent.TimeoutException busySystem) { /* Content assertions below still apply. */ }
     }
 
     static void scrollTo(String name) {
-        for (int attempt = 0; attempt < 12 && find(name) == null; ++attempt) {
-            AccessibilityNodeInfo root = automation().getRootInActiveWindow();
-            scroll(root); SystemClock.sleep(150);
+        settleUi();
+        // A new dialog can expose its tree after the first lookup, and a
+        // retained scroll position can place the target above the viewport.
+        for (int direction : new int[] {AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,
+                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD}) {
+            for (int attempt = 0; attempt < 12; ++attempt) {
+                if (find(name) != null) return;
+                if (!scroll(automation().getRootInActiveWindow(), direction)) break;
+                settleUi();
+            }
         }
         waitFor(name);
     }
 
     private static boolean scroll(AccessibilityNodeInfo node) {
+        return scroll(node, AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+    }
+
+    private static boolean scroll(AccessibilityNodeInfo node, int direction) {
         if (node == null) return false;
-        if (node.isScrollable() && node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) return true;
-        for (int i = 0; i < node.getChildCount(); ++i) if (scroll(node.getChild(i))) return true;
+        if (node.isScrollable() && node.performAction(direction)) return true;
+        for (int i = 0; i < node.getChildCount(); ++i) if (scroll(node.getChild(i), direction)) return true;
         return false;
     }
 }
