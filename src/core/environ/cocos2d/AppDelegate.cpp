@@ -7,6 +7,9 @@
 #include "ConfigManager/GlobalConfigManager.h"
 #include "Application.h"
 #include "Platform.h"
+#if CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
+#include "android/AndroidUtils.h"
+#endif
 #include "ui/MessageBox.h"
 #include "ui/GlobalPreferenceForm.h"
 #include "CustomFileUtils.h"
@@ -85,6 +88,10 @@ bool TVPAppDelegate::applicationDidFinishLaunching() {
 
 	// run
 	director->runWithScene(scene);
+
+#if CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID
+	Android_InitializeEventQueue();
+#endif
 
 	//director->getConsole()->listenOnTCP(16006);
 

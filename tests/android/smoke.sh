@@ -18,8 +18,8 @@ for attempt in 1 2 3 4 5; do
   if timeout 30s adb wait-for-device && [ "$(adb shell id -u | tr -d '\r')" = 0 ]; then break; fi
   sleep 2
 done
-adb shell settings put secure immersive_mode_confirmations confirmed
 test "$(adb shell id -u | tr -d '\r')" = 0
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb shell getprop > test-results/android/properties.txt
 adb shell getconf PAGE_SIZE | tee test-results/android/page-size.txt
 adb logcat -c
@@ -61,7 +61,9 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     continue
   fi
   passed=false
-  for attempt in $(seq 1 60); do
+  # Document-backed plugin/codec checks can take over two minutes under ARM64
+  # translation. Keep a bounded wait while requiring the complete PASS result.
+  for attempt in $(seq 1 90); do
     sleep 2
     if adb shell cat "$output/result.txt" > "test-results/android/$name-engine.raw" 2>/dev/null; then
       python3 tests/android/decode_result.py "test-results/android/$name-engine.raw" > "test-results/android/$name-engine.txt"

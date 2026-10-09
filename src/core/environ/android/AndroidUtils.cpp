@@ -683,8 +683,27 @@ bool TVPCheckStartupArg() {
 }
 
 
+namespace {
+    std::mutex AndroidEventQueueMutex;
+    cocos2d::Scheduler *AndroidEventScheduler = nullptr;
+    std::vector<std::function<void()>> AndroidPendingEvents;
+}
+
+void Android_InitializeEventQueue() {
+    std::lock_guard<std::mutex> lock(AndroidEventQueueMutex);
+    AndroidEventScheduler = cocos2d::Director::getInstance()->getScheduler();
+    for (const auto &event : AndroidPendingEvents)
+        AndroidEventScheduler->performFunctionInCocosThread(event);
+    AndroidPendingEvents.clear();
+}
+
 void Android_PushEvents(const std::function<void()> &func) {
-	cocos2d::Director::getInstance()->getScheduler()->performFunctionInCocosThread(func);
+    // Android can create its controls before the GL thread initializes Cocos.
+    // Director::getInstance() here would race that initialization on the UI
+    // thread. Publish the existing scheduler from the GL thread instead.
+    std::lock_guard<std::mutex> lock(AndroidEventQueueMutex);
+    if (AndroidEventScheduler) AndroidEventScheduler->performFunctionInCocosThread(func);
+    else AndroidPendingEvents.push_back(func);
 }
 
 void TVPControlAdDialog(int adType, int arg1, int arg2) {

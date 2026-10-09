@@ -41,7 +41,10 @@ final class UiChecks {
     }
 
     static void click(String name) {
-        AccessibilityNodeInfo node = waitFor(name);
+        click(waitFor(name), name);
+    }
+
+    private static void click(AccessibilityNodeInfo node, String name) {
         while (node != null && !node.isClickable()) node = node.getParent();
         assertNotNull("Clickable UI element: " + name, node);
         // Activate the actual view, without racing the moving coordinates of
@@ -49,6 +52,25 @@ final class UiChecks {
         // injects and verifies real touch, mouse and keyboard input events.
         assertTrue("Click UI element: " + name, node.performAction(AccessibilityNodeInfo.ACTION_CLICK));
         SystemClock.sleep(150);
+    }
+
+    private static AccessibilityNodeInfo listItem(AccessibilityNodeInfo root, String name) {
+        if (root == null) return null;
+        if ("android.widget.ListView".contentEquals(root.getClassName())) return match(root, name, false);
+        for (int i = 0; i < root.getChildCount(); ++i) {
+            AccessibilityNodeInfo result = listItem(root.getChild(i), name);
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    private static void clickPickerRoot(String name) {
+        long deadline = SystemClock.uptimeMillis() + 15000;
+        AccessibilityNodeInfo node;
+        while ((node = listItem(automation().getRootInActiveWindow(), name)) == null
+                && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100);
+        assertNotNull("Folder-picker root list item: " + name, node);
+        click(node, name);
     }
 
     static void text(String value) {
@@ -99,7 +121,9 @@ final class UiChecks {
         scrollTo("+  Add game folder"); click("+  Add game folder");
         waitFor("Use this folder"); settlePicker();
         if (find("Show roots") != null) click("Show roots");
-        click("Kirikiri test games"); settlePicker();
+        // The selected root name also appears in the toolbar; select the
+        // drawer's list item specifically when reusing a previous grant.
+        clickPickerRoot("Kirikiri test games"); settlePicker();
         long deadline = SystemClock.uptimeMillis() + 15000;
         boolean ready = false;
         do {

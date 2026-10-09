@@ -200,7 +200,8 @@ public class NativeControlsTest {
             while (count("KU 87 ") == releases && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(80);
             assertEquals("Opening Controls releases W", releases + 1, count("KU 87 "));
             UiChecks.screenshot("controls-panel");
-            UiChecks.click("Show Enter, Space, Esc and Ctrl"); UiChecks.click("Touchpad mode");
+            UiChecks.scrollTo("Show Enter, Space, Esc and Ctrl"); UiChecks.click("Show Enter, Space, Esc and Ctrl");
+            UiChecks.scrollTo("Touchpad mode"); UiChecks.click("Touchpad mode");
             UiChecks.click("Resume game"); key(KeyEvent.KEYCODE_W, false, 0); SystemClock.sleep(150);
             assertEquals("Canceled hardware release is not delivered twice", releases + 1, count("KU 87 "));
             UiChecks.waitFor("Hold left mouse button"); UiChecks.screenshot("controls-touchpad");
