@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,7 +52,16 @@ public final class GameControls {
         opacity = preferences.getInt("opacity", 85);
         quickKeys = preferences.getBoolean("quick_keys", false);
         leftHanded = preferences.getBoolean("left_handed", false);
-        overlay = new FrameLayout(activity);
+        overlay = new FrameLayout(activity) {
+            @Override public boolean dispatchKeyEventPreIme(KeyEvent event) {
+                // A text dialog's IME connection can outlive its window. The
+                // focused game must receive hardware keys before that IME.
+                // Android editors keep their own focus and dispatch path.
+                return (GameControls.this.input != null && GameControls.this.input.onKey(event))
+                        || super.dispatchKeyEventPreIme(event);
+            }
+        };
+        overlay.setFocusableInTouchMode(true);
         overlay.setMotionEventSplittingEnabled(true);
         overlay.setClipChildren(false);
         parent.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
@@ -70,6 +80,10 @@ public final class GameControls {
         overlay.requestApplyInsets();
         pointer = new PointerView(activity);
         input = new GameInput(activity.getGLSurfaceView(), GameInput.engine());
+        activity.getGLSurfaceView().setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN && GameInput.nativeIsActive()) restoreGameFocus();
+            return input.onTouch(view, event);
+        });
         input.setCursor((x, y) -> {
             pointer.x = x - overlay.getPaddingLeft(); pointer.y = y - overlay.getPaddingTop(); pointer.invalidate();
         });
@@ -91,6 +105,7 @@ public final class GameControls {
                 active = enabled;
                 if (!active) input.release();
                 overlay.setVisibility(active ? View.VISIBLE : View.GONE);
+                if (active) restoreGameFocus();
             }
             if (active && activity.hasWindowFocus() && !preferences.getBoolean("seen_guide", false)) {
                 preferences.edit().putBoolean("seen_guide", true).apply();
@@ -173,11 +188,9 @@ public final class GameControls {
     }
 
     private void restoreGameFocus() {
-        // Removing a focused overlay button can focus Cocos's hidden text
-        // editor, which then consumes hardware keys instead of the game.
-        View surface = activity.getGLSurfaceView();
-        surface.setFocusableInTouchMode(true);
-        surface.requestFocus();
+        // This native layer routes game keys before the IME without changing
+        // Cocos's GL view or intercepting touches outside the visible controls.
+        overlay.requestFocus();
     }
 
     private void addWeighted(LinearLayout row, View view) {

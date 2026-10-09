@@ -206,8 +206,12 @@ public class NativeControlsTest {
             assertEquals("Canceled hardware release is not delivered twice", releases + 1, count("KU 87 "));
             UiChecks.waitFor("Hold left mouse button"); UiChecks.screenshot("controls-touchpad");
             UiChecks.click("Open game controls"); UiChecks.click("Type text into the game");
+            int editorKeys = count("KD 66 ");
+            key(KeyEvent.KEYCODE_B, true, 0); key(KeyEvent.KEYCODE_B, false, 0);
+            UiChecks.waitFor("b");
             UiChecks.text("你好"); UiChecks.click("Send text");
             waitLog("TEXT 你"); waitLog("TEXT 好");
+            assertEquals("Hardware typing belongs to the Android editor while it is open", editorKeys, count("KD 66 "));
             UiChecks.click("Open game controls"); UiChecks.click("Show keyboard");
             UiChecks.waitFor("Game key W"); UiChecks.screenshot("controls-keyboard");
             int w = count("KD 87 "), wUp = count("KU 87 ");
