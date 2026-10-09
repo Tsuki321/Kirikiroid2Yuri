@@ -102,27 +102,32 @@ final class UiChecks {
     }
 
     static void addFolder(String name) {
-        for (int attempt = 0; attempt < 2; ++attempt) {
-            scrollTo("+  Add game folder"); click("+  Add game folder");
-            waitFor("Use this folder"); settlePicker();
-            if (find("Show roots") != null || find("Kirikiri test games") == null) click("Show roots");
-            click("Kirikiri test games"); settlePicker();
-            try { scrollTo(name); }
-            catch (AssertionError error) {
-                // On first boot, DocumentsUI can deliver the preceding internal
-                // storage listing after changing the root title. Reopen only
-                // for that observed state; do not retry a missing fixture.
-                int oldRows = 0;
-                for (String item : new String[] {"Alarms", "Android", "DCIM", "Download", "Movies", "Music", "Pictures", "Podcasts", "Recordings", "Ringtones"})
-                    if (find(item) != null) ++oldRows;
-                if (attempt != 0 || find("Kirikiri test games") == null || oldRows < 2) throw error;
-                android.util.Log.w("UiChecks", "Reopening picker after stale internal-storage listing");
-                back(); waitFor("Your library"); continue;
-            }
-            click(name); click("Use this folder"); click("Allow"); waitFor(name);
-            return;
+        // Grant the games root through the real system picker, then use the
+        // app's chooser. DocumentsUI loads child listings asynchronously.
+        scrollTo("+  Add game folder"); click("+  Add game folder");
+        waitFor("Use this folder"); settlePicker();
+        if (find("Show roots") != null) click("Show roots");
+        click("Kirikiri test games"); settlePicker();
+        long deadline = SystemClock.uptimeMillis() + 15000;
+        boolean ready = false;
+        do {
+            AccessibilityNodeInfo confirm = find("Use this folder");
+            ready = confirm != null && confirm.isEnabled() && find("Show roots") != null
+                && find("Kirikiri test games") != null;
+            if (ready) break;
+            SystemClock.sleep(150);
+        } while (SystemClock.uptimeMillis() < deadline);
+        assertTrue("Selected fixture provider in Android picker", ready);
+        click("Use this folder"); click("Allow");
+        // The title can already be visible behind a pending discovery. Only a
+        // completed library card proves that selecting the game has finished.
+        deadline = SystemClock.uptimeMillis() + 15000;
+        while (find("Options for " + name) == null && SystemClock.uptimeMillis() < deadline) {
+            if (find("Choose a game folder") != null) click(name);
+            else if (find("Your library") != null) scroll(automation().getRootInActiveWindow());
+            SystemClock.sleep(200);
         }
-        fail("Could not select game folder: " + name);
+        waitFor("Options for " + name);
     }
 
     private static void settlePicker() {

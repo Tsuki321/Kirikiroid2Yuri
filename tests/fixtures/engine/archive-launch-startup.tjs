@@ -7,7 +7,7 @@ try {
         || System.getArgument("-used2d") !== "no") throw "archive did not use sibling preferences";
     if (System.exePath.indexOf(">") != -1) throw "executable path points inside startup archive";
     if (!Storages.isExistentStorage(System.exePath + "Kirikiroid2Preference.xml"))
-        throw "executable path lost the game's preference file";
+        throw "executable path lost the game's preference file: " + System.exePath;
     var sibling = [];
     sibling.load(System.exePath + "valid-raw.xp3>hello.txt");
     if (sibling.join("\n").indexOf("archive fixture OK") != 0) throw "could not load sibling archive";

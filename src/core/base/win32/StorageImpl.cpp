@@ -532,16 +532,15 @@ bool TVPRemoveFolder(const ttstr &name)
 //---------------------------------------------------------------------------
 ttstr TVPGetAppPath()
 {
-	// An early option read must not freeze an empty root. Once a project is
-	// selected, retain its physical folder: TVPBeforeSystemInit later appends
-	// the archive delimiter to TVPProjectDir, while sibling patches/plugins
-	// must remain relative to the folder outside that archive.
-	if (TVPProjectDir.IsEmpty()) return ttstr();
+	// Use the original launch path, which never acquires the archive delimiter
+	// that TVPBeforeSystemInit appends to TVPProjectDir. Sibling patches and
+	// preferences must stay outside the startup archive even on the first call.
+	if (ExePath().IsEmpty()) return ttstr();
 	static ttstr apppath([] {
-		ttstr startup = TVPProjectDir;
-		if (TVPCheckExistentLocalFolder(ExePath()) && startup.GetLastChar() != TJS_W('/'))
+		ttstr startup = ExePath();
+		if (TVPCheckExistentLocalFolder(startup) && startup.GetLastChar() != TJS_W('/'))
 			startup += TJS_W('/');
-		return TVPExtractStoragePath(startup);
+		return TVPExtractStoragePath(TVPNormalizeStorageName(startup));
 	}());
 	return apppath;
 }
