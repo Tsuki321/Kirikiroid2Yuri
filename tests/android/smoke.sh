@@ -110,16 +110,9 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     failures=$((failures + 1))
     continue
   fi
-  if before="$(adb shell pidof com.yuri.kirikiri2)"; then
-    adb shell input keyevent KEYCODE_HOME
-    sleep 2
-    adb shell am start -W --activity-reorder-to-front -n com.yuri.kirikiri2/.MainActivity
-    sleep 2
-    if [ "$(adb shell pidof com.yuri.kirikiri2)" != "$before" ]; then
-      echo "Activity did not survive background/resume: $name" >&2
-      failures=$((failures + 1))
-    fi
-  fi
+  # Startup fixtures with no Window can exit normally after saving their
+  # result. NativeControlsTest verifies background/resume with an interactive
+  # Window and confirms held keys are released without losing that game.
 done 3< test-results/android/cases.txt
 echo "Engine fixtures executed: $executed/$expected; failures: $failures" \
   | tee test-results/android/engine-summary.txt

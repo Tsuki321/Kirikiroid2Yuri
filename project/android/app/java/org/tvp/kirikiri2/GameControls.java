@@ -169,6 +169,15 @@ public final class GameControls {
             overlay.addView(group, anchored(dp(activity, Math.max(156, size * 3)), -2, Gravity.BOTTOM | (leftHanded ? Gravity.LEFT : Gravity.RIGHT)));
         }
         overlay.setVisibility(active ? View.VISIBLE : View.GONE);
+        restoreGameFocus();
+    }
+
+    private void restoreGameFocus() {
+        // Removing a focused overlay button can focus Cocos's hidden text
+        // editor, which then consumes hardware keys instead of the game.
+        View surface = activity.getGLSurfaceView();
+        surface.setFocusableInTouchMode(true);
+        surface.requestFocus();
     }
 
     private void addWeighted(LinearLayout row, View view) {
@@ -288,7 +297,7 @@ public final class GameControls {
         addAction(body, "Return to library", this::confirmExit);
         ScrollView scroll = new ScrollView(theme); scroll.addView(body);
         panel = new AlertDialog.Builder(theme).setTitle("Game controls").setView(scroll).setPositiveButton("Resume game", null).create();
-        panel.setOnDismissListener(dialog -> { input.release(); activity.getGLSurfaceView().requestFocus(); });
+        panel.setOnDismissListener(dialog -> { input.release(); restoreGameFocus(); });
         panel.show();
         return true;
     }
@@ -346,6 +355,7 @@ public final class GameControls {
             dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
             ((InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE)).showSoftInput(edit, InputMethodManager.SHOW_IMPLICIT);
         });
+        dialog.setOnDismissListener(d -> restoreGameFocus());
         dialog.show();
     }
 

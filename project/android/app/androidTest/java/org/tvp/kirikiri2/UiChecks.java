@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.io.File;
@@ -70,7 +72,29 @@ final class UiChecks {
         while ((node = listItem(automation().getRootInActiveWindow(), name)) == null
                 && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100);
         assertNotNull("Folder-picker root list item: " + name, node);
-        click(node, name);
+        // DocumentsUI can report a clickable ListView row whose accessibility
+        // ACTION_CLICK returns false. Wait for its drawer to settle, then tap
+        // the current row bounds through the same input path as a finger.
+        settlePicker();
+        node = listItem(automation().getRootInActiveWindow(), name);
+        assertNotNull("Settled folder-picker root list item: " + name, node);
+        tap(node, name);
+    }
+
+    static void tap(String name) { tap(waitFor(name), name); }
+
+    private static void tap(AccessibilityNodeInfo node, String name) {
+        Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
+        assertFalse("Visible tap bounds: " + name, bounds.isEmpty());
+        long downTime = SystemClock.uptimeMillis();
+        for (int action : new int[] {MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP}) {
+            MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                    bounds.exactCenterX(), bounds.exactCenterY(), 0);
+            event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+            try { assertTrue("Tap UI element: " + name, automation().injectInputEvent(event, true)); }
+            finally { event.recycle(); }
+            SystemClock.sleep(100);
+        }
     }
 
     static void text(String value) {

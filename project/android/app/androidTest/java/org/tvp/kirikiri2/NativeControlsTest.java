@@ -210,8 +210,10 @@ public class NativeControlsTest {
             waitLog("TEXT 你"); waitLog("TEXT 好");
             UiChecks.click("Open game controls"); UiChecks.click("Show keyboard");
             UiChecks.waitFor("Game key W"); UiChecks.screenshot("controls-keyboard");
-            int w = count("KD 87 "); UiChecks.click("Game key W"); SystemClock.sleep(150);
-            assertEquals("On-screen W reaches TJS", w + 1, count("KD 87 "));
+            int w = count("KD 87 "), wUp = count("KU 87 ");
+            UiChecks.tap("Game key W");
+            waitCount("KD 87 ", w + 1);
+            waitCount("KU 87 ", wUp + 1);
             UiChecks.click("Hide keys");
             int aDown = count("KD 65 "), aUp = count("KU 65 ");
             key(KeyEvent.KEYCODE_A, true, 0); waitCount("KD 65 ", aDown + 1);
