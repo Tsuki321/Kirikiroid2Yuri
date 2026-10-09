@@ -335,12 +335,21 @@ void TJS_INTF_METHOD tTVPFileMedia::GetLocallyAccessibleName(ttstr &name)
 		}
     }
 #endif
+    // Exact-case paths need no directory scan, including paths below Android
+    // ancestors that allow traversal but deny directory enumeration.
+    ttstr exactname = newname + TJS_W("/") + ptr;
+    tTVP_stat exactinfo;
+    if (TVP_stat(exactname.c_str(), exactinfo)) {
+        name = exactname;
+        return;
+    }
     while(*ptr) {
     	const tjs_char *ptr_end = ptr;
     	while(*ptr_end && *ptr_end != TJS_W('/')) ++ptr_end;
     	if(ptr_end == ptr) break;
         const tjs_char *ptr_cur = ptr;
-    	tTJSNarrowStringHolder walker(ttstr(ptr, ptr_end - ptr).c_str());
+        ttstr component(ptr, ptr_end - ptr);
+        tTJSNarrowStringHolder walker(component.c_str());
     	while(*ptr_end && *ptr_end == TJS_W('/')) ++ptr_end;
     	ptr = ptr_end;
 
@@ -362,8 +371,10 @@ void TJS_INTF_METHOD tTVPFileMedia::GetLocallyAccessibleName(ttstr &name)
             	break;
             }
         } else {
-            newname += ptr_cur;
-            break;
+            // Android permits traversing ancestors such as /data/user/0 but
+            // denies listing them. Keep walking their exact names so case
+            // matching still works once we reach the app's accessible folder.
+            newname += component;
         }
     }
 

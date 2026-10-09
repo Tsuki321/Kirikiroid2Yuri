@@ -6,8 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.view.InputDevice;
-import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.io.File;
@@ -46,16 +44,10 @@ final class UiChecks {
         AccessibilityNodeInfo node = waitFor(name);
         while (node != null && !node.isClickable()) node = node.getParent();
         assertNotNull("Clickable UI element: " + name, node);
-        Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
-        assertFalse("Visible bounds: " + name, bounds.isEmpty());
-        long now = SystemClock.uptimeMillis();
-        MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, bounds.centerX(), bounds.centerY(), 0);
-        MotionEvent up = MotionEvent.obtain(now, now + 32, MotionEvent.ACTION_UP, bounds.centerX(), bounds.centerY(), 0);
-        down.setSource(InputDevice.SOURCE_TOUCHSCREEN); up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        try {
-            assertTrue("Touch down: " + name, automation().injectInputEvent(down, true));
-            assertTrue("Touch up: " + name, automation().injectInputEvent(up, true));
-        } finally { down.recycle(); up.recycle(); }
+        // Activate the actual view, without racing the moving coordinates of
+        // Android 16's folder-picker drawer. NativeControlsTest separately
+        // injects and verifies real touch, mouse and keyboard input events.
+        assertTrue("Click UI element: " + name, node.performAction(AccessibilityNodeInfo.ACTION_CLICK));
         SystemClock.sleep(150);
     }
 
@@ -118,12 +110,15 @@ final class UiChecks {
             SystemClock.sleep(150);
         } while (SystemClock.uptimeMillis() < deadline);
         assertTrue("Selected fixture provider in Android picker", ready);
-        click("Use this folder"); click("Allow");
+        click("Use this folder");
         // The title can already be visible behind a pending discovery. Only a
         // completed library card proves that selecting the game has finished.
         deadline = SystemClock.uptimeMillis() + 15000;
         while (find("Options for " + name) == null && SystemClock.uptimeMillis() < deadline) {
-            if (find("Choose a game folder") != null) click(name);
+            // Android omits the permission dialog when this tree was already
+            // granted by an earlier library operation.
+            if (find("Allow") != null) click("Allow");
+            else if (find("Choose a game folder") != null) { scrollTo(name); click(name); }
             else if (find("Your library") != null) scroll(automation().getRootInActiveWindow());
             SystemClock.sleep(200);
         }
