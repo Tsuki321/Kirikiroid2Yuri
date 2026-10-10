@@ -13,6 +13,14 @@ function ciThrows(operation, message) {
     try { operation(); } catch (error) { rejected = true; }
     ciCheck(rejected, message);
 }
+function ciProvinceValue(x, y) { return 1 + (x * 7 + y * 19) % 251; }
+function ciProvinceReset(source, target) {
+    for (var y = 0; y < 11; ++y)
+        for (var x = 0; x < 23; ++x) {
+            source.setProvincePixel(x, y, ciProvinceValue(x, y));
+            target.setProvincePixel(x, y, 253);
+        }
+}
 var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
 // Class callbacks and separately loaded fixtures resolve these as globals.
@@ -132,6 +140,67 @@ try {
     ciLayer.clear(0);
     ciLayer.setMainPixel(1, 1, 0x123456);
     ciCheck(ciLayer.getMainPixel(1, 1) == 0x123456, "pixel color read/write");
+
+    // Province maps store one byte per pixel. Exercise a partial copy with
+    // distinct offsets, padded rows and untouched pixels on every side.
+    var ciProvinceSource = new Layer(ciWindow, ciPrimary);
+    var ciProvinceTarget = new Layer(ciWindow, ciPrimary);
+    ciProvinceSource.setSize(23, 11);
+    ciProvinceSource.setImageSize(23, 11);
+    ciProvinceTarget.setSize(23, 11);
+    ciProvinceTarget.setImageSize(23, 11);
+    ciProvinceSource.face = dfProvince;
+    ciProvinceTarget.face = dfProvince;
+    ciProvinceReset(ciProvinceSource, ciProvinceTarget);
+    ciProvinceTarget.copyRect(2, 3, ciProvinceSource, 1, 2, 7, 3);
+    var ciProvincePixels = true;
+    for (var py = 0; py < 11; ++py)
+        for (var px = 0; px < 23; ++px) {
+            var pv = px >= 2 && px < 9 && py >= 3 && py < 6
+                ? ciProvinceValue(px - 1, py - 1) : 253;
+            if (ciProvinceTarget.getProvincePixel(px, py) != pv) ciProvincePixels = false;
+        }
+    ciCheck(ciProvincePixels, "partial province copy preserves byte offsets and surrounding pixels");
+
+    // Include the last column and last row; a four-byte copy would overrun
+    // these small maps. Each overlap case must read the original pixels.
+    ciProvinceReset(ciProvinceSource, ciProvinceTarget);
+    ciProvinceTarget.copyRect(18, 8, ciProvinceSource, 18, 8, 5, 3);
+    ciProvincePixels = true;
+    for (var py = 0; py < 11; ++py)
+        for (var px = 0; px < 23; ++px) {
+            var pv = px >= 18 && py >= 8 ? ciProvinceValue(px, py) : 253;
+            if (ciProvinceTarget.getProvincePixel(px, py) != pv) ciProvincePixels = false;
+        }
+    ciCheck(ciProvincePixels, "province copy includes the bottom-right image boundary");
+    for (var down = 0; down < 2; ++down) {
+        ciProvinceReset(ciProvinceSource, ciProvinceTarget);
+        var sourceX = down ? 1 : 3, sourceY = down ? 1 : 3;
+        var targetX = down ? 3 : 1, targetY = down ? 3 : 1;
+        ciProvinceSource.copyRect(targetX, targetY, ciProvinceSource, sourceX, sourceY, 17, 6);
+        ciProvincePixels = true;
+        for (var py = 0; py < 11; ++py)
+            for (var px = 0; px < 23; ++px) {
+                var inside = px >= targetX && px < targetX + 17 && py >= targetY && py < targetY + 6;
+                var pv = inside ? ciProvinceValue(px - targetX + sourceX, py - targetY + sourceY)
+                    : ciProvinceValue(px, py);
+                if (ciProvinceSource.getProvincePixel(px, py) != pv) ciProvincePixels = false;
+            }
+        ciCheck(ciProvincePixels, down ? "province self-copy preserves downward overlap"
+            : "province self-copy preserves upward overlap");
+    }
+    ciProvinceSource.face = dfAlpha;
+    ciProvinceTarget.face = dfAlpha;
+    ciProvinceSource.fillRect(0, 0, 23, 11, 0x7f123456);
+    ciProvinceTarget.fillRect(0, 0, 23, 11, 0xffabcdef);
+    ciProvinceTarget.copyRect(18, 8, ciProvinceSource, 18, 8, 5, 3);
+    ciCheck(ciProvinceTarget.getMainPixel(22, 10) == 0x123456
+        && ciProvinceTarget.getMaskPixel(22, 10) == 0x7f
+        && ciProvinceTarget.getMainPixel(17, 10) == 0xabcdef,
+        "partial main image copy preserves four-byte color and alpha pixels");
+    invalidate ciProvinceSource;
+    invalidate ciProvinceTarget;
+
     ciLayer.clear(0);
     var ciBrush = new GdiPlus.Appearance();
     ciBrush.addBrush(0xff336699);

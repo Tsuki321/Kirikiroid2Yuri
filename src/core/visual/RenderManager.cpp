@@ -1401,7 +1401,7 @@ public:
 				this->PartialCopy(
 					_tar, rctar.left, rctar.top + y0,
 					_src, rcsrc.left, rcsrc.top + y0,
-					w, y1 - y0, backwardCopy);
+					w, y1 - y0, pixelsize, backwardCopy);
 			});
 		}
 	}
@@ -1409,22 +1409,25 @@ public:
 	void PartialCopy(
 		iTVPTexture2D *dst, tjs_int dx, tjs_int dy,
 		iTVPTexture2D *src, tjs_int sx, tjs_int sy,
-		tjs_int w, tjs_int h, bool backwardCopy)
+		tjs_int w, tjs_int h, tjs_int pixelsize, bool backwardCopy)
 	{
-		// 32bpp
-		w *= sizeof(tjs_uint32);
+		// Province textures have one byte per pixel; main images have four.
+		// Apply the same format to row lengths and both horizontal offsets.
+		w *= pixelsize;
+		dx *= pixelsize;
+		sx *= pixelsize;
 		if (backwardCopy) {
 			for (tjs_int y = h - 1; y >= 0; --y) {
 				memmove(
-					((tjs_uint32*)dst->GetScanLineForWrite(dy + y)) + dx,
-					((const tjs_uint32*)src->GetScanLineForRead(sy + y)) + sx,
+					((tjs_uint8*)dst->GetScanLineForWrite(dy + y)) + dx,
+					((const tjs_uint8*)src->GetScanLineForRead(sy + y)) + sx,
 					w);
 			}
 		} else {
 			for (tjs_int y = 0; y < h; ++y) {
 				memmove(
-					((tjs_uint32*)dst->GetScanLineForWrite(dy + y)) + dx,
-					((const tjs_uint32*)src->GetScanLineForRead(sy + y)) + sx,
+					((tjs_uint8*)dst->GetScanLineForWrite(dy + y)) + dx,
+					((const tjs_uint8*)src->GetScanLineForRead(sy + y)) + sx,
 					w);
 			}
 		}

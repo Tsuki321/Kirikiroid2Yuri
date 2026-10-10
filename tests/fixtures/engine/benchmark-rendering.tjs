@@ -13,7 +13,7 @@ function ciCheckRenderZoom(dest, width, height, label, marginX, marginY) {
             var sx = tx * 80 + 40, sy = ty * 80 + 40;
             var dx = Math.floor((sx - marginX) * width / (width - 2 * marginX));
             var dy = Math.floor((sy - marginY) * height / (height - 2 * marginY));
-            if (dest.getMainPixel(dx, dy) != ciRenderPattern(sx, sy))
+            if (dest.getMainPixel(dx, dy) != (ciRenderPattern(sx, sy) & 0xffffff) || dest.getMaskPixel(dx, dy) != 255)
                 throw label + " changed a constant-color tile interior";
             ++samples;
         }
@@ -42,8 +42,10 @@ function ciRenderingBenchmark() {
     var started = System.getTickCount();
     for (var i = 0; i < 4; ++i) snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
     ciMessages.add("METRIC render_snapshot_piled_copy_ms=" + (System.getTickCount() - started) + " frames=4 width=1280 height=720");
-    ciCheck(snapshot.getMainPixel(440, 280) == ciRenderPattern(440, 280) &&
-        snapshot.getMainPixel(1160, 600) == ciRenderPattern(1160, 600), "render benchmark snapshot preserves its original tile pattern");
+    ciCheck(snapshot.getMainPixel(440, 280) == (ciRenderPattern(440, 280) & 0xffffff) &&
+        snapshot.getMaskPixel(440, 280) == 255 &&
+        snapshot.getMainPixel(1160, 600) == (ciRenderPattern(1160, 600) & 0xffffff) &&
+        snapshot.getMaskPixel(1160, 600) == 255, "render benchmark snapshot preserves its original tile pattern");
     dest.stretchCopy(0, 0, width, height, snapshot, 64, 36, width - 128, height - 72, stFastLinear);
     started = System.getTickCount();
     for (var frame = 0; frame < frames; ++frame) {
@@ -74,12 +76,13 @@ function ciRenderingBenchmark() {
     var original = [];
     for (var x = 0; x < 64; ++x) {
         var color = 0xff000000 | ((x * 3) << 16) | ((x * 2) << 8) | x;
-        alias.fillRect(x, 0, 1, 32, color); original.add(color);
+        alias.fillRect(x, 0, 1, 32, color); original.add(color & 0xffffff);
     }
     alias.stretchCopy(4, 0, 60, 32, alias, 0, 0, 32, 32, stNearest);
     for (var x = 0; x < 64; ++x) {
         var sourceX = x < 4 ? x : Math.floor((x - 4) * 32 / 60);
-        if (alias.getMainPixel(x, 16) != original[sourceX]) throw "Aliased stretchCopy overwrote source pixels";
+        if (alias.getMainPixel(x, 16) != original[sourceX] || alias.getMaskPixel(x, 16) != 255)
+            throw "Aliased stretchCopy overwrote source pixels";
     }
     ciCheck(true, "overlapping stretchCopy preserves every nearest-neighbor source sample");
     ciMessages.save(ciOutput + "progress.txt");

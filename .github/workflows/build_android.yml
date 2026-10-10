@@ -10,9 +10,21 @@ on:
         description: Existing successful APK build and native suites to verify without rebuilding
         required: false
         default: ''
+      benchmark_after_run:
+        description: Run only the loading/zoom benchmark using this successful APK build
+        required: false
+        default: ''
+      benchmark_before_run:
+        description: Baseline successful APK build for the loading/zoom benchmark
+        required: false
+        default: '37937504255'
+      benchmark_render_workload:
+        description: Include the 1280x720 stretch and affine zoom workload
+        type: boolean
+        default: true
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ inputs.benchmark_after_run != '' && 'benchmark-' || '' }}${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -20,7 +32,7 @@ permissions:
 
 jobs:
   dependencies:
-    if: inputs.reuse_build_run == ''
+    if: inputs.reuse_build_run == '' && inputs.benchmark_after_run == ''
     name: Verify ${{ matrix.kind }} bundle
     runs-on: ubuntu-latest
     strategy:
@@ -43,7 +55,7 @@ jobs:
         run: python3 script/fetch_ci_dependencies.py ${{ matrix.kind }}
 
   test:
-    if: inputs.reuse_build_run == ''
+    if: inputs.reuse_build_run == '' && inputs.benchmark_after_run == ''
     name: Native regressions (${{ matrix.compiler }})
     runs-on: ubuntu-latest
     strategy:
@@ -81,7 +93,7 @@ jobs:
           retention-days: 7
 
   build_android:
-    if: inputs.reuse_build_run == ''
+    if: inputs.reuse_build_run == '' && inputs.benchmark_after_run == ''
     name: Build and verify Android APKs
     needs: [test, dependencies]
     runs-on: ubuntu-latest
@@ -183,7 +195,7 @@ jobs:
 
   verify_existing:
     name: Verify existing build provenance
-    if: inputs.reuse_build_run != ''
+    if: inputs.reuse_build_run != '' && inputs.benchmark_after_run == ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -213,7 +225,7 @@ jobs:
   emulator:
     name: Android ${{ matrix.api }} / ${{ matrix.variant }} / ${{ matrix.target }}
     needs: [build_android, verify_existing]
-    if: always() && !cancelled() && (needs.build_android.result == 'success' || needs.verify_existing.result == 'success')
+    if: always() && !cancelled() && inputs.benchmark_after_run == '' && (needs.build_android.result == 'success' || needs.verify_existing.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -265,9 +277,18 @@ jobs:
           path: test-results/android
           retention-days: 7
 
+  benchmark:
+    name: Matched release loading and zoom benchmark
+    if: github.event_name == 'workflow_dispatch' && inputs.benchmark_after_run != ''
+    uses: ./.github/workflows/benchmark_android_loading.yml
+    with:
+      before_run: ${{ inputs.benchmark_before_run }}
+      after_run: ${{ inputs.benchmark_after_run }}
+      render_workload: ${{ inputs.benchmark_render_workload }}
+
   release:
     name: Publish verified release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && inputs.benchmark_after_run == ''
     needs: [test, build_android, emulator]
     runs-on: ubuntu-latest
     permissions:

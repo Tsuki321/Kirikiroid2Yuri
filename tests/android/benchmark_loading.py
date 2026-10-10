@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Compare release APK loading with identical synthetic assets on one emulator.
 
-The newer test APK supplies assets only; instrumentation compiled with its R8
+The newer test APK supplies archive assets, and the checkout supplies the same
+startup script for both versions. Instrumentation compiled with the newer R8
 mapping is never executed against an older application. Timings are descriptive,
 while every trial must complete the archive and cache compatibility assertions.
 """
@@ -20,12 +21,13 @@ import zipfile
 
 PACKAGE = "com.yuri.kirikiri2"
 FILES = f"/data/user/0/{PACKAGE}/files"
+FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures/engine"
 REQUIRED_METRICS = {
     "loading_missing_lookup_ms", "loading_incremental_paths_ms",
     "loading_named_scripts_ms", "loading_cached_lookup_ms",
     "loading_hxv4_repeated_miss_ms",
 }
-RENDER_METRICS = {"render_stretch_copy_ms", "render_affine_copy_ms"}
+RENDER_METRICS = {"render_snapshot_piled_copy_ms", "render_stretch_copy_ms", "render_affine_copy_ms"}
 
 
 def decode_text(data):
@@ -39,7 +41,7 @@ def parse_metrics(data, required_metrics=REQUIRED_METRICS):
         raise ValueError("Archive fixture did not report ENGINE_CI_PASS")
     result = {}
     for line in lines:
-        match = re.fullmatch(r"METRIC ([a-z0-9_]+)=(\d+)(?: [a-z0-9_]+=\d+)*", line)
+        match = re.fullmatch(r"METRIC ([a-z0-9_]+)=(\d+)(?: [a-z0-9_]+=[a-z0-9_-]+)*", line)
         if match:
             if match[1] in result:
                 raise ValueError(f"Duplicate metric: {match[1]}")
@@ -49,7 +51,7 @@ def parse_metrics(data, required_metrics=REQUIRED_METRICS):
     return result
 
 
-def prepare_fixture(test_apk, payload, case, render_script=None):
+def prepare_fixture(test_apk, payload, case, render_script=None, startup_script=None):
     if not re.fullmatch(r"(?:before|after)-[1-3]", case):
         raise ValueError("Unexpected benchmark case name")
     storage = f"{FILES}/loading-benchmark/{case}"
@@ -57,10 +59,10 @@ def prepare_fixture(test_apk, payload, case, render_script=None):
     directory = payload / "loading-benchmark" / case
     directory.mkdir(parents=True)
     (payload / "loading-benchmark" / (case + "-result")).mkdir()
+    script = decode_text((startup_script or FIXTURE_ROOT / "archive-startup.tjs").read_bytes())
+    if "@@STORAGE@@" not in script or "@@OUTPUT@@" not in script:
+        raise ValueError("Archive startup fixture placeholders are missing")
     with zipfile.ZipFile(test_apk) as archive:
-        script = decode_text(archive.read("assets/engine/archive-startup.tjs"))
-        if "@@STORAGE@@" not in script or "@@OUTPUT@@" not in script:
-            raise ValueError("Archive startup fixture placeholders are missing")
         count = 0
         for entry in archive.infolist():
             if not entry.filename.startswith("assets/archives/") or entry.is_dir():
@@ -132,7 +134,7 @@ def capture(output, device_output):
             (output / (filename + ".error")).write_text(str(error), encoding="utf-8")
 
 
-def run_trial(apk, fixtures, label, trial, results, render_script=None):
+def run_trial(apk, fixtures, label, trial, results, render_script=None, startup_script=None):
     case = f"{label}-{trial}"
     output = results / case
     output.mkdir()
@@ -148,7 +150,7 @@ def run_trial(apk, fixtures, label, trial, results, render_script=None):
     with tempfile.TemporaryDirectory(prefix="krkr-loading-") as temporary:
         payload = Path(temporary) / "files"
         payload.mkdir()
-        storage, device_output = prepare_fixture(fixtures, payload, case, render_script)
+        storage, device_output = prepare_fixture(fixtures, payload, case, render_script, startup_script)
         adb("shell", "mkdir", "-p", FILES)
         adb("push", str(payload) + "/.", FILES + "/", timeout=90)
         adb("shell", "chown", "-R", owner, FILES)
@@ -217,7 +219,10 @@ def main():
         parser.error("Run this benchmark only on its dedicated GitHub Actions emulator")
     apks = {"before": apk_in(args.before_dir), "after": apk_in(args.after_dir)}
     fixtures = apk_in(args.fixtures_dir)
-    render_script = Path(__file__).resolve().parents[1] / "fixtures/engine/benchmark-rendering.tjs" if args.render_workload else None
+    startup_script = FIXTURE_ROOT / "archive-startup.tjs"
+    if not startup_script.is_file():
+        raise ValueError("The checked-out loading workload is missing")
+    render_script = FIXTURE_ROOT / "benchmark-rendering.tjs" if args.render_workload else None
     if render_script is not None and not render_script.is_file():
         raise ValueError("The checked-out rendering workload is missing")
     args.output.mkdir(parents=True, exist_ok=True)
@@ -240,13 +245,14 @@ def main():
     provenance = {variant: {"run_id": os.environ.get(variant.upper() + "_RUN"),
                             "apk_sha256": sha256(apk)} for variant, apk in apks.items()}
     provenance["fixtures"] = {"run_id": os.environ.get("AFTER_RUN"), "apk_sha256": sha256(fixtures)}
+    provenance["loading_workload"] = {"script_sha256": sha256(startup_script)}
     if render_script is not None:
         provenance["render_workload"] = {"script_sha256": sha256(render_script)}
     (args.output / "apk-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
     trials = []
     for trial in range(1, 4):
         for variant in ("before", "after"):
-            trials.append(run_trial(apks[variant], fixtures, variant, trial, args.output, render_script))
+            trials.append(run_trial(apks[variant], fixtures, variant, trial, args.output, render_script, startup_script))
     required = REQUIRED_METRICS | RENDER_METRICS if render_script is not None else REQUIRED_METRICS
     report = {"provenance": provenance, "trials": trials, "medians": summarize(trials, required),
               "conditions": "Same API 36 / 4 KB emulator, fresh install per trial, software renderer, debug window disabled",

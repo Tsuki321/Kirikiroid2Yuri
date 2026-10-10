@@ -371,7 +371,9 @@ void KRMovie::VideoPresentOverlay::Stop()
 MoviePlayerOverlay::~MoviePlayerOverlay()
 {
 	assert(std::this_thread::get_id() == TVPMainThreadID);
-	delete m_pPlayer; m_pPlayer = nullptr;
+	// Stop callbacks while their most-derived target still exists. The
+	// presentation base clears its node next; TVPMoviePlayer owns deletion.
+	m_pPlayer->CloseInputStream();
 }
 
 void MoviePlayerOverlay::SetWindow(tTJSNI_Window* window)

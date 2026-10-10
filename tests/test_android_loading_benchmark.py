@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import re
 import tempfile
 import unittest
 import zipfile
@@ -27,6 +28,16 @@ class LoadingBenchmark(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             benchmark.parse_metrics(duplicate.encode())
 
+    def test_render_metrics_accept_actual_workload_annotations(self):
+        fixture = (ROOT / "tests/fixtures/engine/benchmark-rendering.tjs").read_text(encoding="utf-8")
+        messages = re.findall(r'ciMessages.add\("(METRIC [a-z0-9_]+=)"\s*\+.*?\+\s*"([^"]*)"\);', fixture)
+        self.assertEqual(3, len(messages))
+        text = self.result() + "\n" + "\n".join(name + "70" + annotations for name, annotations in messages)
+        metrics = benchmark.parse_metrics(text.encode(), benchmark.REQUIRED_METRICS | benchmark.RENDER_METRICS)
+        self.assertEqual(70, metrics["render_snapshot_piled_copy_ms"])
+        self.assertEqual(70, metrics["render_stretch_copy_ms"])
+        self.assertEqual(70, metrics["render_affine_copy_ms"])
+
     def apk(self, path, extra=None):
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("assets/engine/archive-startup.tjs",
@@ -38,6 +49,20 @@ class LoadingBenchmark(unittest.TestCase):
             archive.writestr("classes.dex", b"must never be installed or extracted")
             if extra:
                 archive.writestr(extra, b"unexpected path")
+
+    def test_checkout_supplies_same_loading_script_independent_of_apk(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            apk, payload, script = root / "test.apk", root / "files", root / "startup.tjs"
+            self.apk(apk)
+            payload.mkdir()
+            script.write_text('// checked-out workload\nvar storage = "@@STORAGE@@"; var output = "@@OUTPUT@@";',
+                              encoding="utf-8")
+            benchmark.prepare_fixture(apk, payload, "before-1", startup_script=script)
+            actual = (payload / "loading-benchmark/before-1/startup.tjs").read_text(encoding="utf-8")
+            self.assertIn("// checked-out workload", actual)
+            self.assertNotIn("@@STORAGE@@", actual)
+            self.assertNotIn("@@OUTPUT@@", actual)
 
     def test_fixture_uses_only_assets_and_preserves_case_sensitive_scenarios(self):
         with tempfile.TemporaryDirectory() as temporary:

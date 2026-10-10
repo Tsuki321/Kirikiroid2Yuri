@@ -80,6 +80,10 @@ void TVPYUVSprite::setupVBOAndVAO()
 
 void TVPYUVSprite::updateTextureDataInternal(cocos2d::Texture2D *pTex, const void* data, int width, int height, cocos2d::Texture2D::PixelFormat pixfmt)
 {
+	// Drawing YUV leaves texture unit 2 active. Texture2D's cached bind can
+	// skip switching to unit 0 when this texture is already bound there.
+	// Its upload must target that unit, not the last chroma plane we drew.
+	cocos2d::GL::activeTexture(GL_TEXTURE0);
 	const cocos2d::Size &size = pTex->getContentSize();
 	cocos2d::Size videoSize(width, height);
 	if (size.width != videoSize.width || size.height != videoSize.height || pTex->getPixelFormat() != pixfmt) {
@@ -136,7 +140,7 @@ bool TVPYUVSprite::init()
 void TVPYUVSprite::updateTextureData(const void* data, int width, int height)
 {
 	cocos2d::Texture2D *pTex = getTexture();
-	const cocos2d::Size &size = pTex->getContentSize();
+	const cocos2d::Size size = pTex->getContentSize();
 	updateTextureDataInternal(getTexture(), data, width, height, cocos2d::Texture2D::PixelFormat::RGBA8888);
 	if (size.width != width || size.height != height) {
 		setTextureRect(cocos2d::Rect(0, 0, width, height));
@@ -146,7 +150,7 @@ void TVPYUVSprite::updateTextureData(const void* data, int width, int height)
 void TVPYUVSprite::updateTextureData(const void* Y, int YW, int YH, const void* U, int UW, int UH, const void* V, int VW, int VH)
 {
 	cocos2d::Texture2D *pTex = getTexture();
-	const cocos2d::Size &size = pTex->getContentSize();
+	const cocos2d::Size size = pTex->getContentSize();
 	updateTextureDataInternal(getTexture(), Y, YW, YH, cocos2d::Texture2D::PixelFormat::I8);
 	updateTextureDataInternal(_textureU, U, UW, UH, cocos2d::Texture2D::PixelFormat::I8);
 	updateTextureDataInternal(_textureV, V, VW, VH, cocos2d::Texture2D::PixelFormat::I8);

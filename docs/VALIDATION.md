@@ -102,6 +102,16 @@ Version-tag publication requires `RELEASE_KEYSTORE_B64`, `SIGN_KEY_ALIAS`,
 native tests, APK validation, and the entire emulator matrix. It publishes the
 production-signed release APK. Ordinary branch builds do not publish releases.
 
+To compare loading and zoom performance on a development branch, dispatch
+`build_android.yml` with `benchmark_after_run` set to a completed APK build run
+and `benchmark_before_run` set to the baseline run. This runs only the reusable
+benchmark job and leaves compilation and the regression matrix skipped. Its
+separate concurrency group allows the regression workflow to run alongside it.
+The default `benchmark_render_workload=true` also measures scene capture and
+1280x720 stretch/affine copies. Both APKs run the same checked-out synthetic TJS
+scripts and archive assets, with hashes recorded in the comparison artifact.
+Every trial must pass the compatibility assertions before its timing is included.
+
 ## Dependency reproducibility
 
 `script/dependencies.lock.json` pins the source, binary, and UI asset bundles by

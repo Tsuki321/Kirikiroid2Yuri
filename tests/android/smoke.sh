@@ -84,6 +84,14 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     failures=$((failures + 1))
     continue
   fi
+  if [[ "$name" == movie* ]] && ! python3 tests/android/movie.py "$name" "$output" > "test-results/android/$name-display-driver.txt" 2>&1; then
+    cat "test-results/android/$name-display-driver.txt"
+    adb exec-out screencap -p > "test-results/android/$name.png"
+    adb logcat -d > "test-results/android/$name-logcat.txt"
+    echo "Movie display driver failed: $name" >&2
+    failures=$((failures + 1))
+    continue
+  fi
   passed=false
   # Document-backed plugin/codec checks can take over two minutes under ARM64
   # translation. Keep a bounded wait while requiring the complete PASS result.

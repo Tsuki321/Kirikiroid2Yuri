@@ -127,6 +127,7 @@ final class UiChecks {
         xml.attribute(null, "id", String.valueOf(node.getViewIdResourceName()));
         xml.attribute(null, "clickable", String.valueOf(node.isClickable()));
         xml.attribute(null, "visible", String.valueOf(node.isVisibleToUser()));
+        xml.attribute(null, "scrollable", String.valueOf(node.isScrollable()));
         Rect bounds = new Rect(); node.getBoundsInScreen(bounds); xml.attribute(null, "bounds", bounds.toShortString());
         for (int i = 0; i < node.getChildCount(); ++i) writeNode(xml, node.getChild(i));
         xml.endTag(null, "node");
@@ -182,9 +183,15 @@ final class UiChecks {
         // retained scroll position can place the target above the viewport.
         for (int direction : new int[] {AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,
                 AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD}) {
+            int unavailable = 0;
             for (int attempt = 0; attempt < 12; ++attempt) {
                 if (find(name) != null) return;
-                if (!scroll(automation().getRootInActiveWindow(), direction)) break;
+                // A newly opened dialog can expose its labels before its
+                // ScrollView supports scrolling. Reacquire after layout.
+                if (!scroll(automation().getRootInActiveWindow(), direction)) {
+                    if (++unavailable >= 3) break;
+                    SystemClock.sleep(250);
+                } else unavailable = 0;
                 settleUi();
             }
         }
@@ -197,7 +204,33 @@ final class UiChecks {
 
     private static boolean scroll(AccessibilityNodeInfo node, int direction) {
         if (node == null) return false;
-        if (node.isScrollable() && node.performAction(direction)) return true;
+        if (node.isVisibleToUser() && node.isScrollable()) {
+            if (node.performAction(direction)) return true;
+            // Some Android 16 ScrollViews reject the accessibility action;
+            // exercise the same bounded drag a user would make in the panel.
+            Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
+            if (bounds.width() > 0 && bounds.height() > 80) {
+                float x = bounds.exactCenterX();
+                float start = bounds.top + bounds.height() * .75f;
+                float end = bounds.top + bounds.height() * .25f;
+                if (direction == AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD) {
+                    float swap = start; start = end; end = swap;
+                }
+                long down = SystemClock.uptimeMillis();
+                for (int step = 0; step <= 12; ++step) {
+                    int action = step == 0 ? MotionEvent.ACTION_DOWN
+                        : step == 12 ? MotionEvent.ACTION_UP : MotionEvent.ACTION_MOVE;
+                    MotionEvent event = MotionEvent.obtain(down, SystemClock.uptimeMillis(),
+                        action, x, start + (end - start) * step / 12f, 0);
+                    event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+                    boolean injected = automation().injectInputEvent(event, true);
+                    event.recycle();
+                    assertTrue("Scroll touch injected", injected);
+                    SystemClock.sleep(25);
+                }
+                return true;
+            }
+        }
         for (int i = 0; i < node.getChildCount(); ++i) if (scroll(node.getChild(i), direction)) return true;
         return false;
     }

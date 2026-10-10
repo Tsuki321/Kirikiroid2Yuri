@@ -129,7 +129,9 @@ def select_picker_root(name):
 def add_game(name):
     scroll_to("+  Add game folder"); click("+  Add game folder")
     locate("Use this folder"); select_picker_root("Kirikiri test games")
-    scroll_to(name); click(name)
+    # Grant the fixture root, then choose the game in the app. DocumentsUI
+    # loads children asynchronously; tapping a stale row can instead activate
+    # its folder confirmation button while the test still expects a listing.
     click("Use this folder")
     deadline = time.monotonic() + 40
     while time.monotonic() < deadline:

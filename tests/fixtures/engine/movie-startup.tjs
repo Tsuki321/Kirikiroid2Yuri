@@ -10,6 +10,7 @@ var ciPrimary = void, ciLayer1 = void, ciLayer2 = void, ciCapture = void;
 var ciFinished = false, ciTicks = 0, ciPhase = "overlay-start", ciPhaseTick = 0;
 var ciClip = -1, ciFrames = 0, ciSeen = [], ciLastColor = -1, ciFurthestFrame = -1;
 var ciPausedPosition = 0, ciPausedFrames = 0, ciPausedPixel = 0, ciSeekFrames = 0;
+var ciOverlayStage = 0;
 // Reopen the MP4 to exercise the cached player, then seek inside its XP3 copy.
 // Every clip is red (0-1s), green (1-2s), blue (2-3s).
 var ciClips = ["test.avi", "test-av.avi", "test-delayed.mp4", "test-delayed.mp4",
@@ -31,6 +32,13 @@ function ciFinish(error) {
     ciMessages.save(ciOutput + "result.txt");
 }
 function ciNextPhase(phase) { ciPhase = phase; ciPhaseTick = ciTicks; }
+function ciOverlayPicture(stage) {
+    ciOverlayStage = stage;
+    ciMovie.stopFrame = 29; ciMovie.playRate = 1.0;
+    ciMovie.position = stage == 1 ? 200 : stage == 2 ? 1400 : 2300;
+    ciMovie.play();
+    ciNextPhase("overlay-picture");
+}
 function ciColor(pixel) {
     var red = (pixel >> 16) & 255, green = (pixel >> 8) & 255, blue = pixel & 255;
     if (red > 200 && green < 40 && blue < 40) return 0;
@@ -78,10 +86,7 @@ function ciOpenLayerMovie() {
 function ciStartLayers() {
     ciMovie.close();
     ciAudio.stop();
-    ciPrimary = new Layer(ciWindow, null);
-    ciPrimary.setSize(320, 240); ciPrimary.setImageSize(320, 240);
     ciPrimary.fillRect(0, 0, 320, 240, 0xff101010);
-    ciPrimary.visible = true;
     ciLayer1 = new Layer(ciWindow, ciPrimary);
     ciLayer2 = new Layer(ciWindow, ciPrimary);
     var layers = [ciLayer1, ciLayer2];
@@ -102,7 +107,7 @@ function ciStep() {
     if (ciFinished) return;
     try {
         ++ciTicks;
-        if (ciTicks - ciPhaseTick > 80)
+        if (ciTicks - ciPhaseTick > (ciPhase == "overlay-ack" ? 600 : 80))
             throw "Movie stalled: clip=" + ciClip + " phase=" + ciPhase +
                 " status=" + ciMovie.status + " position=" + ciMovie.position +
                 " frames=" + ciFrames + " color=" + ciLastColor;
@@ -115,7 +120,21 @@ function ciStep() {
             ciMovie.play(); ciNextPhase("overlay-stop");
         } else if (ciPhase == "overlay-stop" && ciMovie.status == "stop") {
             ciCheck(ciTicks < 30, "overlay movie stops at requested frame");
-            ciStartLayers();
+            ciOverlayPicture(1);
+        } else if (ciPhase == "overlay-picture" && ciMovie.position >=
+                (ciOverlayStage == 1 ? 400 : ciOverlayStage == 2 ? 1600 : 2500)) {
+            ciMovie.pause();
+            ciNextPhase("overlay-settle");
+        } else if (ciPhase == "overlay-settle" && ciTicks - ciPhaseTick >= 3) {
+            [ciOverlayStage + " 320 240"].save(ciOutput + "movie-stage.txt");
+            ciNextPhase("overlay-ack");
+        } else if (ciPhase == "overlay-ack" && Storages.isExistentStorage(ciOutput + "movie-ack.txt")) {
+            var ack = []; ack.load(ciOutput + "movie-ack.txt");
+            if (ack.count > 0 && int(ack[0]) == ciOverlayStage) {
+                ciCheck(true, "overlay framebuffer shows decoded color " + ciOverlayStage);
+                if (ciOverlayStage == 3) ciStartLayers();
+                else ciOverlayPicture(ciOverlayStage + 1);
+            }
         } else if (ciPhase == "layer-start" && ciSeen[0] && ciFrames >= 2 && ciMovie.position >= 200) {
             ciMovie.pause();
             ciPausedPosition = ciMovie.position; ciPausedFrames = ciFrames;
@@ -157,6 +176,15 @@ function ciStep() {
 try {
     ciWindow = new Window();
     ciWindow.setSize(320, 240); ciWindow.visible = true;
+    ciWindow.innerWidth = 320; ciWindow.innerHeight = 240;
+    ciPrimary = new Layer(ciWindow, null);
+    ciPrimary.setSize(320, 240); ciPrimary.setImageSize(320, 240);
+    ciPrimary.type = ltOpaque; ciPrimary.visible = true;
+    ciPrimary.fillRect(0, 0, 320, 240, 0xff101010);
+    var markers = [0xffff00ff, 0xff00ffff, 0xffffff00, 0xffff8000];
+    var markerX = [24, 280, 24, 280], markerY = [40, 40, 184, 184];
+    for (var marker = 0; marker < 4; ++marker)
+        ciPrimary.fillRect(markerX[marker], markerY[marker], 16, 16, markers[marker]);
     ciTimer = new Timer(ciWindow); ciTimer.enabled = false;
     ciMovie = new VideoOverlay(ciWindow);
     ciAudio = new WaveSoundBuffer(ciWindow);
@@ -164,6 +192,7 @@ try {
     ciCheck(ciAudio.totalTime >= 900, "PCM audio decode");
     ciAudio.volume = 0; ciAudio.play();
     ciMovie.open(ciStorage + "test.avi");
+    ciMovie.setPos(80, 80); ciMovie.setSize(160, 80);
     ciCheck(ciMovie.fps >= 9 && ciMovie.fps <= 11, "video frame rate");
     ciCheck(ciMovie.numberOfFrame >= 29 && ciMovie.totalTime >= 2900, "video duration and frame count");
     ciMovie.stopFrame = 12;

@@ -1,6 +1,20 @@
 name: benchmark Android loading and rendering
 
 on:
+  workflow_call:
+    inputs:
+      before_run:
+        description: Build run containing the optimized baseline release test APK
+        type: string
+        required: true
+      after_run:
+        description: Build run containing the current release test APK and loading fixtures
+        type: string
+        required: true
+      render_workload:
+        description: Include the original 1280x720 stretch and affine zoom workload
+        type: boolean
+        default: true
   workflow_dispatch:
     inputs:
       before_run:
