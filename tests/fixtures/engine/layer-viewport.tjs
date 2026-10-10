@@ -1,0 +1,73 @@
+// Original reusable viewport for a cached Layer subtree. Coordinates in root
+// remain in world pixels; display contains the scaled screen pixels.
+class LayerViewport {
+    var root = void, snapshot = void, display = void, timer = void;
+    var interpolation = stFastLinear, renderedFrames = 0, _dirty = true;
+    function LayerViewport(window, sourceParent, displayParent) {
+        root = new Layer(window, sourceParent);
+        root.type = ltAlpha;
+        root.face = dfAlpha;
+        root.visible = false;
+        root.cached = true;
+        snapshot = new Layer(window, sourceParent);
+        snapshot.type = ltAlpha;
+        snapshot.face = dfAlpha;
+        snapshot.visible = false;
+        display = new Layer(window, displayParent);
+        display.type = ltAlpha;
+        display.face = dfAlpha;
+        display.visible = false;
+        display.hitThreshold = 256;
+        timer = new Timer(this, "onTick");
+        timer.enabled = false;
+        timer.interval = 16;
+    }
+    function finalize() {
+        if (timer !== void) { timer.enabled = false; invalidate timer; timer = void; }
+        if (display !== void) { invalidate display; display = void; }
+        if (snapshot !== void) { invalidate snapshot; snapshot = void; }
+        if (root !== void) { invalidate root; root = void; }
+    }
+    function setSourceSize(w, h) {
+        w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+        if (root.width == w && root.height == h) return;
+        root.setSize(w, h); root.setImageSize(w, h);
+        root.fillRect(0, 0, w, h, 0);
+        snapshot.setSize(w, h); snapshot.setImageSize(w, h);
+        _dirty = true;
+    }
+    function setScreenRect(x, y, w, h) {
+        w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+        display.setPos(Math.round(x), Math.round(y));
+        if (display.width != w || display.height != h) {
+            display.setSize(w, h); display.setImageSize(w, h); _dirty = true;
+        }
+    }
+    function setVisible(value) {
+        timer.enabled = false;
+        display.visible = !!value;
+        if (value) { render(); timer.enabled = true; }
+    }
+    function onTick() { render(); }
+    function render(force = false) {
+        if (!display.visible && !force) return false;
+        if (!_dirty && typeof root.cacheDirty != "undefined" && !root.cacheDirty) return false;
+        if (root.width == display.width && root.height == display.height) {
+            display.piledCopy(0, 0, root, 0, 0, root.width, root.height);
+        } else {
+            snapshot.piledCopy(0, 0, root, 0, 0, root.width, root.height);
+            display.stretchCopy(0, 0, display.width, display.height,
+                snapshot, 0, 0, root.width, root.height, interpolation);
+        }
+        _dirty = false;
+        ++renderedFrames;
+        return true;
+    }
+    function capture(target, scratch, w, h) {
+        scratch.setSize(root.width, root.height);
+        scratch.setImageSize(root.width, root.height);
+        scratch.piledCopy(0, 0, root, 0, 0, root.width, root.height);
+        target.stretchCopy(0, 0, w, h, scratch, 0, 0, root.width, root.height, interpolation);
+        return true;
+    }
+}

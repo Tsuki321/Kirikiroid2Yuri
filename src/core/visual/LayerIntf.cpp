@@ -9688,6 +9688,20 @@ TJS_BEGIN_NATIVE_PROP_DECL(cached)
 }
 TJS_END_NATIVE_PROP_DECL(cached)
 //----------------------------------------------------------------------
+TJS_BEGIN_NATIVE_PROP_DECL(cacheDirty)
+{
+	TJS_BEGIN_NATIVE_PROP_GETTER
+	{
+		TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+		*result = _this->GetCacheDirty();
+		return TJS_S_OK;
+	}
+	TJS_END_NATIVE_PROP_GETTER
+
+	TJS_DENY_NATIVE_PROP_SETTER
+}
+TJS_END_NATIVE_PROP_DECL(cacheDirty)
+//----------------------------------------------------------------------
 TJS_BEGIN_NATIVE_PROP_DECL(nodeVisible)
 {
 	TJS_BEGIN_NATIVE_PROP_GETTER

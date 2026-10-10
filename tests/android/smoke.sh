@@ -95,12 +95,13 @@ while IFS=$'\t' read -r -u 3 name storage output; do
   passed=false
   # Document-backed plugin/codec checks can take over two minutes under ARM64
   # translation. Keep a bounded wait while requiring the complete PASS result.
-  # Transition fixtures can spend several minutes in ARM64 translation on the
-  # 4 KB Android 16 release image. Keep the wait bounded, but do not classify a
-  # still-running fixture as failed at the shorter debug-time limit used by the
-  # other cases.
+  # Transitions and the archive document-provider benchmark can spend several
+  # minutes in ARM64 translation. The archive case completes in ~160s on
+  # release images; debug images are still making progress after 180s because
+  # every uncached miss must query SAF before searching archives. Keep the
+  # same assertions and a bounded six-minute allowance for these slow cases.
   wait_attempts=90
-  if [[ "$name" == transitions* ]]; then wait_attempts=180; fi
+  if [[ "$name" == transitions* || "$name" == archive-documents ]]; then wait_attempts=180; fi
   for attempt in $(seq 1 "$wait_attempts"); do
     sleep 2
     if adb shell cat "$output/result.txt" > "test-results/android/$name-engine.raw" 2>/dev/null; then
@@ -145,6 +146,15 @@ while IFS=$'\t' read -r -u 3 name storage output; do
   fi
   if [ "$passed" != true ]; then
     echo "Engine fixture failed or timed out: $name" >&2
+    # Preserve system-side exit reasons before subsequent games rotate them
+    # away. A live native backtrace distinguishes slow work from an init hang.
+    timeout 20s adb logcat -d > "test-results/android/$name-system-logcat.txt" || true
+    timeout 20s adb shell dumpsys activity exit-info com.yuri.kirikiri2 \
+      > "test-results/android/$name-exit-info.txt" || true
+    if [[ "$pid" =~ ^[0-9]+$ ]]; then
+      timeout 20s adb shell debuggerd -b "$pid" \
+        > "test-results/android/$name-native-backtrace.txt" 2>&1 || true
+    fi
     failures=$((failures + 1))
     continue
   fi

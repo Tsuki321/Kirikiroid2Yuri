@@ -1,0 +1,40 @@
+Scripts.execStorage(ciStorage + "layer-viewport.tjs");
+var ciViewport = new LayerViewport(ciWindow, ciLayer, ciLayer);
+ciViewport.setSourceSize(16, 12);
+ciViewport.setScreenRect(0, 0, 32, 24);
+ciViewport.interpolation = stNearest;
+var ciViewChild = new Layer(ciWindow, ciViewport.root);
+ciViewChild.type = ltOpaque;
+ciViewChild.setSize(8, 6);
+ciViewChild.setImageSize(8, 6);
+ciViewChild.fillRect(0, 0, 8, 6, 0xff123456);
+ciViewChild.setPos(4, 3);
+ciViewChild.visible = true;
+ciViewport.render(true);
+ciCheck(ciViewport.display.getMainPixel(10, 8) == 0x123456
+    && ciViewport.display.getMaskPixel(1, 1) == 0,
+    "viewport scales a hidden subtree and preserves transparent borders");
+ciCheck(!ciViewport.root.cacheDirty, "viewport composition clears the cached update region");
+ciViewport.display.visible = true;
+ciCheck(!ciViewport.render() && ciViewport.renderedFrames == 1,
+    "viewport skips unchanged cached frames");
+ciViewChild.setPos(1, 1);
+ciCheck(ciViewport.root.cacheDirty, "child movement invalidates the viewport cache");
+ciViewport.render();
+ciCheck(ciViewport.display.getMainPixel(4, 4) == 0x123456
+    && ciViewport.display.getMaskPixel(22, 16) == 0,
+    "viewport movement updates new and old child locations");
+ciViewport.setSourceSize(32, 24);
+ciViewport.render();
+ciCheck(ciViewport.display.getMainPixel(3, 3) == 0x123456
+    && ciViewport.display.getMaskPixel(12, 10) == 0,
+    "viewport switches to unscaled composition after zoom changes");
+ciViewport.setVisible(false);
+var ciViewFrames = ciViewport.renderedFrames;
+ciViewChild.fillRect(0, 0, 8, 6, 0xffabcdef);
+ciCheck(!ciViewport.render() && ciViewport.renderedFrames == ciViewFrames,
+    "hidden viewport stops frame composition");
+ciViewport.render(true);
+ciCheck(ciViewport.display.getMainPixel(3, 3) == 0xabcdef,
+    "viewport captures changes accumulated while hidden");
+invalidate ciViewport;

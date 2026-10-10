@@ -189,7 +189,7 @@ bool iTVPBaseBitmap::SetPoint(tjs_int x, tjs_int y, tjs_uint32 value)
 	if(x < 0 || y < 0 || x >= (tjs_int)GetWidth() || y >= (tjs_int)GetHeight())
 		TVPThrowExceptionMessage(TVPOutOfRectangle);
 
-	Bitmap->SetPoint(x, y, TVP_REVRGB(value));
+	Bitmap->SetPoint(x, y, Is32BPP() ? TVP_REVRGB(value) : value);
 #if 0
 	if(Is32BPP())
 		*( (tjs_uint32*)GetScanLineForWrite(y) + x) = value; // 32bpp

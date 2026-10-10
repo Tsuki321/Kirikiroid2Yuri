@@ -152,6 +152,9 @@ try {
     ciProvinceSource.face = dfProvince;
     ciProvinceTarget.face = dfProvince;
     ciProvinceReset(ciProvinceSource, ciProvinceTarget);
+    ciCheck(ciProvinceSource.getProvincePixel(1, 2) == ciProvinceValue(1, 2)
+        && ciProvinceTarget.getProvincePixel(22, 10) == 253,
+        "province pixel read/write preserves one-byte indices");
     ciProvinceTarget.copyRect(2, 3, ciProvinceSource, 1, 2, 7, 3);
     var ciProvincePixels = true;
     for (var py = 0; py < 11; ++py)
@@ -200,6 +203,8 @@ try {
         "partial main image copy preserves four-byte color and alpha pixels");
     invalidate ciProvinceSource;
     invalidate ciProvinceTarget;
+
+    Scripts.execStorage(ciStorage + "viewport-tests.tjs");
 
     ciLayer.clear(0);
     var ciBrush = new GdiPlus.Appearance();

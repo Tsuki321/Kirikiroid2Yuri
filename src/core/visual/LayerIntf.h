@@ -689,6 +689,7 @@ public:
 
 	void SetCached(bool b);
 	bool GetCached() const { return Cached; }
+	bool GetCacheDirty() const { return !GetCacheEnabled() || CacheRecalcRegion.GetCount() != 0; }
 
 	//--------------------------------------------- drawing function stuff --
 protected:
