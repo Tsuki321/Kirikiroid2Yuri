@@ -15,6 +15,90 @@ function ciRead(name) {
     lines.load(ciStorage + name + ".xp3>hello.txt");
     return lines.join("\n");
 }
+function ciLoadingPathChecks() {
+    var directory = ciStorage + "loading-paths/subdir/";
+    Scripts.execStorage(directory + "mixed.tjs");
+    ciCheck(global.ciLoadingValue == 71, "exact parent directories resolve a differently cased leaf");
+    Scripts.execStorage(ciStorage + "loadingancestor/nesteddir/casescene.tjs");
+    ciCheck(global.ciLoadingValue == 72, "differently cased ancestors and leaf retain fallback resolution");
+    ciCheck(!Storages.isExistentStorage(directory + "newscene.tjs"), "missing leaf under an exact parent remains absent");
+    var lines = ["global.ciLoadingValue = 73;"];
+    lines.save(directory + "NewScene.TJS");
+    Scripts.execStorage(directory + "newscene.tjs");
+    ciCheck(global.ciLoadingValue == 73, "newly created leaf is immediately visible after a miss");
+    Storages.addAutoPath(directory);
+    Scripts.execStorage("mixed.tjs");
+    ciCheck(global.ciLoadingValue == 71, "directory paths with trailing slashes still enumerate correctly");
+    Storages.removeAutoPath(directory);
+    var started = System.getTickCount();
+    for (var i = 0; i < 128; ++i) {
+        if (Storages.isExistentStorage(directory + "ci-loading-absent-%03d.tjs".sprintf(i)))
+            throw "Missing qualified script unexpectedly resolved";
+    }
+    ciMessages.add("METRIC loading_missing_lookup_ms=" + (System.getTickCount() - started) + " lookups=128");
+    ciCheck(true, "qualified missing-file lookups remain absent");
+}
+function ciLoadingBenchmark() {
+    ciLoadingPathChecks();
+    var base = ciStorage + "loading.xp3>";
+    var patch = ciStorage + "loading-patch.xp3>";
+    var started = System.getTickCount();
+    for (var directory = 0; directory < 16; ++directory) {
+        Storages.addAutoPath(base + "dir-%02d/".sprintf(directory));
+        Scripts.execStorage("ci-load-%02d-00.tjs".sprintf(directory));
+        if (global.ciLoadingValue != directory * 100) throw "Loading search path selected the wrong script";
+    }
+    ciMessages.add("METRIC loading_incremental_paths_ms=" + (System.getTickCount() - started) + " directories=16 scripts=16");
+    ciCheck(true, "incremental archive search paths execute the expected scripts");
+    started = System.getTickCount();
+    for (var directory = 0; directory < 16; ++directory) {
+        for (var entry = 0; entry < 8; ++entry) {
+            Scripts.execStorage("ci-load-%02d-%02d.tjs".sprintf(directory, entry));
+            if (global.ciLoadingValue != directory * 100 + entry) throw "Archive script load returned stale contents";
+        }
+    }
+    ciMessages.add("METRIC loading_named_scripts_ms=" + (System.getTickCount() - started) + " scripts=128");
+    ciCheck(true, "all 128 named archive scripts load with distinct results");
+    started = System.getTickCount();
+    for (var repetition = 0; repetition < 4; ++repetition) {
+        for (var directory = 0; directory < 16; ++directory) {
+            for (var entry = 0; entry < 8; ++entry) {
+                var name = "ci-load-%02d-%02d.tjs".sprintf(directory, entry);
+                if (Storages.getPlacedPath(name).indexOf("loading.xp3>") < 0)
+                    throw "Cached lookup lost its archive path";
+            }
+        }
+    }
+    ciMessages.add("METRIC loading_cached_lookup_ms=" + (System.getTickCount() - started) + " lookups=512");
+    ciCheck(true, "cached loading lookups preserve archive locations");
+    Scripts.execStorage("ci-loading-priority.tjs");
+    ciCheck(global.ciLoadingValue == 15, "last archive directory takes priority");
+    ciCheck(!Storages.isExistentStorage("ci-loading-patch-only.tjs"), "missing loading script is absent before adding its patch");
+    Storages.addAutoPath(patch);
+    Scripts.execStorage("ci-loading-priority.tjs");
+    ciCheck(global.ciLoadingValue == 9001, "adding a patch invalidates previously cached script resolution");
+    Scripts.execStorage("ci-loading-patch-only.tjs");
+    ciCheck(global.ciLoadingValue == 9002, "adding a patch resolves a previously missing script");
+    Storages.removeAutoPath(patch);
+    Scripts.execStorage("ci-loading-priority.tjs");
+    ciCheck(global.ciLoadingValue == 15 && !Storages.isExistentStorage("ci-loading-patch-only.tjs"),
+        "removing a patch restores the base script and removes patch-only results");
+    Storages.addAutoPath(base + "dir-00/");
+    Scripts.execStorage("ci-loading-priority.tjs");
+    ciCheck(global.ciLoadingValue == 15, "duplicate path registration preserves search priority");
+    // A duplicate add is also an explicit refresh for mutable directories.
+    var loose = ciStorage + "loading-loose/";
+    Storages.addAutoPath(loose);
+    ciCheck(!Storages.isExistentStorage("ci-loading-created.txt"), "new loose fixture starts absent");
+    var lines = ["created after path registration"];
+    lines.save(loose + "ci-loading-created.txt");
+    Storages.addAutoPath(loose);
+    lines.clear(); lines.load("ci-loading-created.txt");
+    ciCheck(lines.join("\n") == "created after path registration", "duplicate path registration refreshes newly created files");
+    Storages.removeAutoPath(loose);
+    for (var directory = 0; directory < 16; ++directory)
+        Storages.removeAutoPath(base + "dir-%02d/".sprintf(directory));
+}
 try {
     var ciExpected = "archive fixture OK 日本語";
     var ciValid = ["valid-raw", "valid-compressed", "valid-chained", "valid-unknown", "valid-multisegment"];
@@ -35,6 +119,17 @@ try {
     var hxAuto = [];
     hxAuto.load("dynamic.txt");
     ciCheck(hxAuto.join("\n") == "hashed lookup OK", "Hxv4 dynamic names resolve through auto paths");
+    var hxMissingStart = System.getTickCount();
+    for (var i = 0; i < 256; ++i) {
+        if (Storages.isExistentStorage("late-only.txt")) throw "Missing hashed patch member unexpectedly resolved";
+    }
+    ciMessages.add("METRIC loading_hxv4_repeated_miss_ms=" + (System.getTickCount() - hxMissingStart) + " lookups=256");
+    ciCheck(true, "repeated missing Hxv4 names remain absent");
+    Storages.addAutoPath(ciStorage + "hxv4-late.xp3>nested/");
+    hxAuto.load("late-only.txt");
+    ciCheck(hxAuto.join("\n") == "late hashed lookup OK", "later hashed patch resolves a name cached missing in the base archive");
+    Storages.removeAutoPath(ciStorage + "hxv4-late.xp3>nested/");
+    ciCheck(!Storages.isExistentStorage("late-only.txt"), "removing hashed patch restores the base archive's missing result");
     Storages.addAutoPath(ciStorage + "hxv4-patch.xp3>nested/");
     hxAuto.load("dynamic.txt");
     ciCheck(hxAuto.join("\n") == "hashed patch OK", "later Hxv4 auto path takes priority");
@@ -45,6 +140,7 @@ try {
     Storages.removeAutoPath(ciStorage + "priority.xp3>");
     Storages.removeAutoPath(ciStorage + "hxv4-patch.xp3>nested/");
     Storages.removeAutoPath(ciStorage + "hxv4-raw.xp3>nested/");
+    ciLoadingBenchmark();
     var ciInvalid = ["bad-chunk-header", "bad-chunk-length", "bad-info", "bad-name",
         "bad-segment-range", "bad-segment-size", "bad-segment-method", "bad-index-pointer",
         "bad-index-size", "bad-compressed-size", "bad-compressed-index", "bad-index-cycle",

@@ -343,6 +343,17 @@ void TJS_INTF_METHOD tTVPFileMedia::GetLocallyAccessibleName(ttstr &name)
         name = exactname;
         return;
     }
+    // Optional files and extension probes often miss while their parent is
+    // already spelled correctly. Scan just that directory for a case variant
+    // instead of reopening every ancestor for each unsuccessful lookup.
+    const tjs_char *leaf = TJS_strrchr(ptr, TJS_W('/'));
+    if (leaf && leaf[1]) {
+        ttstr parent = newname + TJS_W("/") + ttstr(ptr, leaf - ptr);
+        if (TVP_stat(parent.c_str(), exactinfo) && S_ISDIR(exactinfo.st_mode)) {
+            newname = parent;
+            ptr = leaf + 1;
+        }
+    }
     while(*ptr) {
     	const tjs_char *ptr_end = ptr;
     	while(*ptr_end && *ptr_end != TJS_W('/')) ++ptr_end;

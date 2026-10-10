@@ -40,6 +40,16 @@ def container(index, payload=TEXT, compressed=False, chained=False):
     return header + payload + index_header + encoded
 
 
+def script_archive(sources):
+    payload, indexes = bytearray(), []
+    for name, source in sources.items():
+        data = b"\xff\xfe" + source.encode("utf-16le")
+        segments = [(0, 19 + len(payload), len(data), len(data))]
+        indexes.append(file_index(data, segments, name))
+        payload.extend(data)
+    return container(b"".join(indexes), bytes(payload))
+
+
 def fixtures():
     result = {"valid-raw.xp3": container(file_index())}
     startup = (Path(__file__).resolve().parents[1] / "tests/fixtures/engine/archive-launch-startup.tjs").read_text(encoding="utf-8")
@@ -80,6 +90,17 @@ def fixtures():
     result["bad-index-count.xp3"] = header + chain + b"\0" + struct.pack("<Q", 0)
     result["unsupported-names.xp3"] = container(chunk(b"Hxv4", b"synthetic") + file_index())
     result.update(hxv4_fixtures())
+    loading = {}
+    for directory in range(16):
+        for entry in range(8):
+            loading[f"dir-{directory:02d}/ci-load-{directory:02d}-{entry:02d}.tjs"] = (
+                f"global.ciLoadingValue = {directory * 100 + entry};")
+        loading[f"dir-{directory:02d}/ci-loading-priority.tjs"] = f"global.ciLoadingValue = {directory};"
+    result["loading.xp3"] = script_archive(loading)
+    result["loading-patch.xp3"] = script_archive({
+        "ci-loading-priority.tjs": "global.ciLoadingValue = 9001;",
+        "ci-loading-patch-only.tjs": "global.ciLoadingValue = 9002;",
+    })
     return result
 
 
@@ -93,13 +114,15 @@ def hxv4_fixtures():
     filters = [Filter(True, 23, (4 << 48) | (12 << 32) | 0x341256,
                       (27 << 48) | (41 << 32) | 0x789abc, bytes(range(16))),
                Filter(True, 1, 0, (16 << 48) | (16 << 32) | 0x432100, bytes(reversed(range(16))))]
-    for kind in ('raw', 'compressed', 'multisegment', 'chained', 'startup', 'patch'):
+    for kind in ('raw', 'compressed', 'multisegment', 'chained', 'startup', 'patch', 'late'):
         payload = bytearray()
         index_files, companion_files = [], []
         first = 36 if kind == 'chained' else 19
         specs = [('hello.txt', TEXT), ('nested/dynamic.txt', b'\xff\xfe' + 'hashed lookup OK'.encode('utf-16le'))]
         if kind == 'patch':
             specs[1] = ('nested/dynamic.txt', b'\xff\xfe' + 'hashed patch OK'.encode('utf-16le'))
+        if kind == 'late':
+            specs[1] = ('nested/late-only.txt', b'\xff\xfe' + 'late hashed lookup OK'.encode('utf-16le'))
         if kind == 'startup':
             specs = [('startup.tjs', b'global.hxFixtureExecuted = "hx startup OK";')]
         for i, (name, plain) in enumerate(specs):

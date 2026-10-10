@@ -1,0 +1,72 @@
+var ciOutput = "@@OUTPUT@@/";
+var ciMessages = ["ENGINE_CI_STARTED"];
+var ciWindow = void, ciPrimary = void, ciTimer = void;
+var ciStage = 0, ciTicks = 0, ciStageTick = 0, ciFinished = false;
+var ciWidth = 321, ciHeight = 241;
+ciMessages.save(ciOutput + "started.txt");
+function ciFinish(error) {
+    if (ciFinished) return;
+    ciFinished = true;
+    if (ciTimer !== void) ciTimer.enabled = false;
+    ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + error);
+    ciMessages.save(ciOutput + "result.txt");
+}
+function ciReset(width, height, background) {
+    ciWidth = width; ciHeight = height;
+    ciWindow.setSize(width, height);
+    ciPrimary.setSize(width, height); ciPrimary.setImageSize(width, height);
+    ciPrimary.fillRect(0, 0, width, height, background);
+    ciPrimary.fillRect(80, 80, width - 160, height - 160, 0xff704090);
+    // Unique markers locate the displayed image through letterboxing, device
+    // rotation and scaling. The host checks the GPU framebuffer independently.
+    ciPrimary.fillRect(24, 40, 16, 16, 0xffff00ff);
+    ciPrimary.fillRect(width - 40, 40, 16, 16, 0xff00ffff);
+    ciPrimary.fillRect(24, height - 56, 16, 16, 0xffffff00);
+    ciPrimary.fillRect(width - 40, height - 56, 16, 16, 0xffff8000);
+}
+function ciEdges() {
+    ciPrimary.fillRect(64, 0, ciWidth - 128, 24, 0xffe03030);
+    ciPrimary.fillRect(64, ciHeight - 24, ciWidth - 128, 24, 0xff3060e0);
+}
+function ciMiddle() {
+    ciPrimary.fillRect(64, Math.floor(ciHeight / 2) - 8, ciWidth - 128, 16, 0xff30d060);
+}
+function ciDrawNext() {
+    ++ciStage;
+    if (ciStage == 1) ciReset(321, 241, 0xff203040);
+    else if (ciStage == 2) ciEdges();
+    else if (ciStage == 3) ciMiddle();
+    else if (ciStage == 4) {
+        ciPrimary.fillRect(64, 70, ciWidth - 128, 8, 0xffe09020);
+        ciPrimary.fillRect(64, ciHeight - 78, ciWidth - 128, 8, 0xff2080a0);
+    } else if (ciStage == 5) ciReset(353, 277, 0xff183828);
+    else if (ciStage == 6) ciEdges();
+    else if (ciStage == 7) ciReset(319, 223, 0xff382018);
+    else if (ciStage == 8) ciMiddle();
+    // Stage 9 changes no pixels: the last uploaded frame must persist.
+    ciStageTick = ciTicks;
+    var marker = [ciStage + " " + ciWidth + " " + ciHeight];
+    marker.save(ciOutput + "presentation-stage.txt");
+}
+function ciStep() {
+    if (ciFinished) return;
+    try {
+        if (++ciTicks - ciStageTick > 450) throw "Framebuffer check did not acknowledge stage " + ciStage;
+        var ack = [];
+        try { ack.load(ciOutput + "presentation-ack.txt"); } catch (ignored) { return; }
+        if (ack.count < 1 || (int ack[0]) != ciStage) return;
+        ciMessages.add("PASS actual display pixels verified for presentation stage " + ciStage);
+        ciMessages.save(ciOutput + "progress.txt");
+        if (ciStage == 9) { ciFinish(); return; }
+        ciDrawNext();
+    } catch (error) { ciFinish(error.message === void ? "" + error : "" + error.message); }
+}
+try {
+    ciWindow = new Window();
+    ciPrimary = new Layer(ciWindow, null);
+    ciPrimary.type = ltOpaque; ciPrimary.visible = true;
+    ciWindow.visible = true;
+    ciDrawNext();
+    ciTimer = new Timer(ciWindow); ciTimer.enabled = false;
+    ciTimer.interval = 100; ciTimer.onTimer = ciStep; ciTimer.enabled = true;
+} catch (error) { ciFinish(error.message === void ? "" + error : "" + error.message); }

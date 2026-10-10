@@ -3,7 +3,7 @@
 #include "LayerBitmapIntf.h"
 #include "Application.h"
 #include "VideoOvlImpl.h"
-#include "SDL_log.h"
+#include "SDL2/SDL_log.h"
 extern "C" {
 #include "libswscale/swscale.h"
 }

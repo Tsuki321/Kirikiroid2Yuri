@@ -15,7 +15,7 @@
 #include "platform/CCPlatformConfig.h"
 #include "AEStream.h"
 #include "WaveMixer.h"
-#include "SDL_log.h"
+#include "SDL2/SDL_log.h"
 
 #ifdef HAS_OMXPLAYER
 #include "../omxplayer/OMXPlayerAudio.h"

@@ -147,7 +147,7 @@ TEST_F(TJSRuntime, EngineFixtureScriptsCompileToValidBytecode) {
     const char *names[] = {"startup.tjs", "compiled-source.tjs", "movie-startup.tjs",
         "archive-startup.tjs", "transition-startup.tjs", "psb-tests.tjs",
         "datapack-tests.tjs", "plugin-tests.tjs", "kag-parser-tests.tjs",
-        "audio-startup.tjs", "dialog-startup.tjs"};
+        "audio-startup.tjs", "dialog-startup.tjs", "presentation-startup.tjs", "benchmark-rendering.tjs"};
     for (const char *name : names) {
         SCOPED_TRACE(name);
         std::ifstream input(std::string(ENGINE_FIXTURE_DIR) + "/" + name, std::ios::binary);

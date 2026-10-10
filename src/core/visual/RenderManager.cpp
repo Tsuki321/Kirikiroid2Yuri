@@ -359,7 +359,7 @@ public:
 	virtual tjs_int GetPitch() const { return Pitch; }
 
 	virtual cocos2d::Texture2D* GetAdapterTexture(cocos2d::Texture2D* origTex) override {
-		if (!origTex || origTex->getPixelsWide() != Width || origTex->getPixelsHigh() != Height) {
+		if (!origTex || origTex->getPixelsWide() != Pitch / 4 || origTex->getPixelsHigh() != Height) {
 			origTex = new cocos2d::Texture2D;
 			origTex->autorelease();
 			origTex->initWithData(BmpData, Pitch * Height,
@@ -863,6 +863,16 @@ public:
 	~tTVPSoftwareTexture2D() {
 		_totalVMemSize -= Pitch * Height;
 		if (Bitmap) Bitmap->Release();
+	}
+	virtual cocos2d::Texture2D* GetAdapterTexture(cocos2d::Texture2D* origTex, const tTVPRect &dirty) override {
+		if (!origTex || origTex->getPixelsWide() != Pitch / 4 || origTex->getPixelsHigh() != Height)
+			return tTVPSoftwareTexture2D_static::GetAdapterTexture(origTex);
+		// Full-width rows preserve padded pitches without repacking pixels.
+		const int top = std::max(0, dirty.top);
+		const int bottom = std::min(Height, dirty.bottom);
+		if (!dirty.is_empty() && bottom > top)
+			origTex->updateWithData(BmpData + Pitch * top, 0, top, Pitch / 4, bottom - top);
+		return origTex;
 	}
 	virtual void Update(const void *pixel, TVPTextureFormat::e format, int pitch, const tTVPRect& rc) {
 		assert(rc.left == 0);
@@ -2773,6 +2783,33 @@ public:
 			int spitch = src->GetPitch();
 			sdata = (const uint8_t *)src->GetPixelData() + (rcsrc.top * spitch + rcsrc.left * 4);
 
+#ifndef USE_SWSCALE
+			// A full-color copy needs no intermediate image or second copy pass.
+			// Retain the snapshot path for aliases, blending and reversed regions.
+			if (method == GetRenderMethod("Copy") && tar != src &&
+				tar->GetFormat() == TVPTextureFormat::RGBA && src->GetFormat() == TVPTextureFormat::RGBA &&
+				dw > 0 && dh > 0 && sw > 0 && sh > 0 && spitch > 0 &&
+				rctar.left >= 0 && rctar.top >= 0 && rctar.right <= tar->GetWidth() && rctar.bottom <= tar->GetHeight() &&
+				rcsrc.left >= 0 && rcsrc.top >= 0 && rcsrc.right <= src->GetWidth() && rcsrc.bottom <= src->GetHeight()) {
+				const int targetPitch = tar->GetPitch();
+				if (targetPitch > 0) {
+					uint8_t *targetData = (uint8_t*)tar->GetScanLineForWrite(rctar.top) + rctar.left * 4;
+					const uintptr_t sourceAddress = reinterpret_cast<uintptr_t>(sdata);
+					const uintptr_t targetAddress = reinterpret_cast<uintptr_t>(targetData);
+					const size_t sourceSpan = size_t(sh - 1) * spitch + size_t(sw) * 4;
+					const size_t targetSpan = size_t(dh - 1) * targetPitch + size_t(dw) * 4;
+					const bool disjoint = targetAddress >= sourceAddress
+						? targetAddress - sourceAddress >= sourceSpan
+						: sourceAddress - targetAddress >= targetSpan;
+					if (disjoint) {
+						cv::Mat source(sh, sw, CV_8UC4, (void*)sdata, spitch);
+						cv::Mat target(dh, dw, CV_8UC4, targetData, targetPitch);
+						cv::resize(source, target, cv::Size(dw, dh), 0, 0, cvFlags[StretchType]);
+						return;
+					}
+				}
+			}
+#endif
 			iTVPTexture2D *tmp = getTempTexture(dw, dh + 1);
 			uint8_t *ddata = (uint8_t *)tmp->GetScanLineForWrite(0);
 			int dpitch = tmp->GetPitch();

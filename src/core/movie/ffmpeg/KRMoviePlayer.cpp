@@ -14,7 +14,7 @@ extern "C" {
 #include "WindowImpl.h"
 #include "VideoOvlImpl.h"
 #include "cocos2d/YUVSprite.h"
-#include "SDL_log.h"
+#include "SDL2/SDL_log.h"
 
 extern std::thread::id TVPMainThreadID;
 

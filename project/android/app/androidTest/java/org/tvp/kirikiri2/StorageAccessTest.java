@@ -148,6 +148,7 @@ public class StorageAccessTest {
         Context tests = InstrumentationRegistry.getInstrumentation().getContext();
         String script = read(tests.getAssets().open("engine/startup.tjs"));
         String movieScript = read(tests.getAssets().open("engine/movie-startup.tjs"));
+        String presentationScript = read(tests.getAssets().open("engine/presentation-startup.tjs"));
         String archiveScript = read(tests.getAssets().open("engine/archive-startup.tjs"));
         String transitionScript = read(tests.getAssets().open("engine/transition-startup.tjs"));
         String audioScript = read(tests.getAssets().open("engine/audio-startup.tjs"));
@@ -167,6 +168,7 @@ public class StorageAccessTest {
                 "archive-launch-local", "archive-launch-documents",
                 "transitions", "transitions-documents", "transitions-opengl", "transitions-opengl-documents",
                 "audio-local", "audio-documents", "dialogs-local", "dialogs-documents",
+                "presentation-local", "presentation-documents",
                 "preferences-missing-local", "preferences-invalid-local", "preferences-invalid-documents", "preferences-root-local"};
         for (String name : names) {
             String storage = name.contains("documents") ? documents + "/" + name : new File(base, name).getPath();
@@ -187,8 +189,14 @@ public class StorageAccessTest {
                 "<Preferences><Custom key=\"ci-preference\" value=\"must not leak\"/></Preferences>");
             write(storage + "/startup.tjs", (name.startsWith("movie") ? movieScript : name.startsWith("archive") ? archiveScript
                 : name.startsWith("transitions") ? transitionScript : name.startsWith("audio-") ? audioScript
+                : name.startsWith("presentation-") ? presentationScript
                 : name.startsWith("dialogs-") ? dialogScript : name.startsWith("preferences-") ? preferenceScript : script)
                 .replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
+            if (name.startsWith("presentation-")) {
+                assertTrue(StorageAccess.delete(context, output + "/presentation-stage.txt"));
+                assertTrue(StorageAccess.delete(context, output + "/presentation-ack.txt"));
+                assertTrue(StorageAccess.delete(context, output + "/result.txt"));
+            }
             if (name.equals("local") || name.equals("documents")) {
                 write(storage + "/engine-body.tjs", script.replace("@@STORAGE@@", storage).replace("@@OUTPUT@@", output));
                 write(storage + "/compiled-startup-source.tjs",
@@ -228,6 +236,13 @@ public class StorageAccessTest {
                 }
             }
             if (name.startsWith("archive")) {
+                assertTrue(StorageAccess.mkdirs(context, storage + "/loading-loose"));
+                assertTrue(StorageAccess.delete(context, storage + "/loading-loose/ci-loading-created.txt"));
+                assertTrue(StorageAccess.mkdirs(context, storage + "/loading-paths/subdir"));
+                assertTrue(StorageAccess.mkdirs(context, storage + "/LoadingAncestor/NestedDir"));
+                write(storage + "/loading-paths/subdir/Mixed.TJS", "global.ciLoadingValue = 71;");
+                write(storage + "/LoadingAncestor/NestedDir/CaseScene.TJS", "global.ciLoadingValue = 72;");
+                assertTrue(StorageAccess.delete(context, storage + "/loading-paths/subdir/NewScene.TJS"));
                 String[] archives = tests.getAssets().list("archives");
                 assertNotNull(archives);
                 assertTrue("synthetic archive fixtures are packaged", archives.length >= 21);

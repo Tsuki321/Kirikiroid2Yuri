@@ -23,20 +23,24 @@ these changes run in GitHub Actions.
 | Offline package inspector | Bounded XP3 metadata inspection, protected/obscured entry reporting, and checks that archive member payloads are never read |
 | Android instrumentation | Existing-directory creation, write failures, local replacement, real persisted document grants, Unicode/case handling, read/write/list/rename/delete, subtree and startup-permission boundaries |
 | Native TJS fixtures | Text/binary/compressed dictionary and empty-string serialization, literal-only loading, bytecode compilation/loading, malformed bytecode, escaped and executable KAG expression insertion, missing/repeated plugins, actual text/shape/image pixels, alpha endpoints, transforms, window controls, valid and malformed XP3 archives through local and document-tree storage |
-| Media fixtures | Generated PCM audio and MPEG-4 video, metadata, playback status/rate, pause/resume and stop frames |
+| Media fixtures | Generated MPEG-4/PCM and H.264/AAC with delayed frames; overlay controls, layer pixels and composition, pause/resume, seeking, cached reopening, archive playback and final frames before EOF |
+| Display presentation | Actual Android framebuffer samples across dirty-row updates, padded widths, disjoint changes, unchanged frames and resize; both local and document-backed startup |
+| Loading and zoom benchmarks | Matched optimized APKs on one Android 16 emulator; archive/script lookup timings and 1280x720 scene capture, stretch and affine copy timings, with independent pixel assertions |
 | Plugin regressions | Seven extrans and twelve extNagano pixel algorithms, option bounds, rule images, morph meshes, locale naming and DSP filter responses under host sanitizers; actual TJS registration, transition completion and filtered PCM playback on Android |
 | Android lifecycle | Backgrounding and returning to the existing activity |
 | APK verification | 16 KB ELF load/RELRO alignment and uncompressed library packing |
 
-The emulator matrix uses API 30 and API 35 with Google's 16 KB system image.
-Both debug and optimized/minified release builds are exercised. The images run
+The full emulator matrix uses API 36 with both 4 KB and 16 KB pages for debug
+and optimized/minified release builds, plus API 35 with 16 KB pages for debug.
+The images run
 on x86-64 hosts and execute the ARM64 APK through Android's native bridge; this
 does not replace testing on physical ARM64 devices and their GPU drivers.
 
-Each configuration runs sixteen engine cases: local and document-tree storage,
-their cold launches from compiled `startup.tjs`, two movie cases, two archive
-cases, four transition cases, two audio-filter cases and two modal-dialog cases. Transition cases run
-with both software and OpenGL rendering; the harness checks the selected renderer
+Each full configuration runs 26 engine cases: local and document-tree storage,
+their cold launches from compiled `startup.tjs`, four movie cases, two archive
+cases, two archive-launch cases, four transition cases, two audio-filter cases,
+two modal-dialog cases, four preference cases and two display-presentation cases.
+Transition and movie cases run with both software and OpenGL rendering; the harness checks the selected renderer
 in the process log. Compiled startup must preserve its bootstrap globals before entering the
 synthetic framework. The storage cases cover `fstat` directory listings, copying,
 timestamps, renaming and removal; removal must reject the wrong entry type and

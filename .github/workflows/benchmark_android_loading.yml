@@ -1,0 +1,97 @@
+name: benchmark Android loading and rendering
+
+on:
+  workflow_dispatch:
+    inputs:
+      before_run:
+        description: Build run containing the optimized baseline release test APK
+        required: true
+        default: '37937504255'
+      after_run:
+        description: Build run containing the current release test APK and loading fixtures
+        required: true
+      render_workload:
+        description: Include the original 1280x720 stretch and affine zoom workload
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  compare:
+    name: Compare loading on one Android 16 emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Record successful APK build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BEFORE_RUN: ${{ inputs.before_run }}
+          AFTER_RUN: ${{ inputs.after_run }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          output = pathlib.Path('test-results/loading')
+          output.mkdir(parents=True, exist_ok=True)
+          for label in ('before', 'after'):
+              run = os.environ[label.upper() + '_RUN']
+              assert run.isdecimal(), 'Run identifiers must be numeric'
+              result = json.loads(subprocess.check_output(['gh', 'run', 'view', run,
+                  '--json', 'headSha,url,status,jobs'], text=True))
+              assert any(job['name'] == 'Build and verify Android APKs' and job['conclusion'] == 'success'
+                         for job in result['jobs']), 'The selected APK build must have succeeded'
+              result['run_id'] = run
+              (output / (label + '-build.json')).write_text(json.dumps(result, indent=2) + '\n')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: krkr2yuri-release-test-apk
+          path: benchmark-apk/before
+          run-id: ${{ inputs.before_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: krkr2yuri-release-test-apk
+          path: benchmark-apk/after
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: krkr2yuri-release-android-tests
+          path: benchmark-apk/fixtures
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          BEFORE_RUN: ${{ inputs.before_run }}
+          AFTER_RUN: ${{ inputs.after_run }}
+          INCLUDE_RENDER_WORKLOAD: ${{ inputs.render_workload }}
+        with:
+          emulator-build: 15917651
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 -B tests/android/benchmark_loading.py --before-dir benchmark-apk/before --after-dir benchmark-apk/after --fixtures-dir benchmark-apk/fixtures --output test-results/loading
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-loading-comparison
+          path: test-results/loading
+          retention-days: 14

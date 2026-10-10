@@ -618,14 +618,28 @@ tTVPArchive * tTVPXP3Archive::Create(const ttstr & name, tTJSBinaryStream *st, b
 bool tTVPXP3Archive::FindHashedStorage(const ttstr &name, tjs_uint &index)
 {
 	if(!HxEnabled || name.IsEmpty()) return false;
+	// Storage callers already normalize names. Check before making another
+	// mutable copy; noncanonical callers still use the normalization below.
+	if(const tjs_int *cached = HxLookupCache.FindAndTouch(name))
+	{
+		if(*cached < 0) return false;
+		index = static_cast<tjs_uint>(*cached);
+		return true;
+	}
 	ttstr normalized(name);
 	NormalizeInArchiveStorageName(normalized);
 	std::u16string text;
+	text.reserve(normalized.length());
 	for(const tjs_char *p = normalized.c_str(); *p; ++p) text.push_back(static_cast<char16_t>(*p));
 	if(!TVPHxv4::ValidName(text)) return false;
 	auto found = HxNames.find(TVPHxv4::HashName(text, HxMedia));
-	if(found == HxNames.end()) return false;
+	if(found == HxNames.end())
+	{
+		HxLookupCache.Add(normalized, -1);
+		return false;
+	}
 	index = found->second;
+	HxLookupCache.Add(normalized, static_cast<tjs_int>(index));
 	return true;
 }
 //---------------------------------------------------------------------------

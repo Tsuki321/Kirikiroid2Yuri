@@ -354,6 +354,7 @@ class TVPWindowLayer : public cocos2d::extension::ScrollView, public iWindowLaye
 	tjs_int ActualZoomDenom; // Zooming factor denominator (actual)
 	tjs_int ActualZoomNumer; // Zooming factor numerator (actual)
 	Sprite *DrawSprite = nullptr;
+	bool DrawBufferNeedsFullUpload = true;
 	Node *PrimaryLayerArea = nullptr;
 	int LayerWidth = 0, LayerHeight = 0;
 	//iTVPTexture2D *DrawTexture = nullptr;
@@ -411,6 +412,12 @@ public:
 
 	bool init() {
 		bool ret = inherit::init();
+		auto rendererReset = EventListenerCustom::create(EVENT_RENDERER_RECREATED, [this](EventCustom*) {
+			DrawBufferNeedsFullUpload = true;
+			if (TJSNativeInstance)
+				TJSNativeInstance->NotifyWindowExposureToLayer(tTVPRect(0, 0, LayerWidth, LayerHeight));
+		});
+		_eventDispatcher->addEventListenerWithSceneGraphPriority(rendererReset, this);
 		setClippingToBounds(false);
 		DrawSprite = Sprite::create();
 		DrawSprite->setAnchorPoint(Vec2(0, 1)); // top-left
@@ -892,7 +899,7 @@ public:
 		RecalcPaintBox();
 	}
 
-	virtual void UpdateDrawBuffer(iTVPTexture2D *tex) {
+	virtual void UpdateDrawBuffer(iTVPTexture2D *tex, const tTVPRect *dirty = nullptr) {
 		if (!tex) return;
 //		iTVPRenderManager *mgr = TVPGetRenderManager();
 // 		if (!mgr->IsSoftware()) {
@@ -911,7 +918,9 @@ public:
 // 			tex = DrawTexture;
 // 		}
 		Texture2D *tex2d = DrawSprite->getTexture();
-		Texture2D *newtex = tex->GetAdapterTexture(tex2d);
+		Texture2D *newtex = dirty && !DrawBufferNeedsFullUpload
+			? tex->GetAdapterTexture(tex2d, *dirty) : tex->GetAdapterTexture(tex2d);
+		DrawBufferNeedsFullUpload = false;
 		if (tex2d != newtex) {
 			DrawSprite->setTexture(newtex);
 			float sw, sh;

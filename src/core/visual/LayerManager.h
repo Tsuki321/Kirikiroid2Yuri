@@ -203,6 +203,9 @@ public:
 	//! @brief		(Window->DrawDevice) レイヤ構造をコンソールにダンプする
 	virtual void TJS_INTF_METHOD DumpLayerStructure() = 0;
     virtual iTVPBaseBitmap *GetDrawBuffer() = 0;
+    // Unknown update regions retain the full-upload fallback.
+    virtual bool GetDrawBufferUpdateRect(tTVPRect &rect) const { return false; }
+    virtual void DrawBufferPresented() {}
 };
 //---------------------------------------------------------------------------
 /*]*/
@@ -245,6 +248,13 @@ class tTVPLayerManager : public iTVPLayerManager, public tTVPDrawable
 	void * DrawDeviceData; //!< draw device specific information
 
 	tTVPBaseTexture * DrawBuffer;
+	tTVPRect DrawBufferUpdateRect{0, 0, 0, 0};
+	bool DrawBufferNeedsFullUpload = true;
+	void MarkDrawBufferUpdated(const tTVPRect &rect) {
+		if (rect.is_empty()) return;
+		if (DrawBufferUpdateRect.is_empty()) DrawBufferUpdateRect = rect;
+		else TVPUnionRect(&DrawBufferUpdateRect, DrawBufferUpdateRect, rect);
+	}
 	tTVPLayerType DesiredLayerType; //!< desired layer type by the draw device for this layer manager
 
 	tTJSNI_BaseLayer * CaptureOwner;
@@ -305,6 +315,14 @@ public: // methods from tTVPDrawable
 		tTVPBaseTexture *bmp, const tTVPRect &cliprect,
 		tTVPLayerType type, tjs_int opacity) override;
 	virtual tTVPBaseTexture *GetDrawBuffer() { return DrawBuffer; }
+	virtual bool GetDrawBufferUpdateRect(tTVPRect &rect) const override {
+		rect = DrawBufferUpdateRect;
+		return !DrawBufferNeedsFullUpload;
+	}
+	virtual void DrawBufferPresented() override {
+		DrawBufferUpdateRect.clear();
+		DrawBufferNeedsFullUpload = false;
+	}
 	tTVPBaseTexture* GetOrCreateDrawBuffer();
 
 public:

@@ -549,9 +549,14 @@ void TJS_INTF_METHOD tTVPBasicDrawDevice::Show()
 	if (Window) {
 		iWindowLayer *form = Window->GetForm();
 		if (form && !Managers.empty()) {
-			iTVPBaseBitmap *buf = Managers.back()->GetDrawBuffer();
-			if (buf);
-				form->UpdateDrawBuffer(buf->GetTexture());
+			iTVPLayerManager *manager = Managers.back();
+			iTVPBaseBitmap *buf = manager->GetDrawBuffer();
+			if (buf) {
+				tTVPRect dirty;
+				const bool hasRegion = manager->GetDrawBufferUpdateRect(dirty);
+				form->UpdateDrawBuffer(buf->GetTexture(), hasRegion ? &dirty : nullptr);
+				manager->DrawBufferPresented();
+			}
 		}
 	}
 #if 0

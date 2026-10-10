@@ -43,7 +43,7 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
   | tr -d '\r' > test-results/android/cases.txt
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -eq 24
+test "$expected" -eq 26
 if [ "$profile" = release ]; then
   # Exercise both storage paths, cold bytecode startup and archive loading.
   # These fixtures also cover preferences, plugins, PSB, datapack and KAG.
@@ -73,6 +73,14 @@ while IFS=$'\t' read -r -u 3 name storage output; do
     adb exec-out screencap -p > "test-results/android/$name.png"
     adb logcat -d > "test-results/android/$name-logcat.txt"
     echo "Dialog driver failed: $name" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+  if [[ "$name" == presentation-* ]] && ! python3 tests/android/presentation.py "$name" "$output" > "test-results/android/$name-display-driver.txt" 2>&1; then
+    cat "test-results/android/$name-display-driver.txt"
+    adb exec-out screencap -p > "test-results/android/$name.png"
+    adb logcat -d > "test-results/android/$name-logcat.txt"
+    echo "Display driver failed: $name" >&2
     failures=$((failures + 1))
     continue
   fi
@@ -114,7 +122,7 @@ while IFS=$'\t' read -r -u 3 name storage output; do
         passed=false
       fi
     fi
-    if [[ "$name" == transitions* || "$name" == movie* ]]; then
+    if [[ "$name" == transitions* || "$name" == movie* || "$name" == presentation-* ]]; then
       renderer=software
       if [[ "$name" == *opengl* ]]; then renderer=opengl; fi
       if ! grep -q "Render manager selected: $renderer" "test-results/android/$name-logcat.txt"; then

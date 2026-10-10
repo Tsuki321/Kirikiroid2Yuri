@@ -87,6 +87,7 @@ void tTVPLayerManager::SetHoldAlpha(bool b)
 tTVPBaseTexture * tTVPLayerManager::GetDrawTargetBitmap(const tTVPRect &rect,
 	tTVPRect &cliprect)
 {
+	MarkDrawBufferUpdated(rect);
 	// retrieve draw target bitmap
 	tjs_int w = rect.get_width();
 	tjs_int h = rect.get_height();
@@ -98,6 +99,7 @@ tTVPBaseTexture * tTVPLayerManager::GetDrawTargetBitmap(const tTVPRect &rect,
             w = rc.get_width();
             h = rc.get_height();
 		}
+        DrawBufferNeedsFullUpload = true;
         DrawBuffer = new tTVPDestTexture(w, h);
 		DrawBuffer->Fill(tTVPRect(0, 0, w, h), 0xFF000000);
 		static_cast<tTVPDestTexture*>(DrawBuffer)->SetHoldAlpha(HoldAlpha);
@@ -108,6 +110,7 @@ tTVPBaseTexture * tTVPLayerManager::GetDrawTargetBitmap(const tTVPRect &rect,
 			// insufficient size; resize the draw buffer
 			tjs_uint neww = bw > w ? bw:w, newh = bh > h ? bh : h;
 			neww += (neww & 1); // align to even
+			DrawBufferNeedsFullUpload = true;
 			DrawBuffer->SetSize(neww, newh, false);
 			DrawBuffer->Fill(tTVPRect(0, 0, neww, newh), 0xFF000000);
 		}
@@ -126,6 +129,7 @@ void tTVPLayerManager::DrawCompleted(const tTVPRect &destrect,
 	tTVPBaseTexture *bmp, const tTVPRect &cliprect,
 		tTVPLayerType type, tjs_int opacity)
 {
+	MarkDrawBufferUpdated(destrect);
 #if 0
 	if (!LayerTreeOwner) return;
 	LayerTreeOwner->NotifyBitmapCompleted(this, destrect.left, destrect.top, bmp, cliprect, type, opacity);
@@ -135,6 +139,7 @@ void tTVPLayerManager::DrawCompleted(const tTVPRect &destrect,
     //Window->GetDrawDevice()->GetSrcSize(w, h);
     if (!DrawBuffer) {
         // create draw buffer
+		DrawBufferNeedsFullUpload = true;
 		DrawBuffer = new tTVPDestTexture(w, h);
 		DrawBuffer->Fill(tTVPRect(0, 0, w, h), 0xFF000000);
 		static_cast<tTVPDestTexture*>(DrawBuffer)->SetHoldAlpha(HoldAlpha);
@@ -145,6 +150,7 @@ void tTVPLayerManager::DrawCompleted(const tTVPRect &destrect,
             // insufficient size; resize the draw buffer
             tjs_uint neww = bw > w ? bw : w, newh = bh > h ? bh : h;
             neww += (neww & 1); // align to even
+            DrawBufferNeedsFullUpload = true;
             DrawBuffer->SetSize(neww, newh, false);
 			DrawBuffer->Fill(tTVPRect(0, 0, neww, newh), 0xFF000000);
 		}
@@ -156,9 +162,12 @@ void tTVPLayerManager::DrawCompleted(const tTVPRect &destrect,
 
 tTVPBaseTexture* tTVPLayerManager::GetOrCreateDrawBuffer()
 {
+	// This accessor exposes the whole writable bitmap without a region.
+	DrawBufferNeedsFullUpload = true;
 	if (!DrawBuffer) {
 		tjs_int w, h;
 		if (!GetPrimaryLayerSize(w, h)) return nullptr;
+		DrawBufferNeedsFullUpload = true;
 		DrawBuffer = new tTVPDestTexture(w, h);
 		DrawBuffer->Fill(tTVPRect(0, 0, w, h), 0xFF000000);
 		static_cast<tTVPDestTexture*>(DrawBuffer)->SetHoldAlpha(HoldAlpha);
@@ -169,6 +178,7 @@ tTVPBaseTexture* tTVPLayerManager::GetOrCreateDrawBuffer()
 //---------------------------------------------------------------------------
 void tTVPLayerManager::AttachPrimary(tTJSNI_BaseLayer *pri)
 {
+	DrawBufferNeedsFullUpload = true;
 	// attach primary layer to the manager
 	DetachPrimary();
 
@@ -1111,6 +1121,8 @@ void TJS_INTF_METHOD tTVPLayerManager::UpdateToDrawDevice()
 //---------------------------------------------------------------------------
 void tTVPLayerManager::NotifyUpdateRegionFixed()
 {
+	if (UpdateRegion.GetCount())
+		MarkDrawBufferUpdated(UpdateRegion.GetBound());
 	// called by primary layer, notifying final update region is fixed
 //	Window->NotifyUpdateRegionFixed(UpdateRegion);
 }

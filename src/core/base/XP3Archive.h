@@ -140,6 +140,9 @@ public:
 	const TVPHxv4::Filter &GetHxFilter(tjs_uint idx) const { return ItemVector[idx].HxFilter; }
 
 private:
+	// The name index is immutable for this archive's lifetime. Cache both
+	// resolved names and misses without retaining an unbounded list of probes.
+	tTJSHashCache<ttstr, tjs_int> HxLookupCache{128};
 	static bool FindChunk(const tjs_uint8 *data, const tjs_uint8 * name,
 		tjs_uint &start, tjs_uint &size);
 	static tjs_int16 ReadI16FromMem(const tjs_uint8 *mem);
