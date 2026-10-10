@@ -43,7 +43,7 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
   | tr -d '\r' > test-results/android/cases.txt
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
-test "$expected" -eq 22
+test "$expected" -eq 24
 if [ "$profile" = release ]; then
   # Exercise both storage paths, cold bytecode startup and archive loading.
   # These fixtures also cover preferences, plugins, PSB, datapack and KAG.
@@ -114,7 +114,7 @@ while IFS=$'\t' read -r -u 3 name storage output; do
         passed=false
       fi
     fi
-    if [[ "$name" == transitions* ]]; then
+    if [[ "$name" == transitions* || "$name" == movie* ]]; then
       renderer=software
       if [[ "$name" == *opengl* ]]; then renderer=opengl; fi
       if ! grep -q "Render manager selected: $renderer" "test-results/android/$name-logcat.txt"; then

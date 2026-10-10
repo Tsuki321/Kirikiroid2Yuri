@@ -55,6 +55,6 @@
 
 GitHub Actions builds both Android APK variants and host tests. Host tests run with GCC and Clang under address/undefined-behavior sanitizers. Android instrumentation checks real persisted document grants; separate native TJS fixtures exercise local files and document trees after process restart.
 
-Debug and optimized/minified release APKs are checked on API30 and API35 (16 KB) emulators. ELF segments and APK packing are checked for 16 KB alignment. Release publication depends on the host tests and entire emulator matrix.
+Debug and optimized/minified release APKs are checked on API36 emulators with 4 KB and 16 KB pages. An API35 (16 KB) debug run also checks compatibility with the earlier movie validation environment. ELF segments and APK packing are checked for 16 KB alignment. Release publication depends on the host tests and entire emulator matrix.
 
 See [VALIDATION.md](VALIDATION.md) for coverage, artifacts, signing, dependency reproducibility and known gaps.

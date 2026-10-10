@@ -114,7 +114,7 @@ public:
                 samples[index] = static_cast<float>(input + delayed * wet_);
                 delayed = static_cast<float>((input + delayed) * feedback_);
             }
-            position_ = (position_ + 1) % delayFrames_;
+            if (++position_ == delayFrames_) position_ = 0;
         }
     }
 };
@@ -196,13 +196,13 @@ class FreeVerbDSP {
             const float output = data[position];
             lowpass = output * (1.0f - damping) + lowpass * damping;
             data[position] = input + lowpass * feedback;
-            position = (position + 1) % data.size();
+            if (++position == data.size()) position = 0;
             return output;
         }
         float Allpass(float input) {
             const float delayed = data[position];
             data[position] = input + 0.5f * delayed;
-            position = (position + 1) % data.size();
+            if (++position == data.size()) position = 0;
             return delayed - input;
         }
     };

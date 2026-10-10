@@ -124,6 +124,7 @@ bool CVideoPlayerVideo::OpenStream(CDVDStreamInfo &hint)
 
 void CVideoPlayerVideo::OpenStream(CDVDStreamInfo &hint, CDVDVideoCodec* codec)
 {
+	m_eof = false;
 //	CLog::Log(LOGDEBUG, "CVideoPlayerVideo::OpenStream - open stream with codec id: %i", hint.codec);
 
 	//reported fps is usually not completely correct
@@ -252,7 +253,7 @@ void CVideoPlayerVideo::Process()
 		} else if (ret == MSGQ_TIMEOUT)
 		{
 			// if we only wanted priority messages, this isn't a stall
-			if (iPriority)
+			if (iPriority || m_eof)
 				continue;
 
 			// check if decoder has produced some output
@@ -301,6 +302,7 @@ void CVideoPlayerVideo::Process()
 			m_fForcedAspectRatio = *((CDVDMsgDouble*)pMsg);
 		} else if (pMsg->IsType(CDVDMsg::GENERAL_RESET))
 		{
+			m_eof = false;
 			if (m_pVideoCodec)
 				m_pVideoCodec->Reset();
 			m_picture.iFlags &= ~DVP_FLAG_ALLOCATED;
@@ -310,6 +312,7 @@ void CVideoPlayerVideo::Process()
 			m_rewindStalled = false;
 		} else if (pMsg->IsType(CDVDMsg::GENERAL_FLUSH)) // private message sent by (CVideoPlayerVideo::Flush())
 		{
+			m_eof = false;
 			bool sync = static_cast<CDVDMsgBool*>(pMsg)->m_value;
 			if (m_pVideoCodec)
 				m_pVideoCodec->Reset();
@@ -356,7 +359,7 @@ void CVideoPlayerVideo::Process()
 			OpenStream(msg->m_hints, msg->m_codec);
 			msg->m_codec = NULL;
 			m_picture.iFlags &= ~DVP_FLAG_ALLOCATED;
-		} else if (pMsg->IsType(CDVDMsg::VIDEO_DRAIN))
+		} else if (pMsg->IsType(CDVDMsg::VIDEO_DRAIN) || pMsg->IsType(CDVDMsg::GENERAL_EOF))
 		{
 			while (!m_bStop && m_pVideoCodec)
 			{
@@ -371,12 +374,15 @@ void CVideoPlayerVideo::Process()
 				if (decoderState & VC_BUFFER)
 					break;
 			}
+			if (pMsg->IsType(CDVDMsg::GENERAL_EOF))
+				m_eof = true;
 		} else if (pMsg->IsType(CDVDMsg::GENERAL_PAUSE))
 		{
 			m_paused = static_cast<CDVDMsgBool*>(pMsg)->m_value;
 		//	CLog::Log(LOGDEBUG, "CVideoPlayerVideo - CDVDMsg::GENERAL_PAUSE: %d", m_paused);
 		} else if (pMsg->IsType(CDVDMsg::DEMUXER_PACKET))
 		{
+			m_eof = false;
 			DemuxPacket* pPacket = ((CDVDMsgDemuxerPacket*)pMsg)->GetPacket();
 			bool bPacketDrop = ((CDVDMsgDemuxerPacket*)pMsg)->GetPacketDrop();
 

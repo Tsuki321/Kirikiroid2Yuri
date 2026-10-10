@@ -50,6 +50,7 @@ public:
 	void Flush(bool sync);
 	bool AcceptsData();
 	bool HasData() const { return m_messageQueue.GetDataSize() > 0; }
+	bool IsEOS() override { return m_eof; }
 	int  GetLevel() { return m_messageQueue.GetLevel(); }
 	bool IsInited() const { return m_messageQueue.IsInited(); }
 	void SendMessage(CDVDMsg* pMsg, int priority = 0) { m_messageQueue.Put(pMsg, priority); }
@@ -109,6 +110,7 @@ protected:
 	float m_fForcedAspectRatio;
 	int m_speed;
 	std::atomic_bool m_stalled;
+	std::atomic_bool m_eof{false};
 	std::atomic_bool m_rewindStalled;
 	bool m_paused;
 	IDVDStreamPlayer::ESyncState m_syncState;

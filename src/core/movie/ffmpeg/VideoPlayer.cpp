@@ -15,6 +15,7 @@
 #include "platform/CCPlatformConfig.h"
 #include "AEStream.h"
 #include "WaveMixer.h"
+#include "SDL_log.h"
 
 #ifdef HAS_OMXPLAYER
 #include "../omxplayer/OMXPlayerAudio.h"
@@ -231,6 +232,7 @@ BasePlayer::~BasePlayer() {
 
 void BasePlayer::Play()
 {
+	SDL_Log("Movie: play requested");
 	m_bStopStatus = false;
 
 	if (!m_ThreadId)
@@ -313,6 +315,7 @@ void BasePlayer::UpdateRenderInfo(CRenderInfo &info)
 
 bool BasePlayer::OpenFromStream(IStream *stream, const tjs_char * streamname, const tjs_char *type, uint64_t size)
 {
+	SDL_Log("Movie: opening stream");
 	if (IsRunning())
 		CloseInputStream();
 
@@ -381,6 +384,10 @@ bool BasePlayer::OpenFromStream(IStream *stream, const tjs_char * streamname, co
 
 	// ready to play
 	m_renderManager.Configure();
+	SDL_Log("Movie: opened video=%d (%s) audio=%d (%s) fps=%.3f duration=%dms",
+		m_CurrentVideo.id, m_pDemuxer->GetStreamCodecName(m_CurrentVideo.demuxerId, m_CurrentVideo.id).c_str(),
+		m_CurrentAudio.id, m_pDemuxer->GetStreamCodecName(m_CurrentAudio.demuxerId, m_CurrentAudio.id).c_str(),
+		GetFPS(), m_pDemuxer->GetStreamLength());
 	return true;
 }
 
@@ -711,7 +718,9 @@ void BasePlayer::Process()
 
 			// while players are still playing, keep going to allow seekbacks
 			if (m_VideoPlayerAudio->HasData()
-				|| m_VideoPlayerVideo->HasData())
+				|| m_VideoPlayerVideo->HasData()
+				|| (m_CurrentVideo.id >= 0 && !m_VideoPlayerVideo->IsEOS())
+				|| m_pRenderer->HasPendingPictures())
 			{
 				Sleep(100);
 				continue;
@@ -724,6 +733,7 @@ void BasePlayer::Process()
 			}
 #endif
 			
+			SDL_Log("Movie: playback reached end of stream");
 			// TODO process loop info
 			SetSpeed(0);
 			SeekTime(0); // rewind
@@ -2101,6 +2111,9 @@ void BasePlayer::HandlePlaySpeed()
 			}
 #endif
 			m_clock.Discontinuity(clock);
+			SDL_Log("Movie: synchronized playback clock=%.3f video=%.3f audio=%.3f",
+				clock / DVD_TIME_BASE, m_CurrentVideo.starttime / DVD_TIME_BASE,
+				m_CurrentAudio.starttime / DVD_TIME_BASE);
 			m_CurrentAudio.syncState = IDVDStreamPlayer::SYNC_INSYNC;
 			m_CurrentAudio.avsync = CCurrentStream::AV_SYNC_NONE;
 			m_CurrentVideo.syncState = IDVDStreamPlayer::SYNC_INSYNC;

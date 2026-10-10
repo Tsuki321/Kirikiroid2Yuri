@@ -115,6 +115,7 @@ public:
 	virtual int AddVideoPicture(DVDVideoPicture &pic, int index) override;
 	virtual int WaitForBuffer(volatile std::atomic_bool&bStop, int timeout = 0) override;
 	virtual void Flush() override;
+	virtual bool HasPendingPictures() override;
 
 	bool IsPlaying() const { return m_pPlayer->IsPlaying(); }
 	void FrameMove();
@@ -138,7 +139,7 @@ protected:
 		};
 		int width = 0; // pitch = width * 4
 		int height = 0;
-		double pts;
+		double pts = 0;
 		BitmapPicture() {
 			fmt = RENDER_FMT_NONE;
 			for (int i = 0; i < sizeof(data) / sizeof(data[0]); ++i)
@@ -149,11 +150,15 @@ protected:
 		void Clear();
 	};
 	BitmapPicture m_picture[MAX_BUFFER_COUNT];
+	// Presentation returns its previous allocation to the ring for reuse.
+	BitmapPicture m_presentPicture;
+	bool TakeDuePicture();
 	int m_curPicture = 0, m_usedPicture = 0;
 	std::mutex m_mtxPicture;
 	std::condition_variable m_condPicture;
 	struct SwsContext *img_convert_ctx = nullptr;
-	double m_curpts = 0;
+	bool m_loggedFirstPicture = false;
+	bool m_loggedFirstPresentation = false;
 };
 
 class VideoPresentOverlay : public TVPMoviePlayer // cocos2d compatible video display overlay

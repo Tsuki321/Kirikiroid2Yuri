@@ -144,6 +144,73 @@ TEST(WaveEffects, DelayTracksSampleRate) {
     EXPECT_FLOAT_EQ(0.25, values[40]);
 }
 
+TEST(WaveEffects, DelayWrapsMatchAnUnboundedHistoryAcrossIrregularBlocks) {
+    // The reference retains the entire history: it has no circular index and
+    // checks wrapping independently of the production delay line.
+    for (unsigned channels : {1u, 2u}) for (unsigned rate : {1000u, 44100u, 384000u}) {
+        for (std::size_t length : {1u, 2u, 3u, 31u, 1009u}) {
+            SCOPED_TRACE(std::to_string(rate) + "/" + std::to_string(channels) + "/" + std::to_string(length));
+            const std::size_t frames = length * 5 + 17;
+            std::vector<float> input(frames * channels), expected(input.size()), history(input.size());
+            for (std::size_t i = 0; i < input.size(); ++i)
+                input[i] = float(int((i * 73 + 19) % 257) - 128) / 256.0f;
+            for (std::size_t frame = 0; frame < frames; ++frame) for (unsigned channel = 0; channel < channels; ++channel) {
+                const std::size_t at = frame * channels + channel;
+                const float delayed = frame < length ? 0 : history[at - length * channels];
+                expected[at] = static_cast<float>(input[at] + delayed * 0.7);
+                history[at] = static_cast<float>((input[at] + delayed) * -0.625);
+            }
+            DelayDSP delay;
+            // Keep rounding away from the integer boundary when converting
+            // this intended frame length to milliseconds and back.
+            delay.Configure((length + 0.125) * 1000.0 / rate, -0.625, 0.7, 1000);
+            delay.Prepare(rate, channels);
+            const auto original = input;
+            for (unsigned repeat = 0; repeat < 2; ++repeat) {
+                input = original;
+                for (std::size_t at = 0; at < frames;) {
+                    const std::size_t count = std::min(frames - at, 1 + (at * 17 + 7) % 53);
+                    delay.Process(input.data() + at * channels, 0, channels);
+                    delay.Process(input.data() + at * channels, count, channels);
+                    at += count;
+                }
+                EXPECT_EQ(expected, input);
+                delay.Reset();
+            }
+        }
+    }
+}
+
+TEST(WaveEffects, FreeVerbDelayLinesPreserveExactHistoryAcrossChunksAndReset) {
+    for (unsigned channels : {1u, 2u}) for (unsigned rate : {1000u, 11025u, 44100u, 48000u, 384000u}) {
+        SCOPED_TRACE(std::to_string(rate) + "/" + std::to_string(channels));
+        const std::size_t frames = rate / 3 + 127;
+        std::vector<float> original(frames * channels);
+        for (std::size_t i = 0; i < original.size(); ++i)
+            original[i] = float(int((i * 131 + 71) % 509) - 254) / 512.0f;
+        FreeVerbDSP whole, divided;
+        for (auto *verb : {&whole, &divided}) {
+            verb->SetRoom(0.83); verb->SetDamping(0.29);
+            verb->SetMix(0.71); verb->SetWidth(0.37);
+            verb->Prepare(rate, channels);
+        }
+        auto expected = original;
+        whole.Process(expected.data(), frames, channels);
+        EXPECT_NE(expected, original);
+        for (unsigned repeat = 0; repeat < 2; ++repeat) {
+            auto actual = original;
+            for (std::size_t at = 0; at < frames;) {
+                const std::size_t count = std::min(frames - at, 1 + (at * 37 + 13) % 521);
+                divided.Process(actual.data() + at * channels, 0, channels);
+                divided.Process(actual.data() + at * channels, count, channels);
+                at += count;
+            }
+            EXPECT_EQ(expected, actual);
+            divided.Reset();
+        }
+    }
+}
+
 TEST(WaveEffects, EqualizerNeutralBandsAreBitExact) {
     EqualizerDSP eq;
     eq.Prepare(22050, 1);

@@ -5,63 +5,171 @@ function ciErrorText(error) {
 var ciMessages = ["ENGINE_CI_STARTED"];
 var ciStorage = "@@STORAGE@@/";
 var ciOutput = "@@OUTPUT@@/";
+var ciWindow = void, ciTimer = void, ciMovie = void, ciAudio = void;
+var ciPrimary = void, ciLayer1 = void, ciLayer2 = void, ciCapture = void;
+var ciFinished = false, ciTicks = 0, ciPhase = "overlay-start", ciPhaseTick = 0;
+var ciClip = -1, ciFrames = 0, ciSeen = [], ciLastColor = -1, ciFurthestFrame = -1;
+var ciPausedPosition = 0, ciPausedFrames = 0, ciPausedPixel = 0, ciSeekFrames = 0;
+// Reopen the MP4 to exercise the cached player, then seek inside its XP3 copy.
+// Every clip is red (0-1s), green (1-2s), blue (2-3s).
+var ciClips = ["test.avi", "test-av.avi", "test-delayed.mp4", "test-delayed.mp4",
+    "movie-assets.xp3>test-delayed.mp4"];
 ciMessages.save(ciOutput + "started.txt");
-var ciWindow = void;
-var ciTimer = void;
-var ciMovie = void;
-var ciAudio = void;
-var ciTicks = 0;
-var ciPhase = 0;
+
 function ciCheck(value, message) {
     if (!value) throw "CI assertion: " + message;
     ciMessages.add("PASS " + message);
     ciMessages.save(ciOutput + "progress.txt");
 }
 function ciFinish(error) {
+    if (ciFinished) return;
+    ciFinished = true;
     if (ciTimer !== void) ciTimer.enabled = false;
     try { ciMovie.close(); } catch (ignored) {}
     try { ciAudio.stop(); } catch (ignored) {}
-    ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + error);
+    ciMessages.add(error === void ? "ENGINE_CI_PASS" : "ENGINE_CI_FAIL " + ciErrorText(error));
     ciMessages.save(ciOutput + "result.txt");
+}
+function ciNextPhase(phase) { ciPhase = phase; ciPhaseTick = ciTicks; }
+function ciColor(pixel) {
+    var red = (pixel >> 16) & 255, green = (pixel >> 8) & 255, blue = pixel & 255;
+    if (red > 200 && green < 40 && blue < 40) return 0;
+    if (green > 200 && red < 40 && blue < 40) return 1;
+    if (blue > 200 && red < 40 && green < 40) return 2;
+    return -1;
+}
+function ciObserveFrame(frame) {
+    if (ciFinished || ciClip < 0) return;
+    try {
+        ++ciFrames;
+        ciFurthestFrame = Math.max(ciFurthestFrame, frame);
+        ciLastColor = ciColor(ciLayer1.getMainPixel(32, 32));
+        if (ciLastColor < 0) throw "Decoded movie pixel is not a fixture color: " + ciLayer1.getMainPixel(32, 32);
+        if (ciColor(ciLayer2.getMainPixel(32, 32)) != ciLastColor)
+            throw "Second movie layer does not receive the same decoded image";
+        if (!ciSeen[ciLastColor]) {
+            // Read the composed native scene too: clock/callback progress alone
+            // must not pass while the movie remains black or its image is stale.
+            ciCapture.piledCopy(0, 0, ciPrimary, 16, 16, 160, 64);
+            ciCheck(ciColor(ciCapture.getMainPixel(32, 32)) == ciLastColor &&
+                    ciColor(ciCapture.getMainPixel(128, 32)) == ciLastColor,
+                ciClips[ciClip] + " decoded color " + ciLastColor + " appears in both composed layers");
+            ciSeen[ciLastColor] = true;
+        }
+    } catch (error) { ciFinish(error); }
+}
+function ciOpenLayerMovie() {
+    ciMovie.close();
+    ++ciClip;
+    if (ciClip == ciClips.count) { ciFinish(); return; }
+    ciFrames = 0; ciSeen = [false, false, false]; ciLastColor = -1; ciFurthestFrame = -1;
+    ciLayer1.fillRect(0, 0, 64, 64, 0xff000000);
+    ciLayer2.fillRect(0, 0, 64, 64, 0xff000000);
+    ciMovie.open(ciStorage + ciClips[ciClip]);
+    ciCheck(ciMovie.numberOfAudioStream == (ciClip == 0 ? 0 : 1),
+        ciClips[ciClip] + " exposes the expected audio stream count");
+    ciCheck(ciMovie.numberOfFrame >= 29 && ciMovie.totalTime >= 2900,
+        ciClips[ciClip] + " opens a full three-second movie");
+    ciMovie.audioVolume = 25000;
+    ciMovie.playRate = 1.0;
+    ciMovie.play();
+    ciNextPhase(ciClip == 0 || ciClip == 4 ? "layer-start" : "layer-end");
+}
+function ciStartLayers() {
+    ciMovie.close();
+    ciAudio.stop();
+    ciPrimary = new Layer(ciWindow, null);
+    ciPrimary.setSize(320, 240); ciPrimary.setImageSize(320, 240);
+    ciPrimary.fillRect(0, 0, 320, 240, 0xff101010);
+    ciPrimary.visible = true;
+    ciLayer1 = new Layer(ciWindow, ciPrimary);
+    ciLayer2 = new Layer(ciWindow, ciPrimary);
+    var layers = [ciLayer1, ciLayer2];
+    for (var i = 0; i < layers.count; ++i) {
+        layers[i].setSize(64, 64); layers[i].setImageSize(64, 64);
+        layers[i].setPos(16 + i * 96, 16);
+        layers[i].type = ltOpaque; layers[i].visible = true;
+    }
+    ciCapture = new Layer(ciWindow, ciPrimary);
+    ciCapture.setSize(160, 64); ciCapture.setImageSize(160, 64);
+    ciCapture.visible = false;
+    ciMovie.mode = vomLayer;
+    ciMovie.layer1 = ciLayer1; ciMovie.layer2 = ciLayer2;
+    ciMovie.onFrameUpdate = ciObserveFrame;
+    ciOpenLayerMovie();
+}
+function ciStep() {
+    if (ciFinished) return;
+    try {
+        ++ciTicks;
+        if (ciTicks - ciPhaseTick > 80)
+            throw "Movie stalled: clip=" + ciClip + " phase=" + ciPhase +
+                " status=" + ciMovie.status + " position=" + ciMovie.position +
+                " frames=" + ciFrames + " color=" + ciLastColor;
+        if (ciPhase == "overlay-start" && ciMovie.position > 0 && ciMovie.status == "play") {
+            ciMovie.pause();
+            ciCheck(ciMovie.status == "pause", "overlay movie pause");
+            ciNextPhase("overlay-pause");
+        } else if (ciPhase == "overlay-pause") {
+            ciCheck(ciMovie.playRate == 1.5, "overlay pause preserves playback rate");
+            ciMovie.play(); ciNextPhase("overlay-stop");
+        } else if (ciPhase == "overlay-stop" && ciMovie.status == "stop") {
+            ciCheck(ciTicks < 30, "overlay movie stops at requested frame");
+            ciStartLayers();
+        } else if (ciPhase == "layer-start" && ciSeen[0] && ciFrames >= 2 && ciMovie.position >= 200) {
+            ciMovie.pause();
+            ciPausedPosition = ciMovie.position; ciPausedFrames = ciFrames;
+            ciPausedPixel = ciLayer1.getMainPixel(32, 32);
+            ciCheck(ciMovie.status == "pause", ciClips[ciClip] + " pauses after decoded frames");
+            ciNextPhase("layer-pausing");
+        } else if (ciPhase == "layer-pausing" && ciTicks - ciPhaseTick >= 2) {
+            // SetSpeed is queued to the demux worker. Allow it to consume that
+            // message before measuring clock drift; layer callbacks stop at once.
+            ciPausedPosition = ciMovie.position;
+            ciNextPhase("layer-pause");
+        } else if (ciPhase == "layer-pause" && ciTicks - ciPhaseTick >= 4) {
+            ciCheck(Math.abs(ciMovie.position - ciPausedPosition) < 50 && ciFrames == ciPausedFrames &&
+                    ciLayer1.getMainPixel(32, 32) == ciPausedPixel,
+                ciClips[ciClip] + " pause freezes clock, callbacks and decoded image");
+            ciMovie.play(); ciNextPhase("layer-resume");
+        } else if (ciPhase == "layer-resume" && ciFrames > ciPausedFrames && ciMovie.position > ciPausedPosition + 100) {
+            ciCheck(ciMovie.status == "play", ciClips[ciClip] + " resumes decoded frame progress");
+            ciSeekFrames = ciFrames; ciMovie.position = 1500;
+            ciNextPhase("seek-forward");
+        } else if (ciPhase == "seek-forward" && ciFrames > ciSeekFrames && ciLastColor == 1 && ciMovie.position >= 1000) {
+            ciCheck(true, ciClips[ciClip] + " forward seek presents green decoded frames");
+            ciSeekFrames = ciFrames; ciMovie.position = 200;
+            ciNextPhase("seek-backward");
+        } else if (ciPhase == "seek-backward" && ciFrames > ciSeekFrames && ciLastColor == 0 && ciMovie.position < 1000) {
+            ciCheck(true, ciClips[ciClip] + " backward seek flushes later frames and presents red");
+            ciNextPhase("layer-end");
+        } else if (ciPhase == "layer-end" && ciMovie.status == "stop") {
+            ciCheck(ciSeen[0] && ciSeen[1] && ciSeen[2] && ciFrames >= 12,
+                ciClips[ciClip] + " advances through all colors and reuses the frame queue");
+            ciCheck(ciLastColor == 2, ciClips[ciClip] + " presents the final blue frames before EOF");
+            // The public stop operation rewinds the clock; retain the last
+            // frame event instead of inspecting position after EOF has stopped.
+            ciCheck(ciFurthestFrame >= 27, ciClips[ciClip] + " reaches EOF without early termination");
+            ciOpenLayerMovie();
+        }
+    } catch (error) { ciFinish(error); }
 }
 try {
     ciWindow = new Window();
-    ciWindow.setSize(320, 240);
-    ciWindow.visible = true;
-    ciTimer = new Timer(ciWindow);
+    ciWindow.setSize(320, 240); ciWindow.visible = true;
+    ciTimer = new Timer(ciWindow); ciTimer.enabled = false;
     ciMovie = new VideoOverlay(ciWindow);
     ciAudio = new WaveSoundBuffer(ciWindow);
     ciAudio.open(ciStorage + "tone.wav");
     ciCheck(ciAudio.totalTime >= 900, "PCM audio decode");
-    ciAudio.volume = 0;
-    ciAudio.play();
+    ciAudio.volume = 0; ciAudio.play();
     ciMovie.open(ciStorage + "test.avi");
     ciCheck(ciMovie.fps >= 9 && ciMovie.fps <= 11, "video frame rate");
-    ciCheck(ciMovie.numberOfFrame >= 19 && ciMovie.totalTime >= 1900, "video duration and frame count");
+    ciCheck(ciMovie.numberOfFrame >= 29 && ciMovie.totalTime >= 2900, "video duration and frame count");
     ciMovie.stopFrame = 12;
     ciCheck(ciMovie.stopFrame == 12, "stop frame setting");
     ciMovie.playRate = 1.5;
     ciCheck(ciMovie.playRate == 1.5, "playback rate");
-    ciMovie.visible = true;
-    ciMovie.play();
-    ciTimer.interval = 100;
-    ciTimer.onTimer = function() {
-        try {
-            ++ciTicks;
-            if (ciTicks > 100) throw "Movie did not reach its stop frame";
-            if (ciPhase == 0 && ciMovie.position > 0 && ciMovie.status == "play") {
-                ciMovie.pause();
-                ciCheck(ciMovie.status == "pause", "movie pause");
-                ciPhase = 1;
-            } else if (ciPhase == 1) {
-                ciCheck(ciMovie.playRate == 1.5, "pause preserves playback rate");
-                ciMovie.play();
-                ciPhase = 2;
-            } else if (ciPhase == 2 && ciMovie.status == "stop") {
-                ciCheck(ciTicks < 30, "movie stops at requested frame");
-                ciFinish();
-            }
-        } catch (error) { ciFinish(ciErrorText(error)); }
-    };
-    ciTimer.enabled = true;
-} catch (error) { ciFinish(ciErrorText(error)); }
+    ciMovie.visible = true; ciMovie.play();
+    ciTimer.interval = 100; ciTimer.onTimer = ciStep; ciTimer.enabled = true;
+} catch (error) { ciFinish(error); }

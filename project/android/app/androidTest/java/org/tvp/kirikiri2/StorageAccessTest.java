@@ -163,7 +163,7 @@ public class StorageAccessTest {
             + "<Custom key=\"ci-preference\" value=\"global fallback\"/>"
             + "<Custom key=\"debugwin\" value=\"no\"/></GlobalPreference>");
         StringBuilder manifest = new StringBuilder();
-        String[] names = {"local", "documents", "movie-local", "movie-documents", "archive-local", "archive-documents",
+        String[] names = {"local", "documents", "movie-local", "movie-documents", "movie-opengl-local", "movie-opengl-documents", "archive-local", "archive-documents",
                 "archive-launch-local", "archive-launch-documents",
                 "transitions", "transitions-documents", "transitions-opengl", "transitions-opengl-documents",
                 "audio-local", "audio-documents", "dialogs-local", "dialogs-documents",
@@ -195,10 +195,9 @@ public class StorageAccessTest {
                     "global.ciColdCompiledStartup = 1;\nScripts.execStorage('engine-body.tjs');\n");
             }
             if (name.startsWith("movie")) {
-                try (InputStream input = tests.getAssets().open("engine/test.avi"); ByteArrayOutputStream movie = new ByteArrayOutputStream()) {
-                    byte[] buffer = new byte[8192]; int size;
-                    while ((size = input.read(buffer)) != -1) movie.write(buffer, 0, size);
-                    assertTrue(StorageAccess.write(context, storage + "/test.avi", movie.toByteArray()));
+                for (String asset : new String[] {"test.avi", "test-av.avi", "test-delayed.mp4", "movie-assets.xp3"}) {
+                    assertTrue(StorageAccess.write(context, storage + "/" + asset,
+                            readBytes(tests.getAssets().open("engine/" + asset))));
                 }
             }
             try (InputStream input = tests.getAssets().open("engine/tone.wav"); ByteArrayOutputStream tone = new ByteArrayOutputStream()) {

@@ -55,6 +55,8 @@ jobs:
       CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Configure sanitizers
         # The Python inspection tests also assert that member payloads are never read.
         run: |
@@ -67,11 +69,15 @@ jobs:
         run: cmake --build build_test -j2
       - name: Run tests
         run: ctest --test-dir build_test --output-on-failure --output-junit results.xml
+      - name: Measure audio effect throughput against the previous implementation
+        run: python3 script/benchmark_wave_effects.py --compiler "$CXX" --output test-results/wave-benchmark.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: native-tests-${{ matrix.compiler }}
-          path: build_test/results.xml
+          path: |
+            build_test/results.xml
+            test-results/wave-benchmark.json
           retention-days: 7
 
   build_android:
@@ -209,13 +215,13 @@ jobs:
     needs: [build_android, verify_existing]
     if: always() && !cancelled() && (needs.build_android.result == 'success' || needs.verify_existing.result == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        variant: ${{ fromJSON(inputs.reuse_build_run != '' && '["debug"]' || '["debug", "release"]') }}
-        api: [36]
-        target: [google_apis, google_apis_ps16k]
+        # Exercise both Android 16 page sizes and build variants, plus the
+        # Android 15 image used to verify earlier movie playback.
+        include: ${{ fromJSON(inputs.reuse_build_run != '' && '[{"api":36,"variant":"debug","target":"google_apis"},{"api":36,"variant":"debug","target":"google_apis_ps16k"}]' || '[{"api":36,"variant":"debug","target":"google_apis"},{"api":36,"variant":"release","target":"google_apis"},{"api":36,"variant":"debug","target":"google_apis_ps16k"},{"api":36,"variant":"release","target":"google_apis_ps16k"},{"api":35,"variant":"debug","target":"google_apis_ps16k"}]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

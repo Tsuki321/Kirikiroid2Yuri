@@ -944,6 +944,8 @@ void tTVPXP3ArchiveStream::EnsureSegment()
 	{
 		if(!CurSegment->IsCompressed)
 			Stream->SetPosition(CurSegment->Start + SegmentPos);
+		// A same-segment seek is now resolved; following reads are sequential.
+		SegmentOpened = true;
 		return;
 	}
 

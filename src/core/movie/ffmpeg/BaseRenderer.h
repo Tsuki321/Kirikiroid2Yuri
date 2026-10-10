@@ -66,6 +66,7 @@ public:
   virtual void UnInit() {}
   virtual void Reset() {}
   virtual void Flush() {}
+  virtual bool HasPendingPictures() { return false; }
   virtual void SetBufferSize(int numBuffers) { }
   virtual void ReleaseBuffer(int idx) { }
   virtual bool NeedBuffer(int idx) { return false; }
