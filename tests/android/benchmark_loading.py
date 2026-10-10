@@ -52,7 +52,7 @@ def parse_metrics(data, required_metrics=REQUIRED_METRICS):
 
 
 def prepare_fixture(test_apk, payload, case, render_script=None, startup_script=None):
-    if not re.fullmatch(r"(?:before|after)-[1-3]", case):
+    if not re.fullmatch(r"(?:before|after)-(?:[1-3]|warmup)", case):
         raise ValueError("Unexpected benchmark case name")
     storage = f"{FILES}/loading-benchmark/{case}"
     output = storage + "-result"

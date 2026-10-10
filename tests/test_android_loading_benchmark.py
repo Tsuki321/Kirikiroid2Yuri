@@ -58,6 +58,19 @@ class LoadingBenchmark(unittest.TestCase):
             if extra:
                 archive.writestr(extra, b"unexpected path")
 
+    def test_warmup_fixture_names_remain_separate_from_measured_trials(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            apk = root / "test.apk"
+            self.apk(apk)
+            for variant in ("before", "after"):
+                payload = root / variant
+                payload.mkdir()
+                storage, output = benchmark.prepare_fixture(apk, payload, variant + "-warmup")
+                self.assertTrue(storage.endswith(variant + "-warmup"))
+                self.assertTrue(output.endswith(variant + "-warmup-result"))
+                self.assertTrue((payload / "loading-benchmark" / (variant + "-warmup") / "startup.tjs").is_file())
+
     def test_checkout_supplies_same_loading_script_independent_of_apk(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
