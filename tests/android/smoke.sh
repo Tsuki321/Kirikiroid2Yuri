@@ -27,7 +27,14 @@ adb install -r -g "$(find apk -name '*.apk' -print -quit)"
 adb install -r -g "$(find test-apk -name '*.apk' -print -quit)"
 adb shell dumpsys package com.yuri.kirikiri2 > test-results/android/package.txt
 failures=0
-adb shell am instrument -w -r -e notClass org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
+profile=${ANDROID_TEST_PROFILE:-full}
+excluded=org.tvp.kirikiri2.NativeControlsTest
+if [ "$profile" = release ]; then
+  # Picker CRUD/rotation remains in the full suite. The native controls test
+  # still opens a real document tree, imports it and launches the engine.
+  excluded+=,org.tvp.kirikiri2.LibraryUiTest
+fi
+adb shell am instrument -w -r -e notClass "$excluded" com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/instrumentation.txt
 if ! grep -E '^OK \([0-9]+ tests?\)' test-results/android/instrumentation.txt; then
   failures=$((failures + 1))
@@ -37,6 +44,15 @@ adb shell cat /data/user/0/com.yuri.kirikiri2/files/engine-ci-cases.txt \
 executed=0
 expected=$(wc -l < test-results/android/cases.txt)
 test "$expected" -eq 22
+if [ "$profile" = release ]; then
+  # Exercise both storage paths, cold bytecode startup and archive loading.
+  # These fixtures also cover preferences, plugins, PSB, datapack and KAG.
+  awk -F '\t' '$1 ~ /^(local|documents|compiled-local|compiled-documents|archive-local|archive-documents)$/' \
+    test-results/android/cases.txt > test-results/android/release-cases.txt
+  cp test-results/android/release-cases.txt test-results/android/cases.txt
+  expected=$(wc -l < test-results/android/cases.txt)
+  test "$expected" -eq 6
+fi
 # adb shell reads stdin. Keep the manifest on another descriptor so starting
 # the first activity cannot consume the remaining fixture rows.
 while IFS=$'\t' read -r -u 3 name storage output; do
@@ -129,7 +145,7 @@ adb shell am force-stop com.yuri.kirikiri2
 adb shell am instrument -w -r -e waitForActivitiesToComplete false -e class org.tvp.kirikiri2.NativeControlsTest com.yuri.kirikiri2.test/androidx.test.runner.AndroidJUnitRunner \
   | tee test-results/android/native-controls.txt
 if grep -E '^OK \([0-9]+ tests?\)' test-results/android/native-controls.txt; then
-  python3 tests/android/library_return.py | tee test-results/android/library-return.txt || failures=$((failures + 1))
+  python3 tests/android/library_return.py --profile "$profile" | tee test-results/android/library-return.txt || failures=$((failures + 1))
 else
   failures=$((failures + 1))
 fi

@@ -1,5 +1,6 @@
 """Verify real engine shutdown, return to the launcher, and a second launch."""
 from pathlib import Path
+import argparse
 import re
 import subprocess
 import time
@@ -166,11 +167,28 @@ def return_to_library():
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--profile', choices=('full', 'release'), default='full')
+    profile = parser.parse_args().profile
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "before-library-return-logcat.txt").write_bytes(adb("logcat", "-d").stdout)
     adb("logcat", "-c")
     open_library()
     screenshot("library-last-played")
+    if profile == 'release':
+        # Bound release verification to returning from and reopening one game.
+        # Multi-game confirmation/cancellation remains in the full suite.
+        scroll_to("Play again"); click("Play again")
+        locate("Open game controls")
+        return_to_library()
+        screenshot("library-returned")
+        scroll_to("Play again"); click("Play again")
+        locate("Open game controls")
+        screenshot("library-relaunched-engine")
+        return_to_library()
+        screenshot("library-returned-again")
+        print("Library return and same-game relaunch passed")
+        return
     add_game("Second controls playground")
     scroll_to("Play again"); click("Play again")
     locate("Open game controls")

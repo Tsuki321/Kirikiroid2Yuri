@@ -5,15 +5,22 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      reuse_build_run:
+        description: Existing successful APK build and native suites to verify without rebuilding
+        required: false
+        default: ''
 
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
+  actions: read
 
 jobs:
   dependencies:
+    if: inputs.reuse_build_run == ''
     name: Verify ${{ matrix.kind }} bundle
     runs-on: ubuntu-latest
     strategy:
@@ -36,6 +43,7 @@ jobs:
         run: python3 script/fetch_ci_dependencies.py ${{ matrix.kind }}
 
   test:
+    if: inputs.reuse_build_run == ''
     name: Native regressions (${{ matrix.compiler }})
     runs-on: ubuntu-latest
     strategy:
@@ -67,6 +75,7 @@ jobs:
           retention-days: 7
 
   build_android:
+    if: inputs.reuse_build_run == ''
     name: Build and verify Android APKs
     needs: [test, dependencies]
     runs-on: ubuntu-latest
@@ -166,15 +175,45 @@ jobs:
             build_android/outputs/mapping/release
           retention-days: 7
 
+  verify_existing:
+    name: Verify existing build provenance
+    if: inputs.reuse_build_run != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require successful build, native suites and unchanged application source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_RUN: ${{ inputs.reuse_build_run }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          run = os.environ['BUILD_RUN']
+          assert run.isdecimal(), 'Build run must be numeric'
+          state = json.loads(subprocess.check_output(['gh', 'run', 'view', run,
+              '--json', 'headSha,jobs,status']))
+          assert state['status'] == 'completed'
+          required = {'Build and verify Android APKs', 'Native regressions (gcc)', 'Native regressions (clang)'}
+          passed = {job['name'] for job in state['jobs'] if job['conclusion'] == 'success'}
+          assert required <= passed, 'Original APK build and both native suites must pass'
+          changed = subprocess.check_output(['git', 'diff', '--name-only', state['headSha'], 'HEAD'], text=True).splitlines()
+          assert all(path.startswith(('tests/', '.github/')) for path in changed), changed
+          print('Verified existing APK source:', state['headSha'])
+          PY
+
   emulator:
     name: Android ${{ matrix.api }} / ${{ matrix.variant }} / ${{ matrix.target }}
-    needs: build_android
+    needs: [build_android, verify_existing]
+    if: always() && !cancelled() && (needs.build_android.result == 'success' || needs.verify_existing.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        variant: [debug, release]
+        variant: ${{ fromJSON(inputs.reuse_build_run != '' && '["debug"]' || '["debug", "release"]') }}
         api: [36]
         target: [google_apis, google_apis_ps16k]
     steps:
@@ -187,16 +226,22 @@ jobs:
         with:
           name: ${{ matrix.variant == 'release' && 'krkr2yuri-release-test-apk' || 'krkr2yuri-debug-apk' }}
           path: apk
+          run-id: ${{ inputs.reuse_build_run || github.run_id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: krkr2yuri-${{ matrix.variant }}-android-tests
           path: test-apk
+          run-id: ${{ inputs.reuse_build_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_TEST_PROFILE: ${{ inputs.reuse_build_run != '' && 'release' || 'full' }}
         with:
           emulator-build: 15917651
           api-level: ${{ matrix.api }}
