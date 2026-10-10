@@ -87,6 +87,45 @@ public class StorageAccessTest {
         write(path, "x");
         assertEquals(1, StorageAccess.stat(context, path)[1]);
     }
+    private static int documentQueryCount() {
+        Uri tree = android.provider.DocumentsContract.buildTreeDocumentUri(TestDocumentsProvider.AUTHORITY, "root/Games");
+        Uri counter = android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, "root/Games/query-count");
+        try (android.database.Cursor cursor = context.getContentResolver().query(counter, new String[] { "queries" }, null, null, null)) {
+            assertNotNull(cursor);
+            assertTrue(cursor.moveToFirst());
+            return cursor.getInt(0);
+        }
+    }
+    @Test public void cDocumentLookupBatchesNamesWithoutCachingMisses() throws Exception {
+        String folder = documents + "/BatchLookup";
+        assertTrue(StorageAccess.mkdirs(context, folder));
+        for (int i = 0; i < 24; ++i) write(folder + "/neighbor-" + i + ".txt", "neighbor");
+        write(folder + "/Scene.TJS", "case variant");
+        int before = documentQueryCount();
+        assertNull(StorageAccess.stat(context, folder + "/newscene.tjs"));
+        assertTrue("Missing leaf must use bounded directory queries", documentQueryCount() - before <= 5);
+        write(folder + "/NewScene.TJS", "created after miss");
+        assertEquals(18, StorageAccess.stat(context, folder + "/newscene.tjs")[1]);
+        // Create a distinct exact-case file through the provider, bypassing the
+        // engine's case-folding create semantics. Exact spelling wins even if
+        // a differently cased entry appeared earlier in the directory cursor.
+        android.provider.DocumentsContract.createDocument(context.getContentResolver(),
+            StorageAccess.resolve(context, folder, false, true).getUri(), "application/octet-stream", "scene.tjs");
+        before = documentQueryCount();
+        assertEquals(0, StorageAccess.stat(context, folder + "/scene.tjs")[1]);
+        assertTrue("Exact lookup must not query each sibling", documentQueryCount() - before <= 5);
+        int fd = StorageAccess.open(context, folder + "/SCENE.TJS", 0);
+        assertTrue(fd >= 0);
+        try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.adoptFd(fd)) { /* ensure descriptor is closed */ }
+        before = documentQueryCount();
+        String[] entries = StorageAccess.list(context, folder);
+        assertNotNull(entries);
+        assertEquals(27 * 4, entries.length);
+        assertTrue("Listing metadata must not query each child", documentQueryCount() - before <= 5);
+        assertTrue(StorageAccess.delete(context, folder + "/NewScene.TJS"));
+        assertNull(StorageAccess.stat(context, folder + "/newscene.tjs"));
+        assertTrue(StorageAccess.delete(context, folder));
+    }
     @Test public void dDocumentRenameDeleteAndGrantBoundaries() {
         String before = documents + "/before.txt", after = documents + "/after.txt";
         write(before, "fixture");

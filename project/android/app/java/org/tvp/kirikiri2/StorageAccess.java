@@ -87,6 +87,37 @@ public final class StorageAccess {
         return path.equalsIgnoreCase(root) || path.regionMatches(true, 0, root + "/", 0, root.length() + 1);
     }
 
+    private static Uri childrenUri(DocumentFile directory) {
+        Uri uri = directory.getUri();
+        return DocumentsContract.buildChildDocumentsUriUsingTree(uri, DocumentsContract.getDocumentId(uri));
+    }
+
+    private static DocumentFile findChild(Context context, DocumentFile parent, String name) throws IOException {
+        String[] columns = { DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME };
+        // Read names with the directory listing. DocumentFile.findFile fetches
+        // each child's name separately; a miss used to repeat that whole scan
+        // for case folding. No listing or miss is retained across operations.
+        try (Cursor cursor = context.getContentResolver().query(childrenUri(parent), columns, null, null, null)) {
+            if (cursor == null) throw new IOException("Cannot query document children");
+            int idColumn = cursor.getColumnIndexOrThrow(columns[0]);
+            int nameColumn = cursor.getColumnIndexOrThrow(columns[1]);
+            String exact = null, folded = null;
+            while (cursor.moveToNext()) {
+                String childName = cursor.getString(nameColumn);
+                if (name.equals(childName)) { exact = cursor.getString(idColumn); break; }
+                if (folded == null && name.equalsIgnoreCase(childName)) folded = cursor.getString(idColumn);
+            }
+            String id = exact != null ? exact : folded;
+            return id == null ? null : DocumentFile.fromTreeUri(context,
+                    DocumentsContract.buildDocumentUriUsingTree(parent.getUri(), id));
+        }
+    }
+
+    private static long optionalLong(Cursor cursor, String column) {
+        int index = cursor.getColumnIndex(column);
+        return index < 0 || cursor.isNull(index) ? 0 : cursor.getLong(index);
+    }
+
     static DocumentFile resolve(Context context, String path, boolean create, boolean directory) throws IOException {
         if (path == null) return null;
         String canonical = new File(path).getCanonicalPath();
@@ -107,13 +138,7 @@ public final class StorageAccess {
         for (int i = 0; i < parts.length; ++i) {
             if (parts[i].length() == 0) continue;
             if (".".equals(parts[i]) || "..".equals(parts[i])) throw new IOException("Invalid document path");
-            DocumentFile next = current.findFile(parts[i]);
-            // Kirikiri normalizes ASCII case. Preserve the provider's spelling.
-            if (next == null) {
-                for (DocumentFile child : current.listFiles()) {
-                    if (parts[i].equalsIgnoreCase(child.getName())) { next = child; break; }
-                }
-            }
+            DocumentFile next = findChild(context, current, parts[i]);
             if (next == null && create) {
                 next = (i < parts.length - 1 || directory)
                         ? current.createDirectory(parts[i])
@@ -141,8 +166,14 @@ public final class StorageAccess {
     public static long[] stat(Context context, String path) {
         try {
             DocumentFile doc = resolve(context, path, false, false);
-            if (doc == null || !doc.exists()) return null;
-            return new long[] { doc.isDirectory() ? 0040000 : 0100000, doc.length(), doc.lastModified() / 1000 };
+            if (doc == null) return null;
+            String[] columns = { DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED };
+            try (Cursor cursor = context.getContentResolver().query(doc.getUri(), columns, null, null, null)) {
+                if (cursor == null || !cursor.moveToFirst()) return null;
+                boolean directory = DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(cursor.getColumnIndexOrThrow(columns[0])));
+                return new long[] { directory ? 0040000 : 0100000, optionalLong(cursor, columns[1]), optionalLong(cursor, columns[2]) / 1000 };
+            }
         } catch (Exception e) { Log.w(TAG, "Cannot query document", e); return null; }
     }
 
@@ -152,13 +183,20 @@ public final class StorageAccess {
             DocumentFile doc = resolve(context, path, false, true);
             if (doc == null || !doc.isDirectory()) return null;
             List<String> result = new ArrayList<>();
-            for (DocumentFile child : doc.listFiles()) {
-                String name = child.getName();
-                if (name == null || name.contains("/") || name.equals(".") || name.equals("..")) continue;
-                result.add(name);
-                result.add(child.isDirectory() ? "d" : "f");
-                result.add(Long.toString(child.length()));
-                result.add(Long.toString(child.lastModified() / 1000));
+            String[] columns = { DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED };
+            try (Cursor cursor = context.getContentResolver().query(childrenUri(doc), columns, null, null, null)) {
+                if (cursor == null) return null;
+                int nameColumn = cursor.getColumnIndexOrThrow(columns[0]);
+                int typeColumn = cursor.getColumnIndexOrThrow(columns[1]);
+                while (cursor.moveToNext()) {
+                    String name = cursor.getString(nameColumn);
+                    if (name == null || name.contains("/") || name.equals(".") || name.equals("..")) continue;
+                    result.add(name);
+                    result.add(DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(typeColumn)) ? "d" : "f");
+                    result.add(Long.toString(optionalLong(cursor, columns[2])));
+                    result.add(Long.toString(optionalLong(cursor, columns[3]) / 1000));
+                }
             }
             return result.toArray(new String[0]);
         } catch (Exception e) { Log.w(TAG, "Cannot list documents", e); return null; }

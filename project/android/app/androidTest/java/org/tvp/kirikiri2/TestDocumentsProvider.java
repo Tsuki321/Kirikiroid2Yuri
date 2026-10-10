@@ -9,6 +9,7 @@ import android.provider.DocumentsProvider;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** A real, separate-UID document provider installed only with the test APK. */
 public class TestDocumentsProvider extends DocumentsProvider {
@@ -19,6 +20,7 @@ public class TestDocumentsProvider extends DocumentsProvider {
         DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED
     };
     private File root;
+    private final AtomicInteger queryCount = new AtomicInteger();
     private android.os.HandlerThread proxyThread;
     @Override public boolean onCreate() {
         root = new File(getContext().getFilesDir(), "documents");
@@ -76,12 +78,19 @@ public class TestDocumentsProvider extends DocumentsProvider {
         } catch (IOException error) { return false; }
     }
     @Override public Cursor queryDocument(String documentId, String[] projection) throws FileNotFoundException {
+        if (documentId.equals("root/Games/query-count")) {
+            MatrixCursor counter = new MatrixCursor(new String[] { "queries" });
+            counter.addRow(new Object[] { queryCount.get() });
+            return counter;
+        }
+        queryCount.incrementAndGet();
         MatrixCursor result = new MatrixCursor(projection == null ? COLUMNS : projection);
         File file = file(documentId);
         if (file.exists()) add(result, file);
         return result;
     }
     @Override public Cursor queryChildDocuments(String parent, String[] projection, String sort) throws FileNotFoundException {
+        queryCount.incrementAndGet();
         MatrixCursor result = new MatrixCursor(projection == null ? COLUMNS : projection);
         File[] children = file(parent).listFiles();
         if (children != null) for (File child : children) add(result, child);
