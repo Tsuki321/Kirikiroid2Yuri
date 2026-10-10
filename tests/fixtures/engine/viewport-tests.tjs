@@ -18,6 +18,18 @@ ciCheck(!ciViewport.root.cacheDirty, "viewport composition clears the cached upd
 ciViewport.display.visible = true;
 ciCheck(!ciViewport.render() && ciViewport.renderedFrames == 1,
     "viewport skips unchanged cached frames");
+ciViewport.snapshot.piledCopy(0, 0, ciViewport.root, 0, 0, 4, 4);
+ciCheck(!ciViewport.root.cacheDirty,
+    "partial piled copy preserves a previously completed source cache");
+ciViewChild.fillRect(0, 0, 1, 1, 0xffabcdef);
+ciCheck(ciViewport.root.cacheDirty, "pixel edit marks the cached source dirty");
+ciViewport.snapshot.piledCopy(0, 0, ciViewport.root, 0, 0, 4, 3);
+ciCheck(ciViewport.root.cacheDirty,
+    "partial piled copy preserves pending edits outside its source rectangle");
+ciViewport.snapshot.piledCopy(0, 0, ciViewport.root, 4, 3, 1, 1);
+ciCheck(!ciViewport.root.cacheDirty && ciViewport.snapshot.getMainPixel(0, 0) == 0xabcdef,
+    "partial piled copy completes only the edited source region");
+ciViewChild.fillRect(0, 0, 8, 6, 0xff123456);
 ciViewChild.setPos(1, 1);
 ciCheck(ciViewport.root.cacheDirty, "child movement invalidates the viewport cache");
 ciViewport.render();

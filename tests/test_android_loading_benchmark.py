@@ -39,10 +39,11 @@ class LoadingBenchmark(unittest.TestCase):
     def test_render_metrics_accept_actual_workload_annotations(self):
         fixture = (ROOT / "tests/fixtures/engine/benchmark-rendering.tjs").read_text(encoding="utf-8")
         messages = re.findall(r'ciMessages.add\("(METRIC [a-z0-9_]+=)"\s*\+.*?\+\s*"([^"]*)"\);', fixture)
-        self.assertEqual(3, len(messages))
+        self.assertEqual(4, len(messages))
         text = self.result() + "\n" + "\n".join(name + "70" + annotations for name, annotations in messages)
         metrics = benchmark.parse_metrics(text.encode(), benchmark.REQUIRED_METRICS | benchmark.RENDER_METRICS)
-        self.assertEqual(70, metrics["render_snapshot_piled_copy_ms"])
+        self.assertEqual(70, metrics["render_snapshot_unchanged_ms"])
+        self.assertEqual(70, metrics["render_snapshot_small_update_ms"])
         self.assertEqual(70, metrics["render_stretch_copy_ms"])
         self.assertEqual(70, metrics["render_affine_copy_ms"])
 

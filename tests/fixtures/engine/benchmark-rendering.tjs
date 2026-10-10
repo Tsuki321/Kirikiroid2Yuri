@@ -20,6 +20,54 @@ function ciCheckRenderZoom(dest, width, height, label, marginX, marginY) {
     }
     ciCheck(samples == 20, label + " preserves 20 independently predicted zoom samples");
 }
+function ciSnapshotBenchmark(window, primary, snapshot, width, height, frames, warmupFrames) {
+    // The source is larger than the output so piledCopy must copy a rectangle,
+    // rather than simply sharing the complete source texture. Visible children
+    // require actual subtree composition even though the source is offscreen.
+    var scene = new Layer(window, primary);
+    scene.setSize(width + 64, height + 64); scene.setImageSize(width + 64, height + 64);
+    scene.type = ltOpaque; scene.holdAlpha = false; scene.visible = false;
+    scene.fillRect(0, 0, width + 64, height + 64, 0xff102030);
+    var pieces = [];
+    for (var i = 0; i < 6; ++i) {
+        var piece = new Layer(window, scene);
+        piece.setSize(320, 200); piece.setImageSize(320, 200);
+        piece.setPos(64 + (i % 3) * 400, 64 + Math.floor(i / 3) * 280);
+        piece.type = ltOpaque; piece.holdAlpha = false; piece.visible = true;
+        piece.fillRect(0, 0, 320, 200, 0xff000000 | (0x203040 + i * 0x111111));
+        pieces.add(piece);
+    }
+    var small = new Layer(window, scene);
+    small.setSize(48, 32); small.setImageSize(48, 32); small.setPos(608, 640);
+    small.type = ltOpaque; small.holdAlpha = false; small.visible = true;
+    small.fillRect(0, 0, 48, 32, 0xffaa3300);
+    scene.cached = true;
+    for (var i = 0; i < warmupFrames; ++i) snapshot.piledCopy(0, 0, scene, 32, 32, width, height);
+    var started = System.getTickCount();
+    for (var i = 0; i < frames; ++i) snapshot.piledCopy(0, 0, scene, 32, 32, width, height);
+    ciMessages.add("METRIC render_snapshot_unchanged_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720 children=7");
+    for (var i = 0; i < 6; ++i) {
+        var x = 64 + (i % 3) * 400 + 160 - 32, y = 64 + Math.floor(i / 3) * 280 + 100 - 32;
+        if (snapshot.getMainPixel(x, y) != 0x203040 + i * 0x111111 || snapshot.getMaskPixel(x, y) != 255)
+            throw "Partial cached snapshot lost a child";
+    }
+    ciCheck(snapshot.getMainPixel(0, 0) == 0x102030 && snapshot.getMainPixel(600, 620) == 0xaa3300,
+        "partial cached snapshot preserves independently predicted background and children");
+    for (var i = 0; i < warmupFrames; ++i) {
+        small.fillRect(0, 0, 48, 32, i % 2 ? 0xff00cc77 : 0xffaa3300);
+        snapshot.piledCopy(0, 0, scene, 32, 32, width, height);
+    }
+    started = System.getTickCount();
+    for (var i = 0; i < frames; ++i) {
+        small.fillRect(0, 0, 48, 32, i % 2 ? 0xff00cc77 : 0xffaa3300);
+        snapshot.piledCopy(0, 0, scene, 32, 32, width, height);
+    }
+    ciMessages.add("METRIC render_snapshot_small_update_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720 dirty_width=48 dirty_height=32 children=7");
+    ciCheck(snapshot.getMainPixel(600, 620) == 0x00cc77 && snapshot.getMaskPixel(600, 620) == 255 &&
+        snapshot.getMainPixel(31, 620) == 0x102030 && snapshot.getMainPixel(192, 132) == 0x203040,
+        "small cached child updates preserve the changed pixels and untouched scene");
+    scene.cached = false;
+}
 function ciRenderingBenchmark() {
     var width = 1280, height = 720, frames = 240, warmupFrames = 24;
     var window = new Window(); window.setSize(width, height);
@@ -36,19 +84,16 @@ function ciRenderingBenchmark() {
         layers[i].setSize(width, height); layers[i].setImageSize(width, height);
         layers[i].type = ltOpaque; layers[i].holdAlpha = false; layers[i].visible = false;
     }
-    // KAG zoom effects first capture a composited scene, then repeatedly scale
-    // a cropped part of that snapshot. Keep the snapshot cost a separate metric.
-    for (var i = 0; i < warmupFrames; ++i) snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
-    var started = System.getTickCount();
-    for (var i = 0; i < frames; ++i) snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
-    ciMessages.add("METRIC render_snapshot_piled_copy_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720");
+    ciSnapshotBenchmark(window, primary, snapshot, width, height, frames, warmupFrames);
+    // Isolate resampling from subtree capture with the original tile pattern.
+    snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
     ciCheck(snapshot.getMainPixel(440, 280) == (ciRenderPattern(440, 280) & 0xffffff) &&
         snapshot.getMaskPixel(440, 280) == 255 &&
         snapshot.getMainPixel(1160, 600) == (ciRenderPattern(1160, 600) & 0xffffff) &&
         snapshot.getMaskPixel(1160, 600) == 255, "render benchmark snapshot preserves its original tile pattern");
     for (var frame = 0; frame < warmupFrames; ++frame)
         dest.stretchCopy(0, 0, width, height, snapshot, 64, 36, width - 128, height - 72, stFastLinear);
-    started = System.getTickCount();
+    var started = System.getTickCount();
     for (var frame = 0; frame < frames; ++frame) {
         var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
         dest.stretchCopy(0, 0, width, height, snapshot, marginX, marginY,

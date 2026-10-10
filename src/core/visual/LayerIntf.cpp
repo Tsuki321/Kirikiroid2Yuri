@@ -3699,7 +3699,8 @@ void tTJSNI_BaseLayer::CompactCache()
 tjs_uint tTJSNI_BaseLayer::IncCacheEnabledCount()
 {
 	CacheEnabledCount++;
-	if(CacheEnabledCount)
+	// Nested users (for example piledCopy) must preserve an existing cache.
+	if(CacheEnabledCount == 1)
 	{
 		RegisterCompactEventHook();
 			// register to compact event hook to call CompactCache when idle

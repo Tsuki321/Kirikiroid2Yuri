@@ -27,7 +27,7 @@ REQUIRED_METRICS = {
     "loading_named_scripts_ms", "loading_cached_lookup_ms",
     "loading_hxv4_repeated_miss_ms",
 }
-RENDER_METRICS = {"render_snapshot_piled_copy_ms", "render_stretch_copy_ms", "render_affine_copy_ms"}
+RENDER_METRICS = {"render_snapshot_unchanged_ms", "render_snapshot_small_update_ms", "render_stretch_copy_ms", "render_affine_copy_ms"}
 
 
 def decode_text(data):
