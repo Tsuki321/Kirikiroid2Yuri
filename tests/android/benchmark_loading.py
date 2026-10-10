@@ -118,6 +118,13 @@ def adb(*args, check=True, timeout=30):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+def app_context(data):
+    fields = data.decode().split()
+    if not fields or not re.fullmatch(r"u:object_r:app_data_file:s0(?::c\d+(?:,c\d+)*)?", fields[0]):
+        raise ValueError("Unable to determine the installed app's SELinux context")
+    return fields[0]
+
+
 def capture(output, device_output):
     for filename, command in {
         "logcat.txt": ("logcat", "-d"),
@@ -147,6 +154,7 @@ def run_trial(apk, fixtures, label, trial, results, render_script=None, startup_
     owner = adb("shell", "stat", "-c", "%u:%g", f"/data/user/0/{PACKAGE}").stdout.decode().strip()
     if not re.fullmatch(r"\d+:\d+", owner):
         raise ValueError("Unable to determine app directory ownership")
+    context = app_context(adb("shell", "ls", "-Zd", f"/data/user/0/{PACKAGE}").stdout)
     with tempfile.TemporaryDirectory(prefix="krkr-loading-") as temporary:
         payload = Path(temporary) / "files"
         payload.mkdir()
@@ -155,6 +163,11 @@ def run_trial(apk, fixtures, label, trial, results, render_script=None, startup_
         adb("push", str(payload) + "/.", FILES + "/", timeout=90)
         adb("shell", "chown", "-R", owner, FILES)
         adb("shell", "restorecon", "-RF", FILES)
+        # Reinstalling can assign a new UID while restorecon retains the old
+        # package categories. Use the current app root label for the payload.
+        adb("shell", "chcon", "-R", context, FILES)
+        labels = adb("shell", "ls", "-Zd", FILES, storage).stdout
+        (output / "deployment.txt").write_text(f"owner={owner}\ncontext={context}\n" + labels.decode(), encoding="utf-8")
     adb("logcat", "-c")
     started = time.monotonic()
     try:

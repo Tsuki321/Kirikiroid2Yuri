@@ -16,6 +16,14 @@ class LoadingBenchmark(unittest.TestCase):
         return "\n".join(["ENGINE_CI_STARTED"] + [f"METRIC {name}=10 lookups=128"
                         for name in sorted(benchmark.REQUIRED_METRICS)] + [final])
 
+    def test_reinstall_payload_uses_installed_apps_selinux_categories(self):
+        for categories in ("c216,c256,c512,c768", "c217,c256,c512,c768"):
+            context = "u:object_r:app_data_file:s0:" + categories
+            self.assertEqual(context, benchmark.app_context((context + " /data/user/0/com.yuri.kirikiri2\n").encode()))
+        for invalid in (b"", b"ls: Permission denied", b"u:object_r:shell_data_file:s0 /data/local/tmp"):
+            with self.assertRaises(ValueError):
+                benchmark.app_context(invalid)
+
     def test_result_requires_all_metrics_and_actual_pass(self):
         for encoding in ("utf-8", "utf-16"):
             self.assertEqual({name: 10 for name in benchmark.REQUIRED_METRICS},
