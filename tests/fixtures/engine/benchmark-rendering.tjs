@@ -21,7 +21,7 @@ function ciCheckRenderZoom(dest, width, height, label, marginX, marginY) {
     ciCheck(samples == 20, label + " preserves 20 independently predicted zoom samples");
 }
 function ciRenderingBenchmark() {
-    var width = 1280, height = 720, frames = 24;
+    var width = 1280, height = 720, frames = 240, warmupFrames = 24;
     var window = new Window(); window.setSize(width, height);
     var primary = new Layer(window, null);
     primary.setSize(width, height); primary.setImageSize(width, height);
@@ -38,25 +38,27 @@ function ciRenderingBenchmark() {
     }
     // KAG zoom effects first capture a composited scene, then repeatedly scale
     // a cropped part of that snapshot. Keep the snapshot cost a separate metric.
-    snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
+    for (var i = 0; i < warmupFrames; ++i) snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
     var started = System.getTickCount();
-    for (var i = 0; i < 4; ++i) snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
-    ciMessages.add("METRIC render_snapshot_piled_copy_ms=" + (System.getTickCount() - started) + " frames=4 width=1280 height=720");
+    for (var i = 0; i < frames; ++i) snapshot.piledCopy(0, 0, primary, 0, 0, width, height);
+    ciMessages.add("METRIC render_snapshot_piled_copy_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720");
     ciCheck(snapshot.getMainPixel(440, 280) == (ciRenderPattern(440, 280) & 0xffffff) &&
         snapshot.getMaskPixel(440, 280) == 255 &&
         snapshot.getMainPixel(1160, 600) == (ciRenderPattern(1160, 600) & 0xffffff) &&
         snapshot.getMaskPixel(1160, 600) == 255, "render benchmark snapshot preserves its original tile pattern");
-    dest.stretchCopy(0, 0, width, height, snapshot, 64, 36, width - 128, height - 72, stFastLinear);
+    for (var frame = 0; frame < warmupFrames; ++frame)
+        dest.stretchCopy(0, 0, width, height, snapshot, 64, 36, width - 128, height - 72, stFastLinear);
     started = System.getTickCount();
     for (var frame = 0; frame < frames; ++frame) {
         var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
         dest.stretchCopy(0, 0, width, height, snapshot, marginX, marginY,
             width - 2 * marginX, height - 2 * marginY, stFastLinear);
     }
-    ciMessages.add("METRIC render_stretch_copy_ms=" + (System.getTickCount() - started) + " frames=24 width=1280 height=720 filter=fast-linear");
+    ciMessages.add("METRIC render_stretch_copy_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720 filter=fast-linear");
     ciCheckRenderZoom(dest, width, height, "stretchCopy", 88, 48);
 
-    dest.affineCopy(snapshot, 64, 36, width - 128, height - 72, false, 0, 0, width, 0, 0, height, stFastLinear);
+    for (var frame = 0; frame < warmupFrames; ++frame)
+        dest.affineCopy(snapshot, 64, 36, width - 128, height - 72, false, 0, 0, width, 0, 0, height, stFastLinear);
     started = System.getTickCount();
     for (var frame = 0; frame < frames; ++frame) {
         var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
@@ -65,7 +67,7 @@ function ciRenderingBenchmark() {
         dest.affineCopy(snapshot, marginX, marginY, width - 2 * marginX, height - 2 * marginY,
             false, 0, 0, width, 0, 0, height, stFastLinear);
     }
-    ciMessages.add("METRIC render_affine_copy_ms=" + (System.getTickCount() - started) + " frames=24 width=1280 height=720 filter=fast-linear");
+    ciMessages.add("METRIC render_affine_copy_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720 filter=fast-linear");
     ciCheckRenderZoom(dest, width, height, "affineCopy", 88, 48);
 
     // Direct writes must retain the temporary-image fallback when source and

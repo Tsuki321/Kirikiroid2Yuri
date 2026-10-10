@@ -262,13 +262,19 @@ def main():
     if render_script is not None:
         provenance["render_workload"] = {"script_sha256": sha256(render_script)}
     (args.output / "apk-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+    # Complete real workloads before measuring so first-boot initialization
+    # and ARM translation caches do not fall entirely on the first baseline.
+    warmups = []
+    for variant in ("before", "after"):
+        warmups.append(run_trial(apks[variant], fixtures, variant, "warmup", args.output, render_script, startup_script))
     trials = []
     for trial in range(1, 4):
-        for variant in ("before", "after"):
+        order = ("before", "after") if trial % 2 else ("after", "before")
+        for variant in order:
             trials.append(run_trial(apks[variant], fixtures, variant, trial, args.output, render_script, startup_script))
     required = REQUIRED_METRICS | RENDER_METRICS if render_script is not None else REQUIRED_METRICS
-    report = {"provenance": provenance, "trials": trials, "medians": summarize(trials, required),
-              "conditions": "Same API 36 / 4 KB emulator, fresh install per trial, software renderer, debug window disabled",
+    report = {"provenance": provenance, "warmups": warmups, "trials": trials, "medians": summarize(trials, required),
+              "conditions": "Same API 36 / 4 KB emulator, fresh install per trial, one excluded warm-up trial per APK, alternating pair order, software renderer, debug window disabled",
               "scope": "Synthetic loading, lookup and optional zoom timings; ARM translation and host scheduling affect elapsed time. No timing pass threshold."}
     (args.output / "comparison.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     rows = ["| Metric | Before median (ms) | After median (ms) | Ratio |",
