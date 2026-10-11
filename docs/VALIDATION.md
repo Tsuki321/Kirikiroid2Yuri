@@ -136,6 +136,21 @@ speedup. These are warmed synthetic operations in app-private storage, not game
 FPS, cold game loading, or document-provider timings. Document-provider batching
 has separate query-count, nested-access, write and invalidation regressions.
 
+A [subsequent isolated comparison](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38108466465)
+tested `f53956b` against `1725542` with identical workloads. Enlarging a 640×360
+viewport to 1920×1080 with `stFastLinear` took 9,139 → 295 ms per 240 copies
+(38.08 → 1.23 ms per copy). All eight trials passed the same 88 assertions;
+fractional fast-linear scaling stayed effectively unchanged. This is a gain for
+the exact 3× operation, not a whole-game frame-rate or startup-speed claim.
+
+The optimization preserves the existing pixels for integral RGBA enlargement,
+including transparent RGB, by avoiding interpolation with zero neighbor weights.
+Uniform 2× enlargement retains the existing optimized OpenCV/Tegra route.
+The common Android fixture checks every destination pixel for eight integer-scale
+cases, including cropping, margins, one unchanged axis, and both overlap directions.
+Both compiler suites and all five Android configurations passed in
+[build 38107977254](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38107977254).
+
 ## Dependency reproducibility
 
 `script/dependencies.lock.json` pins the source, binary, and UI asset bundles by
