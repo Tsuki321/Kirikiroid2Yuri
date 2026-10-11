@@ -258,9 +258,18 @@ extern "C" {
 			Android_PushEvents([utf8] { TVPMainScene::onTextInput(utf8); });
 	}
 
-	JNIEXPORT jboolean JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeGetHideSystemButton(JNIEnv* env, jclass cls)
+	JNIEXPORT void JNICALL Java_org_tvp_kirikiri2_KR2Activity_nativeRequestSystemUiVisibility(JNIEnv*, jclass)
 	{
-		return GlobalConfigManager::GetInstance()->GetValue<bool>("hide_android_sys_btn", false);
+		// Window focus can arrive before the GL thread replaces FileUtils and
+		// initializes config. Read preferences on the engine thread, like writes.
+		Android_PushEvents([] {
+			if (!GlobalConfigManager::GetInstance()->GetValue<bool>("hide_android_sys_btn", false)) return;
+			cocos2d::JniMethodInfo method;
+			if (cocos2d::JniHelper::getStaticMethodInfo(method, "org/tvp/kirikiri2/KR2Activity", "applyHideSystemUi", "()V")) {
+				method.env->CallStaticVoidMethod(method.classID, method.methodID);
+				method.env->DeleteLocalRef(method.classID);
+			}
+		});
 	}
 
 	static float _mouseX, _mouseY;

@@ -1131,14 +1131,22 @@ public class KR2Activity extends Cocos2dxActivity implements ActivityCompat.OnRe
 		getWindow().getDecorView().setSystemUiVisibility(uiOpts);
     }
 
-    private static native boolean nativeGetHideSystemButton();
+    private static native void nativeRequestSystemUiVisibility();
     private static native void nativeSetSafTreeUri(String uri);
     private static native String nativeGetSafTreeUri();
     private static native void nativeSetStartupArgs(String startupPath, String[] args);
     void hideSystemUI() {
-    	if(nativeGetHideSystemButton() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-    		doSetSystemUiVisibility();
-    	}
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) nativeRequestSystemUiVisibility();
+    }
+
+    public static void applyHideSystemUi() {
+        KR2Activity activity = sInstance;
+        if (activity == null) return;
+        activity.runOnUiThread(() -> {
+            if (!activity.isFinishing() && !activity.isDestroyed() && activity.hasWindowFocus()) {
+                activity.doSetSystemUiVisibility();
+            }
+        });
     }
     
     static public String getLocaleName() {
