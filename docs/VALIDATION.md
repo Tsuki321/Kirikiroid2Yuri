@@ -116,6 +116,26 @@ The default `benchmark_render_workload=true` also measures scene capture and
 scripts and archive assets, with hashes recorded in the comparison artifact.
 Every trial must pass the compatibility assertions before its timing is included.
 
+The [2026-10-11 matched run](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38105025220)
+compared `3f4cc30` with `24a7e2a` on one Android 16 x86_64 emulator running
+the ARM64 APK through native translation. After one discarded warmup per APK,
+three measured trials per APK passed the same 83 assertions. Medians in milliseconds:
+
+| Workload | Batch size | Before | After |
+| --- | ---: | ---: | ---: |
+| Unchanged partial subtree capture | 240 calls | 81 | 28 |
+| Capture after small child updates | 240 calls | 70 | 30 |
+| HXV4 missing-name lookups | 256 calls | 145 | 90 |
+| Fast-linear stretch copy | 240 calls | 3,651 | 3,517 |
+| Fast-linear affine copy | 240 calls | 3,566 | 3,507 |
+
+The cache gain is specific to scene capture: about 0.17–0.22 ms saved per call
+in this workload. Stretch and affine scaling remain the larger cost; the affine
+after-trials range from 3,481 to 4,771 ms, so these results do not establish a zoom
+speedup. These are warmed synthetic operations in app-private storage, not game
+FPS, cold game loading, or document-provider timings. Document-provider batching
+has separate query-count, nested-access, write and invalidation regressions.
+
 ## Dependency reproducibility
 
 `script/dependencies.lock.json` pins the source, binary, and UI asset bundles by

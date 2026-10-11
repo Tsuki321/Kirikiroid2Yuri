@@ -20,6 +20,85 @@ function ciCheckRenderZoom(dest, width, height, label, marginX, marginY) {
     }
     ciCheck(samples == 20, label + " preserves 20 independently predicted zoom samples");
 }
+function ciLinearRamp(x, y) {
+    return [16 + 24 * x, 24 + 40 * y, 224 - 16 * x - 8 * y, 16 * x + 16 * y];
+}
+function ciCheckLinearPixel(layer, x, y, expected, tolerance, label) {
+    var rgb = layer.getMainPixel(x, y);
+    var actual = [(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, layer.getMaskPixel(x, y)];
+    for (var channel = 0; channel < 4; ++channel)
+        if (Math.abs(actual[channel] - expected[channel]) > tolerance)
+            throw label + " at " + x + "," + y + " channel " + channel +
+                " expected " + expected[channel] + " got " + actual[channel];
+}
+function ciCheckLinearResize(window, primary) {
+    // An affine RGBA ramp has an independent bilinear oracle at every pixel.
+    // Alpha starts at zero with nonzero RGB, exposing accidental premultiplying
+    // or compositing. These checks run outside the timed opaque zoom workload.
+    var source = new Layer(window, primary), dest = new Layer(window, primary);
+    source.setSize(7, 5); source.setImageSize(7, 5);
+    dest.setSize(17, 16); dest.setImageSize(17, 16);
+    var layers = [source, dest];
+    for (var i = 0; i < layers.count; ++i) {
+        layers[i].type = ltAlpha; layers[i].face = dfAlpha;
+        layers[i].holdAlpha = false; layers[i].visible = false;
+    }
+    for (var y = 0; y < 5; ++y)
+        for (var x = 0; x < 7; ++x) {
+            var rgba = ciLinearRamp(x, y);
+            source.fillRect(x, y, 1, 1, (rgba[3] << 24) | (rgba[0] << 16) | (rgba[1] << 8) | rgba[2]);
+        }
+    for (var affine = 0; affine < 2; ++affine) {
+        dest.fillRect(0, 0, 17, 16, 0x7f315273);
+        if (affine)
+            dest.affineCopy(source, 0, 0, 7, 5, false, 3, 5, 14, 5, 3, 13, stLinear);
+        else
+            dest.stretchCopy(3, 5, 11, 8, source, 0, 0, 7, 5, stLinear);
+        var label = affine ? "linear affineCopy" : "linear stretchCopy";
+        for (var y = 0; y < 16; ++y)
+            for (var x = 0; x < 17; ++x) {
+                if (x < 3 || x >= 14 || y < 5 || y >= 13) {
+                    ciCheckLinearPixel(dest, x, y, [49, 82, 115, 127], 0, label + " untouched margin");
+                    continue;
+                }
+                // Pixel-center coordinates with source-edge replication.
+                var sx = Math.max(0, Math.min(6, ((x - 3) + 0.5) * 7 / 11 - 0.5));
+                var sy = Math.max(0, Math.min(4, ((y - 5) + 0.5) * 5 / 8 - 0.5));
+                ciCheckLinearPixel(dest, x, y, ciLinearRamp(sx, sy), 1, label + " RGBA ramp");
+            }
+        for (var y = 0; y < 5; ++y)
+            for (var x = 0; x < 7; ++x)
+                ciCheckLinearPixel(source, x, y, ciLinearRamp(x, y), 0, label + " unchanged source");
+        ciCheck(source.imageWidth == 7 && source.imageHeight == 5 &&
+            dest.imageWidth == 17 && dest.imageHeight == 16,
+            label + " preserves every ramp RGBA sample, transparent RGB, source and margins");
+    }
+}
+function ciZoomBenchmark(dest, snapshot, width, height, frames, warmupFrames, filter) {
+    var label = filter == stLinear ? "linear" : "fast-linear";
+    for (var frame = 0; frame < warmupFrames; ++frame)
+        dest.stretchCopy(0, 0, width, height, snapshot, 64, 36, width - 128, height - 72, filter);
+    var started = System.getTickCount();
+    for (var frame = 0; frame < frames; ++frame) {
+        var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
+        dest.stretchCopy(0, 0, width, height, snapshot, marginX, marginY,
+            width - 2 * marginX, height - 2 * marginY, filter);
+    }
+    var stretchTime = System.getTickCount() - started;
+    ciCheckRenderZoom(dest, width, height, label + " stretchCopy", 88, 48);
+    for (var frame = 0; frame < warmupFrames; ++frame)
+        dest.affineCopy(snapshot, 64, 36, width - 128, height - 72, false, 0, 0, width, 0, 0, height, filter);
+    started = System.getTickCount();
+    for (var frame = 0; frame < frames; ++frame) {
+        var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
+        // Axis-aligned scene zooms use the rectangle path.
+        dest.affineCopy(snapshot, marginX, marginY, width - 2 * marginX, height - 2 * marginY,
+            false, 0, 0, width, 0, 0, height, filter);
+    }
+    var affineTime = System.getTickCount() - started;
+    ciCheckRenderZoom(dest, width, height, label + " affineCopy", 88, 48);
+    return [stretchTime, affineTime];
+}
 function ciSnapshotBenchmark(window, primary, snapshot, width, height, frames, warmupFrames) {
     // The source is larger than the output so piledCopy must copy a rectangle,
     // rather than simply sharing the complete source texture. Visible children
@@ -91,29 +170,20 @@ function ciRenderingBenchmark() {
         snapshot.getMaskPixel(440, 280) == 255 &&
         snapshot.getMainPixel(1160, 600) == (ciRenderPattern(1160, 600) & 0xffffff) &&
         snapshot.getMaskPixel(1160, 600) == 255, "render benchmark snapshot preserves its original tile pattern");
-    for (var frame = 0; frame < warmupFrames; ++frame)
-        dest.stretchCopy(0, 0, width, height, snapshot, 64, 36, width - 128, height - 72, stFastLinear);
-    var started = System.getTickCount();
-    for (var frame = 0; frame < frames; ++frame) {
-        var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
-        dest.stretchCopy(0, 0, width, height, snapshot, marginX, marginY,
-            width - 2 * marginX, height - 2 * marginY, stFastLinear);
+    // Reverse kernel order in trial 2 for both APKs. Each kernel warms up with
+    // the same images/crops before timing; the filter semantics remain distinct.
+    var filters = ciStorage.indexOf("-2") >= 0 ? [stLinear, stFastLinear] : [stFastLinear, stLinear];
+    var fastTimes, linearTimes;
+    ciMessages.add("DETAIL zoom_filter_order=" + (filters[0] == stLinear ? "linear-first" : "fast-linear-first"));
+    for (var i = 0; i < filters.count; ++i) {
+        var times = ciZoomBenchmark(dest, snapshot, width, height, frames, warmupFrames, filters[i]);
+        if (filters[i] == stLinear) linearTimes = times; else fastTimes = times;
     }
-    ciMessages.add("METRIC render_stretch_copy_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720 filter=fast-linear");
-    ciCheckRenderZoom(dest, width, height, "stretchCopy", 88, 48);
-
-    for (var frame = 0; frame < warmupFrames; ++frame)
-        dest.affineCopy(snapshot, 64, 36, width - 128, height - 72, false, 0, 0, width, 0, 0, height, stFastLinear);
-    started = System.getTickCount();
-    for (var frame = 0; frame < frames; ++frame) {
-        var marginX = 64 + (frame % 4) * 8, marginY = 36 + (frame % 4) * 4;
-        // An axis-aligned destination quad exercises the same rectangle path
-        // as ordinary scene zooms without the arbitrary-rotation fallback.
-        dest.affineCopy(snapshot, marginX, marginY, width - 2 * marginX, height - 2 * marginY,
-            false, 0, 0, width, 0, 0, height, stFastLinear);
-    }
-    ciMessages.add("METRIC render_affine_copy_ms=" + (System.getTickCount() - started) + " frames=240 width=1280 height=720 filter=fast-linear");
-    ciCheckRenderZoom(dest, width, height, "affineCopy", 88, 48);
+    ciMessages.add("METRIC render_stretch_copy_ms=" + fastTimes[0] + " frames=240 width=1280 height=720 filter=fast-linear");
+    ciMessages.add("METRIC render_affine_copy_ms=" + fastTimes[1] + " frames=240 width=1280 height=720 filter=fast-linear");
+    ciMessages.add("METRIC render_stretch_copy_linear_ms=" + linearTimes[0] + " frames=240 width=1280 height=720 filter=linear");
+    ciMessages.add("METRIC render_affine_copy_linear_ms=" + linearTimes[1] + " frames=240 width=1280 height=720 filter=linear");
+    ciCheckLinearResize(window, primary);
 
     // Direct writes must retain the temporary-image fallback when source and
     // destination overlap. A unique column pattern exposes overwritten reads.

@@ -27,7 +27,11 @@ REQUIRED_METRICS = {
     "loading_named_scripts_ms", "loading_cached_lookup_ms",
     "loading_hxv4_repeated_miss_ms",
 }
-RENDER_METRICS = {"render_snapshot_unchanged_ms", "render_snapshot_small_update_ms", "render_stretch_copy_ms", "render_affine_copy_ms"}
+RENDER_METRICS = {
+    "render_snapshot_unchanged_ms", "render_snapshot_small_update_ms",
+    "render_stretch_copy_ms", "render_affine_copy_ms",
+    "render_stretch_copy_linear_ms", "render_affine_copy_linear_ms",
+}
 
 
 def decode_text(data):
@@ -218,6 +222,27 @@ def summarize(trials, required_metrics=REQUIRED_METRICS):
     return report
 
 
+def summarize_filters(trials):
+    """Pair different public filters within each measured APK trial."""
+    report = {}
+    for variant in ("before", "after"):
+        records = sorted((trial for trial in trials if trial["variant"] == variant), key=lambda trial: trial["trial"])
+        if [trial["trial"] for trial in records] != [1, 2, 3]:
+            raise ValueError("Filter comparison requires three distinct measured trials per APK")
+        report[variant] = {}
+        for operation in ("stretch_copy", "affine_copy"):
+            fast = [trial["metrics_ms"][f"render_{operation}_ms"] for trial in records]
+            linear = [trial["metrics_ms"][f"render_{operation}_linear_ms"] for trial in records]
+            paired_ratios = [a / b if b else None for a, b in zip(fast, linear)]
+            report[variant][operation] = {
+                "fast_linear_trials_ms": fast, "linear_trials_ms": linear,
+                "fast_linear_median_ms": statistics.median(fast), "linear_median_ms": statistics.median(linear),
+                "paired_fast_over_linear": paired_ratios,
+                "median_paired_fast_over_linear": statistics.median(paired_ratios) if all(linear) else None,
+            }
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--before-dir", type=Path, required=True)
@@ -226,7 +251,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--render-workload", action="store_true",
                         default=os.environ.get("INCLUDE_RENDER_WORKLOAD") == "true",
-                        help="also measure the original 1280x720 zoom workload")
+                        help="also compare stFastLinear and stLinear on the same 1280x720 zoom workload")
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true":
         parser.error("Run this benchmark only on its dedicated GitHub Actions emulator")
@@ -276,6 +301,9 @@ def main():
     report = {"provenance": provenance, "warmups": warmups, "trials": trials, "medians": summarize(trials, required),
               "conditions": "Same API 36 / 4 KB emulator, fresh install per trial, one excluded warm-up trial per APK, alternating pair order, software renderer, debug window disabled",
               "scope": "Synthetic loading, lookup and optional zoom timings; ARM translation and host scheduling affect elapsed time. No timing pass threshold."}
+    if render_script is not None:
+        report["filter_comparisons"] = summarize_filters(trials)
+        report["conditions"] += "; each zoom filter warms up for 24 frames, runs 240 frames, and runs first in alternating measured trials"
     (args.output / "comparison.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     rows = ["| Metric | Before median (ms) | After median (ms) | Ratio |",
             "| --- | ---: | ---: | ---: |"]
@@ -283,6 +311,15 @@ def main():
         ratio = f"{values['speedup']:.2f}x" if values["speedup"] is not None else "n/a"
         rows.append(f"| {metric} | {values['before_median_ms']} | {values['after_median_ms']} | {ratio} |")
     summary = "\n".join(rows) + "\n\n" + report["scope"] + "\n"
+    if render_script is not None:
+        filter_rows = ["| APK | Operation | stFastLinear median (ms) | stLinear median (ms) | Median paired ratio |",
+                       "| --- | --- | ---: | ---: | ---: |"]
+        for variant, operations in report["filter_comparisons"].items():
+            for operation, values in operations.items():
+                ratio = values["median_paired_fast_over_linear"]
+                ratio_text = f"{ratio:.2f}x" if ratio is not None else "n/a"
+                filter_rows.append(f"| {variant} | {operation} | {values['fast_linear_median_ms']} | {values['linear_median_ms']} | {ratio_text} |")
+        summary += "\n" + "\n".join(filter_rows) + "\n\nRatios above 1 favor stLinear within the same APK. The filters have different sampling and rounding; these timings do not establish equivalent output.\n"
     (args.output / "comparison.md").write_text(summary, encoding="utf-8")
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:

@@ -39,13 +39,20 @@ class LoadingBenchmark(unittest.TestCase):
     def test_render_metrics_accept_actual_workload_annotations(self):
         fixture = (ROOT / "tests/fixtures/engine/benchmark-rendering.tjs").read_text(encoding="utf-8")
         messages = re.findall(r'ciMessages.add\("(METRIC [a-z0-9_]+=)"\s*\+.*?\+\s*"([^"]*)"\);', fixture)
-        self.assertEqual(4, len(messages))
+        self.assertEqual(6, len(messages))
         text = self.result() + "\n" + "\n".join(name + "70" + annotations for name, annotations in messages)
         metrics = benchmark.parse_metrics(text.encode(), benchmark.REQUIRED_METRICS | benchmark.RENDER_METRICS)
         self.assertEqual(70, metrics["render_snapshot_unchanged_ms"])
         self.assertEqual(70, metrics["render_snapshot_small_update_ms"])
         self.assertEqual(70, metrics["render_stretch_copy_ms"])
         self.assertEqual(70, metrics["render_affine_copy_ms"])
+        self.assertEqual(70, metrics["render_stretch_copy_linear_ms"])
+        self.assertEqual(70, metrics["render_affine_copy_linear_ms"])
+        for metric in ("render_stretch_copy_linear_ms", "render_affine_copy_linear_ms"):
+            with self.assertRaisesRegex(ValueError, "Missing"):
+                benchmark.parse_metrics("\n".join(line for line in text.splitlines()
+                                                  if not line.startswith("METRIC " + metric + "=")).encode(),
+                                        benchmark.REQUIRED_METRICS | benchmark.RENDER_METRICS)
 
     def apk(self, path, extra=None):
         with zipfile.ZipFile(path, "w") as archive:
@@ -150,6 +157,28 @@ class LoadingBenchmark(unittest.TestCase):
         self.assertEqual(5, result["loading_named_scripts_ms"]["speedup"])
         with self.assertRaises(ValueError):
             benchmark.summarize(trials[:-1])
+
+    def test_filter_comparison_pairs_trials_within_each_apk(self):
+        trials = []
+        for variant, fast, linear in (("before", [100, 20, 30], [10, 10, 30]),
+                                      ("after", [60, 40, 20], [15, 20, 10])):
+            for trial, (a, b) in enumerate(zip(fast, linear), 1):
+                metrics = {f"render_{operation}{suffix}_ms": value
+                           for operation in ("stretch_copy", "affine_copy")
+                           for suffix, value in (("", a), ("_linear", b))}
+                trials.append({"variant": variant, "trial": trial, "metrics_ms": metrics})
+        result = benchmark.summarize_filters(list(reversed(trials)))
+        before = result["before"]["stretch_copy"]
+        self.assertEqual([100, 20, 30], before["fast_linear_trials_ms"])
+        self.assertEqual([10, 2, 1], before["paired_fast_over_linear"])
+        self.assertEqual(2, before["median_paired_fast_over_linear"])
+        self.assertEqual(30, before["fast_linear_median_ms"])
+        self.assertEqual(10, before["linear_median_ms"])
+        self.assertEqual([4, 2, 2], result["after"]["affine_copy"]["paired_fast_over_linear"])
+        with self.assertRaisesRegex(ValueError, "distinct"):
+            benchmark.summarize_filters(trials[:-1])
+        with self.assertRaisesRegex(ValueError, "distinct"):
+            benchmark.summarize_filters(trials[:-1] + [trials[-2]])
 
 
 if __name__ == "__main__":
