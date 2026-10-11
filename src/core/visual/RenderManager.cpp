@@ -2787,6 +2787,15 @@ public:
 			sdata = (const uint8_t *)src->GetPixelData() + (rcsrc.top * spitch + rcsrc.left * 4);
 
 #ifndef USE_SWSCALE
+			// INTER_AREA enlargement uses floor-based source coordinates. When
+			// both scale factors are integers, every interpolation weight is zero
+			// for the next pixel, so nearest replication produces identical RGBA.
+			// Keep uniform 2x enlargement on OpenCV's existing Tegra fast path.
+			const int resizeInterpolation = StretchType == stFastLinear &&
+				src->GetFormat() == TVPTextureFormat::RGBA && tar->GetFormat() == TVPTextureFormat::RGBA &&
+				sw > 0 && sh > 0 && dw >= sw && dh >= sh && dw % sw == 0 && dh % sh == 0 &&
+				!(dw / sw == 2 && dh / sh == 2)
+				? cv::INTER_NEAREST : cvFlags[StretchType];
 			// A full-color copy needs no intermediate image or second copy pass.
 			// Retain the snapshot path for aliases, blending and reversed regions.
 			if (method == GetRenderMethod("Copy") && tar != src &&
@@ -2807,7 +2816,7 @@ public:
 					if (disjoint) {
 						cv::Mat source(sh, sw, CV_8UC4, (void*)sdata, spitch);
 						cv::Mat target(dh, dw, CV_8UC4, targetData, targetPitch);
-						cv::resize(source, target, cv::Size(dw, dh), 0, 0, cvFlags[StretchType]);
+						cv::resize(source, target, cv::Size(dw, dh), 0, 0, resizeInterpolation);
 						return;
 					}
 				}
@@ -2837,7 +2846,7 @@ public:
 			cv::Size dsize(dw, dh);
 			cv::Mat src_img(sh, sw, CV_8UC4, (void*)sdata, spitch);
 			cv::Mat dst_img(dh, dw, CV_8UC4, (void*)ddata, dpitch);
-			cv::resize(src_img, dst_img, dsize, 0, 0, cvFlags[StretchType]);
+			cv::resize(src_img, dst_img, dsize, 0, 0, resizeInterpolation);
 #endif
 			tTVPRect rc(0, 0, dw, dh);
 			((tTVPRenderMethod_Software*)method)->DoRender(

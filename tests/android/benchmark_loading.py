@@ -31,6 +31,7 @@ RENDER_METRICS = {
     "render_snapshot_unchanged_ms", "render_snapshot_small_update_ms",
     "render_stretch_copy_ms", "render_affine_copy_ms",
     "render_stretch_copy_linear_ms", "render_affine_copy_linear_ms",
+    "render_integer_upscale_ms",
 }
 
 

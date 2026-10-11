@@ -147,6 +147,37 @@ function ciSnapshotBenchmark(window, primary, snapshot, width, height, frames, w
         "small cached child updates preserve the changed pixels and untouched scene");
     scene.cached = false;
 }
+function ciIntegerUpscaleBenchmark(window, primary, frames, warmupFrames) {
+    // Match the observed game viewport: 640x360 world pixels fill a 1920x1080 screen.
+    var source = new Layer(window, primary), dest = new Layer(window, primary);
+    source.setSize(640, 360); source.setImageSize(640, 360);
+    dest.setSize(1920, 1080); dest.setImageSize(1920, 1080);
+    source.type = dest.type = ltOpaque;
+    source.holdAlpha = dest.holdAlpha = false;
+    source.visible = dest.visible = false;
+    for (var y = 0; y < 360; y += 80)
+        for (var x = 0; x < 640; x += 80)
+            source.fillRect(x, y, Math.min(80, 640 - x), Math.min(80, 360 - y), ciRenderPattern(x, y));
+    for (var i = 0; i < warmupFrames; ++i)
+        dest.stretchCopy(0, 0, 1920, 1080, source, 0, 0, 640, 360, stFastLinear);
+    var started = System.getTickCount();
+    for (var i = 0; i < frames; ++i)
+        dest.stretchCopy(0, 0, 1920, 1080, source, 0, 0, 640, 360, stFastLinear);
+    ciMessages.add("METRIC render_integer_upscale_ms=" + (System.getTickCount() - started) + " frames=240 source=640x360 target=1920x1080 filter=fast-linear");
+    // Check both sides of tile boundaries and the final short row independently.
+    var xs = [0, 239, 240, 479, 480, 719, 720, 959, 960, 1199, 1200, 1439, 1440, 1679, 1680, 1919];
+    var ys = [0, 239, 240, 479, 480, 719, 720, 959, 960, 1079];
+    for (var yi = 0; yi < ys.count; ++yi) {
+        for (var xi = 0; xi < xs.count; ++xi) {
+            var color = ciRenderPattern(Math.floor(xs[xi] / 3), Math.floor(ys[yi] / 3));
+            ciCheckLinearPixel(dest, xs[xi], ys[yi],
+                [(color >> 16) & 255, (color >> 8) & 255, color & 255, 255],
+                0, "integer viewport enlargement");
+        }
+    }
+    ciCheck(true, "integer viewport enlargement preserves tile boundaries and final pixels");
+    invalidate dest; invalidate source;
+}
 function ciRenderingBenchmark() {
     var width = 1280, height = 720, frames = 240, warmupFrames = 24;
     var window = new Window(); window.setSize(width, height);
@@ -184,6 +215,7 @@ function ciRenderingBenchmark() {
     ciMessages.add("METRIC render_stretch_copy_linear_ms=" + linearTimes[0] + " frames=240 width=1280 height=720 filter=linear");
     ciMessages.add("METRIC render_affine_copy_linear_ms=" + linearTimes[1] + " frames=240 width=1280 height=720 filter=linear");
     ciCheckLinearResize(window, primary);
+    ciIntegerUpscaleBenchmark(window, primary, frames, warmupFrames);
 
     // Direct writes must retain the temporary-image fallback when source and
     // destination overlap. A unique column pattern exposes overwritten reads.

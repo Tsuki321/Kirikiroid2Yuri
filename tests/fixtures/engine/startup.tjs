@@ -205,6 +205,7 @@ try {
     invalidate ciProvinceTarget;
 
     Scripts.execStorage(ciStorage + "viewport-tests.tjs");
+    Scripts.execStorage(ciStorage + "integer-scale-tests.tjs");
 
     ciLayer.clear(0);
     var ciBrush = new GdiPlus.Appearance();

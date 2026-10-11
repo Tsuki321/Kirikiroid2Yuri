@@ -39,7 +39,7 @@ class LoadingBenchmark(unittest.TestCase):
     def test_render_metrics_accept_actual_workload_annotations(self):
         fixture = (ROOT / "tests/fixtures/engine/benchmark-rendering.tjs").read_text(encoding="utf-8")
         messages = re.findall(r'ciMessages.add\("(METRIC [a-z0-9_]+=)"\s*\+.*?\+\s*"([^"]*)"\);', fixture)
-        self.assertEqual(6, len(messages))
+        self.assertEqual(7, len(messages))
         text = self.result() + "\n" + "\n".join(name + "70" + annotations for name, annotations in messages)
         metrics = benchmark.parse_metrics(text.encode(), benchmark.REQUIRED_METRICS | benchmark.RENDER_METRICS)
         self.assertEqual(70, metrics["render_snapshot_unchanged_ms"])
@@ -48,7 +48,8 @@ class LoadingBenchmark(unittest.TestCase):
         self.assertEqual(70, metrics["render_affine_copy_ms"])
         self.assertEqual(70, metrics["render_stretch_copy_linear_ms"])
         self.assertEqual(70, metrics["render_affine_copy_linear_ms"])
-        for metric in ("render_stretch_copy_linear_ms", "render_affine_copy_linear_ms"):
+        self.assertEqual(70, metrics["render_integer_upscale_ms"])
+        for metric in ("render_stretch_copy_linear_ms", "render_affine_copy_linear_ms", "render_integer_upscale_ms"):
             with self.assertRaisesRegex(ValueError, "Missing"):
                 benchmark.parse_metrics("\n".join(line for line in text.splitlines()
                                                   if not line.startswith("METRIC " + metric + "=")).encode(),

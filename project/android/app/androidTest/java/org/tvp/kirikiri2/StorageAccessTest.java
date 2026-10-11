@@ -259,6 +259,7 @@ public class StorageAccessTest {
             write(storage + "/kag-parser-tests.tjs", read(tests.getAssets().open("engine/kag-parser-tests.tjs")));
             write(storage + "/layer-viewport.tjs", read(tests.getAssets().open("engine/layer-viewport.tjs")));
             write(storage + "/viewport-tests.tjs", read(tests.getAssets().open("engine/viewport-tests.tjs")));
+            write(storage + "/integer-scale-tests.tjs", read(tests.getAssets().open("engine/integer-scale-tests.tjs")));
             assertTrue(StorageAccess.write(context, storage + "/plugin-tone.wav",
                     readBytes(tests.getAssets().open("engine/plugin-tone.wav"))));
             if (name.startsWith("transitions"))

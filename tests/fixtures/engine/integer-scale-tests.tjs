@@ -1,0 +1,54 @@
+// Integer enlargement repeats each complete RGBA pixel, including hidden RGB
+// in transparent pixels. Check the public copy result against the input image.
+function ciIntegerScalePixel(x, y) {
+    var alpha = [0, 1, 63, 127, 128, 254, 255][(x + y * 3) % 7];
+    return (alpha << 24) | (((x * 53 + y * 17 + 11) & 255) << 16)
+        | (((x * 7 + y * 97 + 31) & 255) << 8) | ((x * 101 + y * 13 + 71) & 255);
+}
+function ciIntegerScaleCase(label, scaleX, scaleY, sx, sy, sw, sh, alias) {
+    var dx = 3, dy = 2, dw = sw * scaleX, dh = sh * scaleY;
+    var width = dw + 6, height = dh + 5, sentinel = 0x5a193b57;
+    var target = new Layer(ciWindow, ciLayer);
+    target.setSize(width, height); target.setImageSize(width, height);
+    target.type = ltAlpha; target.face = dfAlpha;
+    target.holdAlpha = false; target.visible = false;
+    target.fillRect(0, 0, width, height, sentinel);
+    var source = alias ? target : new Layer(ciWindow, ciLayer);
+    var sourceWidth = alias ? width : 9, sourceHeight = alias ? height : 7;
+    if (!alias) {
+        source.setSize(sourceWidth, sourceHeight);
+        source.setImageSize(sourceWidth, sourceHeight);
+        source.type = ltAlpha; source.face = dfAlpha;
+        source.holdAlpha = false; source.visible = false;
+    }
+    // Keep expected pixels before an aliased copy can overwrite its input.
+    var original = [];
+    for (var y = 0; y < sourceHeight; ++y)
+        for (var x = 0; x < sourceWidth; ++x) {
+            var pixel = ciIntegerScalePixel(x, y);
+            original.add(pixel);
+            source.fillRect(x, y, 1, 1, pixel);
+        }
+    target.stretchCopy(dx, dy, dw, dh, source, sx, sy, sw, sh, stFastLinear);
+    for (var y = 0; y < height; ++y)
+        for (var x = 0; x < width; ++x) {
+            var expected = alias ? original[y * sourceWidth + x] : sentinel;
+            if (x >= dx && x < dx + dw && y >= dy && y < dy + dh)
+                expected = original[(sy + Math.floor((y - dy) / scaleY)) * sourceWidth
+                    + sx + Math.floor((x - dx) / scaleX)];
+            var color = target.getMainPixel(x, y), alpha = target.getMaskPixel(x, y);
+            if (color != (expected & 0xffffff) || alpha != ((expected >> 24) & 255))
+                throw "Integer enlargement " + label + " changed RGBA at " + x + "," + y;
+        }
+    ciCheck(true, "stFastLinear " + label + " preserves every RGBA pixel and untouched margins");
+    if (!alias) invalidate source;
+    invalidate target;
+}
+ciIntegerScaleCase("2x2 enlargement", 2, 2, 0, 0, 5, 4, false);
+ciIntegerScaleCase("3x3 enlargement", 3, 3, 0, 0, 5, 4, false);
+ciIntegerScaleCase("2x3 enlargement", 2, 3, 0, 0, 5, 4, false);
+ciIntegerScaleCase("3x1 enlargement", 3, 1, 0, 0, 5, 4, false);
+ciIntegerScaleCase("1x3 enlargement", 1, 3, 0, 0, 5, 4, false);
+ciIntegerScaleCase("offset cropped enlargement", 3, 2, 2, 1, 4, 3, false);
+ciIntegerScaleCase("downward overlapping enlargement", 3, 2, 1, 1, 5, 4, true);
+ciIntegerScaleCase("upward overlapping enlargement", 2, 3, 8, 7, 5, 4, true);
