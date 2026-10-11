@@ -903,6 +903,9 @@ void tTJSInterCodeContext::ExecuteAsFunction(iTJSDispatch2 *objthis,
 void tTJSInterCodeContext::DisplayExceptionGeneratedCode(tjs_int codepos,
 	const tTJSVariant *ra)
 {
+	// Script catch blocks also pass here; detailed VM dumps are debug output.
+	if(!TJSEnableDebugMode) return;
+
 	tTJS *tjs = Block->GetTJS();
 	ttstr info(
 		TJS_W("==== An exception occured at ") +

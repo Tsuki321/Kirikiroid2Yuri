@@ -1194,6 +1194,8 @@ void TVPShowScriptException(eTJSScriptError &e)
 	{
 		ttstr errstr = (ttstr(TVPScriptExceptionRaised) + TJS_W("\n") + e.GetMessage());
 		TVPAddLog(ttstr(TVPScriptExceptionRaised) + TJS_W("\n") + e.GetMessage());
+		TVPAddLog(ttstr(TJS_W("source : ")) + e.GetBlockName() + TJS_W("(") +
+			ttstr(e.GetSourceLine()) + TJS_W(")"));
 		if(e.GetTrace().GetLen() != 0)
 			TVPAddLog(ttstr(TJS_W("trace : ")) + e.GetTrace());
 		TVPShowSimpleMessageBox(errstr, TVPGetErrorDialogTitle());

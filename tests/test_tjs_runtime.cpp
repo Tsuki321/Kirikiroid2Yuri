@@ -465,6 +465,97 @@ TEST_F(TJSRuntime, SubclassConstructionAndExceptionsPreserveTheExecutionStack) {
     EXPECT_EQ(1, Integer(TJS_W("caught")));
 }
 
+class TJSDiagnosticRuntime : public TJSRuntime, public testing::WithParamInterface<bool> {
+protected:
+    class ConsoleCapture : public iTJSConsoleOutput {
+    public:
+        std::string output;
+        size_t lines = 0;
+        void Print(const tjs_char *message) override {
+            output += ttstr(message).AsStdString();
+            output += '\n';
+            ++lines;
+        }
+        void ExceptionPrint(const tjs_char *message) override { Print(message); }
+    } console;
+    bool previousDebugMode = false;
+    void SetUp() override {
+        previousDebugMode = TJSEnableDebugMode;
+        TJSEnableDebugMode = GetParam();
+        TJSRuntime::SetUp();
+        runtime->SetConsoleOutput(&console);
+    }
+    void TearDown() override {
+        // Debug object tracking must stay enabled until this runtime is gone.
+        TJSRuntime::TearDown();
+        TJSEnableDebugMode = previousDebugMode;
+    }
+};
+
+TEST_P(TJSDiagnosticRuntime, CaughtMissingMethodsDumpOnlyInDebugMode) {
+    Script(TJS_W("class DiagnosticObject {}\n"
+                 "var object = new DiagnosticObject(), caught = 0, caughtMessage = '';\n"
+                 "function missing() { object.missingMethod(); }\n"
+                 "function fallback() {\n"
+                 "  var preserved = 41;\n"
+                 "  try { missing(); } catch (error) { ++caught; caughtMessage = error.message; }\n"
+                 "  return preserved + 1;\n"
+                 "}\n"
+                 "var total = 0; for (var i = 0; i < 8; ++i) total += fallback();"));
+    EXPECT_EQ(8, Integer(TJS_W("caught")));
+    EXPECT_EQ(336, Integer(TJS_W("total")));
+    EXPECT_EQ(1, Integer(TJS_W("caughtMessage.indexOf('missingMethod') >= 0")));
+    if (GetParam()) {
+        EXPECT_NE(std::string::npos, console.output.find("-- Disassembled VM code --"));
+        EXPECT_NE(std::string::npos, console.output.find("-- Register dump --"));
+        EXPECT_GT(console.lines, 8u);
+    } else {
+        EXPECT_TRUE(console.output.empty());
+        EXPECT_EQ(0u, console.lines);
+    }
+    std::cout << "Caught missing-method diagnostics: debug=" << GetParam()
+              << " exceptions=8 lines=" << console.lines << " bytes=" << console.output.size() << '\n';
+}
+
+TEST_P(TJSDiagnosticRuntime, UncaughtErrorsKeepSourceTraceAndExecutionState) {
+    const tjs_char *source = TJS_W("class DiagnosticObject {} var object = new DiagnosticObject();\n"
+                                  "function missing() {\n"
+                                  "  object.missingMethod();\n"
+                                  "}\n"
+                                  "function caller() { missing(); }\n"
+                                  "caller();\n");
+    bool caught = false;
+    try {
+        runtime->ExecScript(source, nullptr, nullptr, TJS_W("uncaught-diagnostic.tjs"));
+    } catch (const eTJSScriptError &error) {
+        caught = true;
+        EXPECT_NE(std::string::npos, error.GetMessage().AsStdString().find("missingMethod"));
+        EXPECT_EQ(Text(TJS_W("uncaught-diagnostic.tjs")), Text(error.GetBlockName()));
+        EXPECT_EQ(3, error.GetSourceLine());
+        EXPECT_NE(std::string::npos, error.GetTrace().AsStdString().find("caller"));
+    }
+    EXPECT_TRUE(caught);
+    if (!GetParam()) EXPECT_TRUE(console.output.empty());
+    Script(TJS_W("function recovered(value) { return value + 1; } var answer = recovered(41);"));
+    EXPECT_EQ(42, Integer(TJS_W("answer")));
+
+    // A direct top-level error has source metadata even without a caller trace.
+    caught = false;
+    try {
+        runtime->ExecScript(TJS_W("\nobject.missingMethod();"), nullptr, nullptr,
+                            TJS_W("top-level-diagnostic.tjs"));
+    } catch (const eTJSScriptError &error) {
+        caught = true;
+        EXPECT_NE(std::string::npos, error.GetMessage().AsStdString().find("missingMethod"));
+        EXPECT_EQ(Text(TJS_W("top-level-diagnostic.tjs")), Text(error.GetBlockName()));
+        EXPECT_EQ(2, error.GetSourceLine());
+    }
+    EXPECT_TRUE(caught);
+    EXPECT_EQ(43, Integer(TJS_W("recovered(answer)")));
+}
+
+INSTANTIATE_TEST_SUITE_P(DebugMode, TJSDiagnosticRuntime, testing::Bool());
+
 TEST_F(TJSRuntime, GarbageCollectionReleasesUnusedObjectsAndAllowsReentry) {
     InstallCollector();
     Script(TJS_W("var finalized = 0;"
