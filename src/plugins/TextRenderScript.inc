@@ -21,7 +21,8 @@ class TextRenderBase {
                      "leading" => "([{「『【（［｛", "begin" => "「『（", "end" => "」』）",
                      "wordbreak" => true, "kinsoku_max" => 1, "ignore_delay" => false,
                      "width_time_scale" => false, "ignore_xr" => false];
-        clear();
+        // Derived clear methods may depend on fields their constructors set later.
+        (global.TextRenderBase.clear incontextof this)();
     }
     function _copy(value) {
         var copy = %[];

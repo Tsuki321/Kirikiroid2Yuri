@@ -225,6 +225,27 @@ TEST_F(TJSRuntime, TextRendererWrapsAndKeepsInstancesIndependent) {
     EXPECT_EQ(5, Integer(TJS_W("r.renderCount")));
 }
 
+TEST_F(TJSRuntime, TextRendererConstructionDefersDerivedClearUntilOwnerIsReady) {
+    Script(TextRenderTestSource);
+    Script(TJS_W("class OwnedLayout extends TextRenderBase {"
+                 "  var owner = void;"
+                 "  function OwnedLayout(value) { super.TextRenderBase(); owner = value; }"
+                 "}"
+                 "class MessageLayout extends OwnedLayout {"
+                 "  function MessageLayout(value) { super.OwnedLayout(value); }"
+                 "  function clear() { ++owner.clears; super.clear(); }"
+                 "}"
+                 "var owner = %['clears'=>0]; var layout = new MessageLayout(owner);"
+                 "layout.render('AB');"));
+    EXPECT_EQ(0, Integer(TJS_W("owner.clears")));
+    EXPECT_EQ(2, Integer(TJS_W("layout.renderCount")));
+    EXPECT_EQ(1, Integer(TJS_W("layout.renderText == 'AB'")));
+    Script(TJS_W("layout.clear(); layout.render('C');"));
+    EXPECT_EQ(1, Integer(TJS_W("owner.clears")));
+    EXPECT_EQ(1, Integer(TJS_W("layout.renderCount")));
+    EXPECT_EQ(1, Integer(TJS_W("layout.renderText == 'C'")));
+}
+
 TEST_F(TJSRuntime, TextRendererFormattingAndFontCallbacks) {
     Script(TextRenderTestSource);
     Script(TJS_W("var r = new TextRenderBase(); r.defaultFontSize = 20; r.clear();"

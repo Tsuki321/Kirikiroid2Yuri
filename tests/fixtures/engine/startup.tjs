@@ -282,6 +282,23 @@ try {
     ciCheck((ciNoisePixel & 255) == ((ciNoisePixel >> 16) & 255), "white noise is grayscale");
     ciLayer.setClip();
     Plugins.link("textrender.dll");
+    class CiOwnedLayout extends TextRenderBase {
+        var owner = void;
+        function CiOwnedLayout(value) { super.TextRenderBase(); owner = value; }
+    }
+    class CiMessageLayout extends CiOwnedLayout {
+        function CiMessageLayout(value) { super.CiOwnedLayout(value); }
+        function clear() { ++owner.clears; super.clear(); }
+    }
+    var ciLayoutOwner = %["clears" => 0];
+    var ciOwnedLayout = new CiMessageLayout(ciLayoutOwner);
+    ciOwnedLayout.render("AB");
+    ciCheck(ciLayoutOwner.clears == 0 && ciOwnedLayout.renderCount == 2,
+        "text renderer constructs derived layouts before calling their clear override");
+    ciOwnedLayout.clear(); ciOwnedLayout.render("C");
+    ciCheck(ciLayoutOwner.clears == 1 && ciOwnedLayout.renderCount == 1 && ciOwnedLayout.renderText == "C",
+        "text renderer preserves derived clear dispatch and resets inherited layout state");
+    invalidate ciOwnedLayout;
     class CiTextLayout extends TextRenderBase {
         function CiTextLayout() { super.TextRenderBase(); }
         function onFontChange(info) { ciLayer.font.bold = info.bold; ciLayer.font.italic = info.italic; }
