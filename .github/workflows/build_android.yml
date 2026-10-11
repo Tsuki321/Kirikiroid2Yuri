@@ -10,6 +10,10 @@ on:
         description: Existing successful APK build and native suites to verify without rebuilding
         required: false
         default: ''
+      full_emulator_profile:
+        description: Run the full paired emulator matrix when reusing an existing APK build
+        type: boolean
+        default: false
       skip_emulator_tests:
         description: Build APKs and run native checks without starting an emulator
         type: boolean
@@ -238,8 +242,8 @@ jobs:
       max-parallel: 1
       matrix:
         # Swap debug/release installs on one emulator per Android 16 page size.
-        # Keep Android 15 debug coverage and the reused-build debug-only profile.
-        include: ${{ fromJSON(inputs.reuse_build_run != '' && '[{"api":36,"variants":"debug","target":"google_apis"},{"api":36,"variants":"debug","target":"google_apis_ps16k"}]' || '[{"api":36,"variants":"debug release","target":"google_apis"},{"api":36,"variants":"debug release","target":"google_apis_ps16k"},{"api":35,"variants":"debug","target":"google_apis_ps16k"}]') }}
+        # Reused builds default to debug-only unless the full profile is requested.
+        include: ${{ fromJSON(inputs.reuse_build_run != '' && !inputs.full_emulator_profile && '[{"api":36,"variants":"debug","target":"google_apis"},{"api":36,"variants":"debug","target":"google_apis_ps16k"}]' || '[{"api":36,"variants":"debug release","target":"google_apis"},{"api":36,"variants":"debug release","target":"google_apis_ps16k"},{"api":35,"variants":"debug","target":"google_apis_ps16k"}]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -279,7 +283,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@v2
         env:
-          ANDROID_TEST_PROFILE: ${{ inputs.reuse_build_run != '' && 'release' || 'full' }}
+          ANDROID_TEST_PROFILE: ${{ inputs.reuse_build_run != '' && !inputs.full_emulator_profile && 'release' || 'full' }}
           ANDROID_APK_BUILD_RUN: ${{ inputs.reuse_build_run || github.run_id }}
         with:
           emulator-build: 15917651
