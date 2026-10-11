@@ -1,5 +1,9 @@
 Scripts.execStorage(ciStorage + "layer-viewport.tjs");
 var ciViewport = new LayerViewport(ciWindow, ciLayer, ciLayer);
+ciCheck(ciViewport.root.type == ltAlpha && ciViewport.root.face == dfAlpha
+    && ciViewport.snapshot.type == ltAlpha && ciViewport.snapshot.face == dfAlpha
+    && ciViewport.display.type == ltAlpha && ciViewport.display.face == dfAlpha,
+    "viewport defaults to straight alpha for source, snapshot, and display");
 ciViewport.setSourceSize(16, 12);
 ciViewport.setScreenRect(0, 0, 32, 24);
 ciViewport.interpolation = stNearest;
@@ -97,3 +101,97 @@ ciCheck(ciViewport.render() && !ciViewport.root.cacheDirty
     && !ciViewport.render() && ciViewport.display.getMainPixel(2, 2) == 0xabcdef,
     "a childless cached source completes edits and skips unchanged frames");
 invalidate ciViewport;
+
+// A wholly synthetic premultiplied subtree: two pixels inside nested binders,
+// surrounded by a transparent border. Raw RGB is already multiplied by alpha.
+function ciCheckPremultViewportPixels(layer, scale, edited, label) {
+    for (var y = 0; y < 3 * scale; ++y)
+        for (var x = 0; x < 4 * scale; ++x) {
+            var sx = Math.floor(x / scale), sy = Math.floor(y / scale);
+            var expected = 0;
+            if (sy == 1 && sx == 1) expected = 0xff123456;
+            if (sy == 1 && sx == 2) expected = edited ? 0x80204030 : 0x80402010;
+            var color = layer.getMainPixel(x, y), alpha = layer.getMaskPixel(x, y);
+            if (color != (expected & 0xffffff) || alpha != ((expected >> 24) & 255))
+                throw label + " changed RGBA at " + x + "," + y
+                    + " rgb=" + color + " alpha=" + alpha;
+        }
+    ciCheck(true, label + " preserves every premultiplied RGBA pixel and transparent border");
+}
+var ciPremultBlack = new Layer(ciWindow, ciLayer);
+ciPremultBlack.type = ltOpaque; ciPremultBlack.face = dfOpaque;
+ciPremultBlack.holdAlpha = false; ciPremultBlack.visible = false;
+ciPremultBlack.setSize(8, 6); ciPremultBlack.setImageSize(8, 6);
+ciPremultBlack.fillRect(0, 0, 8, 6, 0xff000000);
+var ciPremultView = new LayerViewport(ciWindow, ciLayer, ciPremultBlack, ltAddAlpha);
+ciCheck(ciPremultView.root.type == ltAddAlpha && ciPremultView.root.face == dfAddAlpha
+    && ciPremultView.snapshot.type == ltAddAlpha && ciPremultView.snapshot.face == dfAddAlpha
+    && ciPremultView.display.type == ltAddAlpha && ciPremultView.display.face == dfAddAlpha,
+    "viewport uses premultiplied alpha for source, snapshot, and display when requested");
+ciPremultView.setSourceSize(4, 3);
+ciPremultView.setScreenRect(0, 0, 4, 3);
+// Keep the helper's default stFastLinear to exercise exact integer enlargement.
+var ciPremultOuter = new Layer(ciWindow, ciPremultView.root);
+ciPremultOuter.type = ltBinder; ciPremultOuter.setSize(4, 3); ciPremultOuter.visible = true;
+var ciPremultInner = new Layer(ciWindow, ciPremultOuter);
+ciPremultInner.type = ltBinder; ciPremultInner.setSize(2, 1);
+ciPremultInner.setPos(1, 1); ciPremultInner.visible = true;
+var ciPremultChild = new Layer(ciWindow, ciPremultInner);
+ciPremultChild.type = ltAddAlpha; ciPremultChild.face = dfAddAlpha;
+ciPremultChild.setSize(2, 1); ciPremultChild.setImageSize(2, 1);
+ciPremultChild.fillRect(0, 0, 1, 1, 0xff123456);
+ciPremultChild.fillRect(1, 0, 1, 1, 0x80402010);
+ciPremultChild.visible = true;
+ciCheck(ciPremultView.render(true), "premultiplied viewport composes a hidden nested subtree");
+ciCheckPremultViewportPixels(ciPremultView.display, 1, false, "Unscaled viewport");
+
+var ciPremultCapture = new Layer(ciWindow, ciLayer);
+ciPremultCapture.type = ltAddAlpha; ciPremultCapture.face = dfAddAlpha;
+ciPremultCapture.visible = false;
+ciPremultCapture.setSize(8, 6); ciPremultCapture.setImageSize(8, 6);
+var ciPremultScratch = new Layer(ciWindow, ciLayer);
+ciPremultScratch.type = ltAddAlpha; ciPremultScratch.face = dfAddAlpha;
+ciPremultScratch.visible = false;
+ciCheck(ciPremultView.capture(ciPremultCapture, ciPremultScratch, 8, 6),
+    "premultiplied viewport captures through caller-owned layers of the same format");
+ciCheckPremultViewportPixels(ciPremultScratch, 1, false, "Capture snapshot");
+ciCheckPremultViewportPixels(ciPremultCapture, 2, false, "2x capture");
+ciPremultView.setScreenRect(0, 0, 8, 6);
+ciPremultView.display.visible = true;
+ciCheck(ciPremultView.render() && !ciPremultView.root.cacheDirty,
+    "premultiplied viewport completes its cached source while scaling");
+ciCheckPremultViewportPixels(ciPremultView.snapshot, 1, false, "Viewport snapshot");
+ciCheckPremultViewportPixels(ciPremultView.display, 2, false, "2x viewport");
+var ciPremultFrames = ciPremultView.renderedFrames;
+ciCheck(!ciPremultView.render() && ciPremultView.renderedFrames == ciPremultFrames,
+    "premultiplied viewport skips unchanged cached frames");
+
+// Compose the visible display layer over an actual opaque parent. Pixel copies
+// alone cannot detect a display layer that multiplies premultiplied RGB again.
+ciPremultCapture.piledCopy(0, 0, ciPremultBlack, 0, 0, 8, 6);
+for (var ciPremultY = 0; ciPremultY < 6; ++ciPremultY)
+    for (var ciPremultX = 0; ciPremultX < 8; ++ciPremultX) {
+        var ciPremultExpected = 0;
+        if (ciPremultY >= 2 && ciPremultY < 4) {
+            if (ciPremultX >= 2 && ciPremultX < 4) ciPremultExpected = 0x123456;
+            if (ciPremultX >= 4 && ciPremultX < 6) ciPremultExpected = 0x402010;
+        }
+        if (ciPremultCapture.getMainPixel(ciPremultX, ciPremultY) != ciPremultExpected)
+            throw "Premultiplied display over black changed RGB at " + ciPremultX + "," + ciPremultY;
+    }
+ciCheck(true, "premultiplied display composes over opaque black without multiplying alpha twice");
+ciPremultChild.fillRect(1, 0, 1, 1, 0x80204030);
+ciCheck(ciPremultView.root.cacheDirty && ciPremultView.render()
+    && !ciPremultView.root.cacheDirty && ciPremultView.renderedFrames == ciPremultFrames + 1,
+    "premultiplied child pixel edit invalidates and completes the nested viewport cache");
+ciCheckPremultViewportPixels(ciPremultView.snapshot, 1, true, "Edited viewport snapshot");
+ciCheckPremultViewportPixels(ciPremultView.display, 2, true, "Edited 2x viewport");
+ciCheck(!ciPremultView.render() && ciPremultView.renderedFrames == ciPremultFrames + 1,
+    "premultiplied viewport skips unchanged frames after a pixel edit");
+invalidate ciPremultChild;
+invalidate ciPremultInner;
+invalidate ciPremultOuter;
+invalidate ciPremultCapture;
+invalidate ciPremultScratch;
+invalidate ciPremultView;
+invalidate ciPremultBlack;
