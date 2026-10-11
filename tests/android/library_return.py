@@ -86,11 +86,14 @@ def scroll_to(name):
         for _ in range(12):
             root = tree()
             bounds = find_bounds(root, name)
-            if bounds is not None:
+            # A clipped row can expose only a few pixels above the navigation
+            # bar. Scroll it into a usable tap area before trying to activate it.
+            if bounds is not None and bounds[3] - bounds[1] >= 48:
                 left, top, right, bottom = bounds
                 return (left + right) // 2, (top + bottom) // 2
             scroll = next(((node, bounds) for node, bounds in visible_nodes(root)
-                           if node.get("scrollable") == "true"), None)
+                           if node.get("scrollable") == "true"
+                           or node.get("class") in ("android.widget.ScrollView", "android.widget.ListView")), None)
             if scroll is None:
                 time.sleep(0.2)
                 continue

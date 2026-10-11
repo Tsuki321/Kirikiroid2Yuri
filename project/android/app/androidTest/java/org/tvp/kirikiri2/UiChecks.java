@@ -185,7 +185,11 @@ final class UiChecks {
                 AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD}) {
             int unavailable = 0;
             for (int attempt = 0; attempt < 12; ++attempt) {
-                if (find(name) != null) return;
+                AccessibilityNodeInfo target = find(name);
+                if (target != null) {
+                    Rect bounds = new Rect(); target.getBoundsInScreen(bounds);
+                    if (bounds.height() >= 48) return;
+                }
                 // A newly opened dialog can expose its labels before its
                 // ScrollView supports scrolling. Reacquire after layout.
                 if (!scroll(automation().getRootInActiveWindow(), direction)) {
@@ -204,10 +208,14 @@ final class UiChecks {
 
     private static boolean scroll(AccessibilityNodeInfo node, int direction) {
         if (node == null) return false;
-        if (node.isVisibleToUser() && node.isScrollable()) {
-            if (node.performAction(direction)) return true;
-            // Some Android 16 ScrollViews reject the accessibility action;
-            // exercise the same bounded drag a user would make in the panel.
+        CharSequence viewClass = node.getClassName();
+        boolean scrollContainer = "android.widget.ScrollView".contentEquals(viewClass == null ? "" : viewClass)
+            || "android.widget.ListView".contentEquals(viewClass == null ? "" : viewClass);
+        // Android can report scrollable=false for clipped dialog lists, or
+        // accept ACTION_SCROLL_FORWARD without moving a dialog ScrollView.
+        // Use bounded touch drags for these known vertical containers.
+        if (node.isVisibleToUser() && (node.isScrollable() || scrollContainer)) {
+            if (!scrollContainer && node.performAction(direction)) return true;
             Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
             if (bounds.width() > 0 && bounds.height() > 80) {
                 float x = bounds.exactCenterX();
