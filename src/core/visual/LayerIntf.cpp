@@ -2405,6 +2405,8 @@ void tTJSNI_BaseLayer::SetImageSize(tjs_uint width, tjs_uint height)
 void tTJSNI_BaseLayer::ImageLayerSizeChanged()
 {
 	// called from geographical management
+	// The layer bounds can change without resizing its larger image buffer.
+	ResizeCache();
 	if(!MainImage) return;
 
 	if((tjs_int)MainImage->GetWidth() < Rect.get_width())
@@ -3669,10 +3671,12 @@ void tTJSNI_BaseLayer::AllocateCache()
 void tTJSNI_BaseLayer::ResizeCache()
 {
 	// resize to Rect's size
-	if(CacheBitmap && MainImage)
+	if(CacheBitmap)
 	{
-		CacheBitmap->SetSize(MainImage->GetWidth(), MainImage->GetHeight());
+		CacheBitmap->SetSize(Rect.get_width(), Rect.get_height());
 	}
+	// The resized cache replaces the old contents and coordinate bounds.
+	CacheRecalcRegion.Clear();
 	CacheRecalcRegion.Or(tTVPRect(0, 0, Rect.get_width(), Rect.get_height()));
 }
 //---------------------------------------------------------------------------
@@ -6904,7 +6908,9 @@ tTVPBaseTexture * tTJSNI_BaseLayer::Complete(const tTVPRect & rect)
 	if(!GetCacheEnabled()) return NULL;
 		// caller must ensure that the caching is enabled
 
-	if(GetVisibleChildrenCount() == 0 && ImageLeft == 0 && ImageTop == 0 &&
+	// Explicitly cached layers must refresh the real cache even after their
+	// last visible child disappears, so later partial updates cannot reuse it.
+	if(!Cached && MainImage && GetVisibleChildrenCount() == 0 && ImageLeft == 0 && ImageTop == 0 &&
 		MainImage->GetWidth() == GetWidth() && MainImage->GetHeight() == GetHeight())
 	{
 		// the layer has no visible children

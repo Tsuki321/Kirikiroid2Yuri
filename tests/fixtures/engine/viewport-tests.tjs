@@ -41,6 +41,47 @@ ciViewport.render();
 ciCheck(ciViewport.display.getMainPixel(3, 3) == 0x123456
     && ciViewport.display.getMaskPixel(12, 10) == 0,
     "viewport switches to unscaled composition after zoom changes");
+ciCheck(!ciViewport.root.cacheDirty && !ciViewport.render(),
+    "growing the viewport source completes its cache and skips unchanged frames");
+
+ciViewport.root.fillRect(24, 18, 1, 1, 0xffabcdef);
+ciViewport.setSourceSize(16, 12);
+ciCheck(ciViewport.root.cacheDirty && ciViewport.render()
+    && !ciViewport.root.cacheDirty && !ciViewport.render(),
+    "shrinking the source discards dirty regions outside its new image bounds");
+ciViewport.setSourceSize(32, 24);
+ciCheck(ciViewport.render() && !ciViewport.root.cacheDirty
+    && ciViewport.display.getMaskPixel(24, 18) == 0,
+    "growing a previously shrunk source initializes the newly exposed pixels");
+
+ciViewport.root.fillRect(24, 18, 1, 1, 0xffabcdef);
+ciViewport.root.setSize(16, 12);
+ciViewport.snapshot.piledCopy(0, 0, ciViewport.root, 0, 0, 16, 12);
+ciCheck(ciViewport.root.imageWidth == 32 && ciViewport.root.imageHeight == 24
+    && !ciViewport.root.cacheDirty,
+    "shrinking only the layer bounds discards out-of-bounds dirty regions");
+ciViewport.root.setSize(32, 24);
+ciCheck(ciViewport.root.cacheDirty,
+    "growing the layer bounds invalidates its newly exposed cache area");
+ciViewport.snapshot.piledCopy(0, 0, ciViewport.root, 0, 0, 32, 24);
+ciCheck(!ciViewport.root.cacheDirty
+    && ciViewport.snapshot.getMainPixel(24, 18) == 0xabcdef,
+    "growing only the layer bounds preserves and recomposes its image pixels");
+ciViewport.root.fillRect(24, 18, 1, 1, 0);
+ciViewport.render(true);
+
+ciViewChild.visible = false;
+ciCheck(ciViewport.root.cacheDirty && ciViewport.render()
+    && !ciViewport.root.cacheDirty && !ciViewport.render()
+    && ciViewport.display.getMaskPixel(2, 2) == 0,
+    "hiding the last visible child completes a transparent cache and skips unchanged frames");
+ciViewChild.setPos(20, 14);
+ciViewChild.visible = true;
+ciCheck(ciViewport.render() && !ciViewport.root.cacheDirty
+    && ciViewport.display.getMainPixel(22, 16) == 0x123456
+    && ciViewport.display.getMaskPixel(2, 2) == 0,
+    "showing the last child elsewhere leaves its old cached pixels cleared");
+ciViewChild.setPos(1, 1);
 ciViewport.setVisible(false);
 var ciViewFrames = ciViewport.renderedFrames;
 ciViewChild.fillRect(0, 0, 8, 6, 0xffabcdef);
@@ -49,4 +90,10 @@ ciCheck(!ciViewport.render() && ciViewport.renderedFrames == ciViewFrames,
 ciViewport.render(true);
 ciCheck(ciViewport.display.getMainPixel(3, 3) == 0xabcdef,
     "viewport captures changes accumulated while hidden");
+invalidate ciViewChild;
+ciViewport.display.visible = true;
+ciViewport.root.fillRect(2, 2, 1, 1, 0xffabcdef);
+ciCheck(ciViewport.render() && !ciViewport.root.cacheDirty
+    && !ciViewport.render() && ciViewport.display.getMainPixel(2, 2) == 0xabcdef,
+    "a childless cached source completes edits and skips unchanged frames");
 invalidate ciViewport;
