@@ -11,9 +11,18 @@ on:
         required: false
         default: ''
       full_emulator_profile:
-        description: Run the full paired emulator matrix when reusing an existing APK build
+        description: Run the full emulator test profile when reusing an existing APK build
         type: boolean
         default: false
+      emulator_image:
+        description: Emulator image to verify (Android 16 debug/release pair or Android 15 debug)
+        type: choice
+        default: all
+        options:
+          - all
+          - android16-4k
+          - android16-16k
+          - android15-16k
       skip_emulator_tests:
         description: Build APKs and run native checks without starting an emulator
         type: boolean
@@ -242,8 +251,16 @@ jobs:
       max-parallel: 1
       matrix:
         # Swap debug/release installs on one emulator per Android 16 page size.
-        # Reused builds default to debug-only unless the full profile is requested.
-        include: ${{ fromJSON(inputs.reuse_build_run != '' && !inputs.full_emulator_profile && '[{"api":36,"variants":"debug","target":"google_apis"},{"api":36,"variants":"debug","target":"google_apis_ps16k"}]' || '[{"api":36,"variants":"debug release","target":"google_apis"},{"api":36,"variants":"debug release","target":"google_apis_ps16k"},{"api":35,"variants":"debug","target":"google_apis_ps16k"}]') }}
+        # Explicit Android 16 images run a debug/release pair; Android 15 stays debug.
+        # With all images, reused builds remain debug-only unless full is requested.
+        include: >-
+          ${{ fromJSON(
+            inputs.emulator_image == 'android16-4k' && '[{"api":36,"variants":"debug release","target":"google_apis"}]' ||
+            inputs.emulator_image == 'android16-16k' && '[{"api":36,"variants":"debug release","target":"google_apis_ps16k"}]' ||
+            inputs.emulator_image == 'android15-16k' && '[{"api":35,"variants":"debug","target":"google_apis_ps16k"}]' ||
+            inputs.reuse_build_run != '' && !inputs.full_emulator_profile && '[{"api":36,"variants":"debug","target":"google_apis"},{"api":36,"variants":"debug","target":"google_apis_ps16k"}]' ||
+            '[{"api":36,"variants":"debug release","target":"google_apis"},{"api":36,"variants":"debug release","target":"google_apis_ps16k"},{"api":35,"variants":"debug","target":"google_apis_ps16k"}]'
+          ) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
