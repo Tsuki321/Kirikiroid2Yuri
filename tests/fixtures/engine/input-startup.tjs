@@ -1,6 +1,15 @@
 var inputOutput = "@@OUTPUT@@/events.txt";
 var inputEvents = [];
-function inputLog(value) { inputEvents.add(value); inputEvents.save(inputOutput); }
+Plugins.link("fstat.dll");
+function inputLog(value) {
+    inputEvents.add(value);
+    // The Android test reads this local file while engine events arrive.
+    // Publish a complete snapshot so a rewrite cannot reset its key counts.
+    var temporary = inputOutput + ".tmp";
+    inputEvents.save(temporary);
+    if (!Storages.moveFile(temporary, inputOutput))
+        throw "Cannot publish input event log";
+}
 class InputWindow extends Window {
     function InputWindow() { super.Window(); }
     function onKeyDown(key, shift) {
