@@ -178,6 +178,119 @@ function ciIntegerUpscaleBenchmark(window, primary, frames, warmupFrames) {
     ciCheck(true, "integer viewport enlargement preserves tile boundaries and final pixels");
     invalidate dest; invalidate source;
 }
+function ciNestedMapPixel(x, y, frame) {
+    var color = ciRenderPattern(x, y);
+    var rgba = [(color >> 16) & 255, (color >> 8) & 255, color & 255, 255];
+    if (x >= 416 && x < 448 && y >= 208 && y < 256) {
+        if (y < 232) return frame ? [192, 96, 32, 255] : [64, 128, 192, 255];
+        var premult = frame ? [32, 48, 64] : [64, 32, 16];
+        // KiriKiri's premultiplied source-over uses the byte complement of
+        // source alpha: S + floor(D * (255 - 128) / 256).
+        for (var channel = 0; channel < 3; ++channel)
+            rgba[channel] = premult[channel] + Math.floor(rgba[channel] * 127 / 256);
+    }
+    return rgba;
+}
+function ciCheckNestedMap(snapshot, cameraX, cameraY, frame, label) {
+    var xs = [0, 15, 16, 79, 80, 159, 160, 319, 320, 479, 480, 638, 639];
+    var ys = [0, 23, 24, 79, 80, 159, 160, 239, 240, 358, 359];
+    for (var yi = 0; yi < ys.count; ++yi)
+        for (var xi = 0; xi < xs.count; ++xi)
+            ciCheckLinearPixel(snapshot, xs[xi], ys[yi],
+                ciNestedMapPixel(xs[xi] + cameraX, ys[yi] + cameraY, frame), 0, label);
+    // Include both halves of the sprite, its edges, and unchanged map pixels
+    // immediately outside the dirty rectangle, also after camera movement.
+    xs = [415, 416, 431, 432, 447, 448]; ys = [207, 208, 231, 232, 255, 256];
+    for (var yi = 0; yi < ys.count; ++yi)
+        for (var xi = 0; xi < xs.count; ++xi)
+            ciCheckLinearPixel(snapshot, xs[xi] - cameraX, ys[yi] - cameraY,
+                ciNestedMapPixel(xs[xi], ys[yi], frame), 0, label);
+    ciCheck(true, label + " preserves clipped world tiles and opaque/premultiplied sprite pixels");
+}
+function ciNestedSnapshotBenchmark(window, primary, frames, warmupFrames) {
+    // A synthetic scrolled world: two image-free binders, a large premultiplied
+    // map, and one animated child. Exact-size capture retains the cached source
+    // texture between frames, unlike the larger-source cropped benchmark.
+    var scene = new Layer(window, primary), snapshot = new Layer(window, primary);
+    scene.type = snapshot.type = ltAddAlpha; scene.face = snapshot.face = dfAddAlpha;
+    scene.visible = snapshot.visible = false;
+    scene.setSize(640, 360); scene.setImageSize(640, 360);
+    snapshot.setSize(640, 360); snapshot.setImageSize(640, 360);
+    scene.fillRect(0, 0, 640, 360, 0); scene.cached = true;
+    var outer = new Layer(window, scene), camera = new Layer(window, outer);
+    outer.type = camera.type = ltBinder;
+    outer.setSize(1280, 960); camera.setSize(1280, 960);
+    var cameraX = 64, cameraY = 96;
+    camera.setPos(-cameraX, -cameraY); outer.visible = camera.visible = true;
+    var map = new Layer(window, camera);
+    map.type = ltAddAlpha; map.face = dfAddAlpha;
+    map.setSize(1280, 960); map.setImageSize(1280, 960); map.visible = true;
+    for (var y = 0; y < 960; y += 80)
+        for (var x = 0; x < 1280; x += 80)
+            map.fillRect(x, y, 80, 80, ciRenderPattern(x, y));
+    var spriteFrames = [];
+    for (var i = 0; i < 2; ++i) {
+        var image = new Layer(window, primary);
+        image.type = ltAddAlpha; image.face = dfAddAlpha; image.visible = false;
+        image.setSize(32, 48); image.setImageSize(32, 48);
+        image.fillRect(0, 0, 32, 24, i ? 0xffc06020 : 0xff4080c0);
+        image.fillRect(0, 24, 32, 24, i ? 0x80203040 : 0x80402010);
+        spriteFrames.add(image);
+    }
+    var sprite = new Layer(window, map);
+    sprite.type = ltAddAlpha; sprite.face = dfAddAlpha;
+    sprite.setSize(32, 48); sprite.setImageSize(32, 48);
+    sprite.setPos(416, 208); sprite.visible = true;
+    sprite.copyRect(0, 0, spriteFrames[0], 0, 0, 32, 48);
+    snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    ciCheckNestedMap(snapshot, cameraX, cameraY, 0, "Initial nested snapshot");
+    var retained = new Layer(window, primary);
+    retained.type = ltAddAlpha; retained.face = dfAddAlpha; retained.visible = false;
+    retained.setSize(640, 360); retained.setImageSize(640, 360);
+    retained.copyRect(0, 0, snapshot, 0, 0, 640, 360);
+    sprite.copyRect(0, 0, spriteFrames[1], 0, 0, 32, 48);
+    snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    ciCheckNestedMap(snapshot, cameraX, cameraY, 1, "Edited nested snapshot");
+    ciCheckNestedMap(retained, cameraX, cameraY, 0, "Retained snapshot after recapture");
+    invalidate retained;
+
+    for (var i = 0; i < warmupFrames; ++i)
+        snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    var started = System.getTickCount();
+    for (var i = 0; i < frames; ++i)
+        snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    ciMessages.add("METRIC render_nested_snapshot_unchanged_ms=" + (System.getTickCount() - started) + " frames=240 warmup=30 width=640 height=360 world=1280x960 binders=2");
+    ciCheckNestedMap(snapshot, cameraX, cameraY, 1, "Unchanged nested snapshot");
+
+    // Swap prepainted frames so timing covers a small pixel update and capture,
+    // without regenerating the tile pattern or running sprite drawing code.
+    for (var i = 0; i < warmupFrames; ++i) {
+        sprite.copyRect(0, 0, spriteFrames[i % 2], 0, 0, 32, 48);
+        snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    }
+    started = System.getTickCount();
+    for (var i = 0; i < frames; ++i) {
+        sprite.copyRect(0, 0, spriteFrames[i % 2], 0, 0, 32, 48);
+        snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    }
+    ciMessages.add("METRIC render_nested_snapshot_small_update_ms=" + (System.getTickCount() - started) + " frames=240 warmup=30 width=640 height=360 dirty_width=32 dirty_height=48 binders=2");
+    ciCheckNestedMap(snapshot, cameraX, cameraY, (frames - 1) % 2, "Animated nested snapshot");
+
+    for (var i = 0; i < warmupFrames; ++i) {
+        camera.setPos(-(++cameraX), -cameraY);
+        snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    }
+    started = System.getTickCount();
+    for (var i = 0; i < frames; ++i) {
+        camera.setPos(-(++cameraX), -cameraY);
+        snapshot.piledCopy(0, 0, scene, 0, 0, 640, 360);
+    }
+    ciMessages.add("METRIC render_nested_snapshot_scroll_ms=" + (System.getTickCount() - started) + " frames=240 warmup=30 width=640 height=360 world=1280x960 scroll_step=1 binders=2");
+    ciCheckNestedMap(snapshot, cameraX, cameraY, (frames - 1) % 2, "Scrolled nested snapshot");
+    invalidate sprite;
+    for (var i = 0; i < spriteFrames.count; ++i) invalidate spriteFrames[i];
+    invalidate map; invalidate camera; invalidate outer; invalidate snapshot; invalidate scene;
+}
 function ciRenderingBenchmark() {
     var width = 1280, height = 720, frames = 240, warmupFrames = 24;
     var window = new Window(); window.setSize(width, height);
@@ -216,6 +329,7 @@ function ciRenderingBenchmark() {
     ciMessages.add("METRIC render_affine_copy_linear_ms=" + linearTimes[1] + " frames=240 width=1280 height=720 filter=linear");
     ciCheckLinearResize(window, primary);
     ciIntegerUpscaleBenchmark(window, primary, frames, warmupFrames);
+    ciNestedSnapshotBenchmark(window, primary, frames, 30);
 
     // Direct writes must retain the temporary-image fallback when source and
     // destination overlap. A unique column pattern exposes overwritten reads.
