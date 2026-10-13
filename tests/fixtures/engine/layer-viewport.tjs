@@ -69,6 +69,10 @@ class LayerViewport {
     }
     function capture(target, scratch, w, h) {
         // Caller-owned target and scratch layers must use the viewport's format.
+        // A completed source cache does not mean the display contains its pixels.
+        // Capture may consume pending edits, or another reader may already have
+        // completed them. Keep the display pending until render updates it.
+        _dirty = true;
         scratch.setSize(root.width, root.height);
         scratch.setImageSize(root.width, root.height);
         scratch.piledCopy(0, 0, root, 0, 0, root.width, root.height);

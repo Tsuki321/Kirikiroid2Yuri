@@ -188,6 +188,53 @@ ciCheckPremultViewportPixels(ciPremultView.snapshot, 1, true, "Edited viewport s
 ciCheckPremultViewportPixels(ciPremultView.display, 2, true, "Edited 2x viewport");
 ciCheck(!ciPremultView.render() && ciPremultView.renderedFrames == ciPremultFrames + 1,
     "premultiplied viewport skips unchanged frames after a pixel edit");
+
+// Capturing the source completes its cache without updating the displayed image.
+// Exercise both direct shared-texture display and the scaled snapshot path.
+for (var ciCaptureScale = 1; ciCaptureScale <= 2; ++ciCaptureScale) {
+    ciPremultView.setScreenRect(0, 0, 4 * ciCaptureScale, 3 * ciCaptureScale);
+    ciPremultChild.fillRect(1, 0, 1, 1, 0x80402010);
+    ciCheck(ciPremultView.render(), "capture refresh establishes the previous displayed frame");
+    ciCheckPremultViewportPixels(ciPremultView.display, ciCaptureScale, false,
+        "Display before capture at " + ciCaptureScale + "x");
+    var ciCaptureFrames = ciPremultView.renderedFrames;
+
+    ciPremultChild.fillRect(1, 0, 1, 1, 0x80204030);
+    ciCheck(ciPremultView.root.cacheDirty, "capture refresh starts with an unrendered child edit");
+    ciPremultView.capture(ciPremultCapture, ciPremultScratch, 8, 6);
+    ciCheck(!ciPremultView.root.cacheDirty && ciPremultView.renderedFrames == ciCaptureFrames,
+        "capture completes the source cache without rendering the display");
+    ciCheckPremultViewportPixels(ciPremultScratch, 1, true, "Updated capture scratch");
+    ciCheckPremultViewportPixels(ciPremultCapture, 2, true, "Updated capture target");
+    ciCheckPremultViewportPixels(ciPremultView.display, ciCaptureScale, false,
+        "Retained display after capture at " + ciCaptureScale + "x");
+    // A second capture sees a clean source and must preserve the pending refresh.
+    ciPremultView.capture(ciPremultCapture, ciPremultScratch, 8, 6);
+    ciCheck(ciPremultView.render() && ciPremultView.renderedFrames == ciCaptureFrames + 1
+        && !ciPremultView.root.cacheDirty,
+        "repeated captures preserve one display refresh without resizing or forcing");
+    ciCheckPremultViewportPixels(ciPremultView.display, ciCaptureScale, true,
+        "Display refreshed after capture at " + ciCaptureScale + "x");
+    ciCheck(!ciPremultView.render() && ciPremultView.renderedFrames == ciCaptureFrames + 1,
+        "unchanged frames are skipped after the capture refresh");
+
+    // cacheDirty describes the source cache, not a per-reader generation. An
+    // independent capture can clear it before this helper captures the source.
+    ciPremultChild.fillRect(1, 0, 1, 1, 0x80402010);
+    ciPremultScratch.piledCopy(0, 0, ciPremultView.root, 0, 0, 4, 3);
+    ciCheck(!ciPremultView.root.cacheDirty, "another reader can complete the edited source cache");
+    ciCheckPremultViewportPixels(ciPremultScratch, 1, false, "Independently captured pixels");
+    ciCheckPremultViewportPixels(ciPremultView.display, ciCaptureScale, true,
+        "Display retained after another reader completes the source");
+    ciPremultView.capture(ciPremultCapture, ciPremultScratch, 8, 6);
+    ciCheck(ciPremultView.render() && ciPremultView.renderedFrames == ciCaptureFrames + 2,
+        "capture refreshes the display even when another reader already completed the source");
+    ciCheckPremultViewportPixels(ciPremultCapture, 2, false, "Capture after an independent reader");
+    ciCheckPremultViewportPixels(ciPremultView.display, ciCaptureScale, false,
+        "Display refreshed after an independent reader");
+    ciCheck(!ciPremultView.render() && ciPremultView.renderedFrames == ciCaptureFrames + 2,
+        "display refresh resumes skipping after independently completed source pixels");
+}
 invalidate ciPremultChild;
 invalidate ciPremultInner;
 invalidate ciPremultOuter;
