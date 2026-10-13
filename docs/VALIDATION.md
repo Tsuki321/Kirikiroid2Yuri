@@ -45,8 +45,22 @@ the reused APK build was `38197108281`. Each variant also passed the exact
 premultiplied viewport pixels and derived text-renderer constructor checks through
 local, document-backed, and both compiled startup paths.
 
+The [capture-refresh pair](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38399046282)
+reused build `38390113781` at `ffda3ac` on API 36 / 4 KB. Each variant passed
+six engine cases, 1,542 engine assertions, 22 instrumentation tests, native
+controls, and same-game library return/relaunch. This includes 34 new checks
+through each of the four startup paths: capture and independent readers may
+complete the source cache before the display refreshes, while repeated captures
+must preserve that pending refresh. Both 1x and 2x displays preserve exact
+premultiplied RGBA pixels and resume skipping unchanged frames after refresh.
+
 The prior API 36 / 16 KB pair passed. The API 35 / 16 KB run was interrupted
-by an Android system-server crash after 11 engine cases and still needs a rerun.
+by an Android system-server crash after 11 engine cases. The
+[latest API 35 retry](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38400999182)
+installed both APKs but aborted before tests when `system_server` crashed in ART
+method resolution while polling input-device battery state. Its tombstone identifies
+the Android `android.display` thread; instrumentation reported `System has crashed`.
+API 35 coverage remains pending.
 These results do not establish real-game loading smoothness or frame rate.
 
 Each full configuration runs 26 engine cases: local and document-tree storage,
