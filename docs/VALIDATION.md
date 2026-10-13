@@ -36,6 +36,19 @@ The images run
 on x86-64 hosts and execute the ARM64 APK through Android's native bridge; this
 does not replace testing on physical ARM64 devices and their GPU drivers.
 
+The [paired API 36 / 4 KB rerun](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38245745589)
+installed debug and release sequentially on one emulator. Both passed all 26
+engine cases, 23 instrumentation tests, native controls, and library return. This
+closed the earlier debug controls failure after the test fixture began publishing
+input-event snapshots atomically. The application source matched `71f8d3d`;
+the reused APK build was `38197108281`. Each variant also passed the exact
+premultiplied viewport pixels and derived text-renderer constructor checks through
+local, document-backed, and both compiled startup paths.
+
+The prior API 36 / 16 KB pair passed. The API 35 / 16 KB run was interrupted
+by an Android system-server crash after 11 engine cases and still needs a rerun.
+These results do not establish real-game loading smoothness or frame rate.
+
 Each full configuration runs 26 engine cases: local and document-tree storage,
 their cold launches from compiled `startup.tjs`, four movie cases, two archive
 cases, two archive-launch cases, four transition cases, two audio-filter cases,
