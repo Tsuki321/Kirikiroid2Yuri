@@ -56,11 +56,13 @@ premultiplied RGBA pixels and resume skipping unchanged frames after refresh.
 
 The prior API 36 / 16 KB pair passed. The API 35 / 16 KB run was interrupted
 by an Android system-server crash after 11 engine cases. The
-[latest API 35 retry](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38400999182)
-installed both APKs but aborted before tests when `system_server` crashed in ART
-method resolution while polling input-device battery state. Its tombstone identifies
-the Android `android.display` thread; instrumentation reported `System has crashed`.
-API 35 coverage remains pending.
+[latest API 35 retry](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38400999182/attempts/2)
+passed all 26 engine cases, 2,380 engine assertions, 23 instrumentation tests,
+native controls, and the full library return/switch/relaunch checks using the
+same `ffda3ac` debug APK. Its four startup paths include all 136 capture-refresh
+assertions. The first attempt had aborted before tests when `system_server`
+crashed in ART method resolution on Android's `android.display` thread;
+that platform failure remains recorded separately from the successful retry.
 These results do not establish real-game loading smoothness or frame rate.
 
 Each full configuration runs 26 engine cases: local and document-tree storage,
