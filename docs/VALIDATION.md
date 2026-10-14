@@ -180,6 +180,28 @@ cases, including cropping, margins, one unchanged axis, and both overlap directi
 Both compiler suites and all five Android configurations passed in
 [build 38107977254](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38107977254).
 
+The [2026-10-14 nested-map comparison](https://github.com/Tsuki321/Kirikiroid2Yuri/actions/runs/38566381558)
+compared `3f4cc30` with `ffda3ac` using the same scripts and fixtures on one
+API 36 / 4 KB emulator. All eight trials passed 94 assertions each, including
+clipped map tiles, opaque and premultiplied sprite pixels, retained snapshots,
+and pixels around the sprite's dirty rectangle. Each APK had one excluded warmup
+and three measured trials with alternating pair order. Median batch times:
+
+| Operation | Workload | Before (ms) | After (ms) |
+| --- | --- | ---: | ---: |
+| Unchanged nested capture | 240 captures | 251 | 0* |
+| Capture after 32x48 sprite updates | 240 captures | 251 | 104 |
+| Capture while scrolling one pixel | 240 captures | 264 | 259 |
+| Exact 3x viewport enlargement | 240 copies | 9,280 | 298 |
+
+The nested scene uses a 640x360 viewport over a 1280x960 world and two binder
+layers. Sprite updates improved from 1.05 to 0.43 ms per capture; scrolling stayed
+within the overlapping trial ranges. `0*` means the unchanged-capture batches
+measured below the millisecond timer's resolution, not that they require no work.
+Fractional stretch and affine medians improved only about 3%, so this run does
+not establish a general zoom improvement. These are warmed synthetic operation
+costs under ARM translation, not whole-game FPS or cold loading measurements.
+
 ## Dependency reproducibility
 
 `script/dependencies.lock.json` pins the source, binary, and UI asset bundles by
